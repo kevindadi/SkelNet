@@ -89,9 +89,11 @@ python -m skelnet run --arm SKEL --tasks all --reps 3 --rounds 4 --dry-run
 ```
 
 `--dry-run` prints the request budget and prompt shas and calls no model.
-`--out` must be absent or empty (pass `--force` to overwrite); a run directory
-is single-run, so `eval` rebuilds `SUMMARY.json`/`REPORT.md` from the manifest's
-selected tasks and reps only.
+`--out` must be absent or empty. `--force` only clears a *previous run
+directory* (one carrying a `MANIFEST.json`) and refuses to clear the repository,
+the current directory, the home directory, the filesystem root, symlinks, or
+their ancestors. A run directory is single-run, so `eval` rebuilds
+`SUMMARY.json`/`REPORT.md` from the manifest's selected tasks and reps only.
 
 ## Report columns
 

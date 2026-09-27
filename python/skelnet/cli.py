@@ -94,6 +94,66 @@ def default_oracle_factory(*, timeout: float, runner=None):
     return factory
 
 
+def _is_ancestor(ancestor: Path, descendant: Path) -> bool:
+    """True when `ancestor` is `descendant` or a strict ancestor of it."""
+    try:
+        descendant.relative_to(ancestor)
+        return True
+    except ValueError:
+        return False
+
+
+def _unsafe_to_clear(out: Path) -> str | None:
+    """A human reason why `out` must not be recursively deleted, or None."""
+    if out.is_symlink():
+        return "it is a symlink"
+    resolved = out.resolve()
+    protected = {
+        "the repository": repo_root(),
+        "the current directory": Path.cwd(),
+        "the home directory": Path.home(),
+        "the filesystem root": Path(resolved.anchor),
+    }
+    for label, path in protected.items():
+        try:
+            target = path.resolve()
+        except OSError:  # pragma: no cover - unresolvable protected path
+            target = path
+        if resolved == target:
+            return f"it is {label}"
+        # `out` is an ancestor of a protected path (so clearing it would
+        # destroy that path).
+        if _is_ancestor(resolved, target):
+            return f"it is an ancestor of {label}"
+    return None
+
+
+def _prepare_out(out: Path, *, force: bool) -> None:
+    """Validate/clear the output directory before a run.
+
+    `--force` only clears a *previous run directory* (one that carries a
+    MANIFEST.json) and refuses the repository, the current directory, the home
+    directory, the filesystem root, symlinks, and their ancestors.
+    """
+    out = Path(out)
+    if (out.exists() or out.is_symlink()) and not out.is_dir():
+        raise SystemExit(f"output path {out} exists and is not a directory")
+    if not out.exists() or not any(out.iterdir()):
+        out.mkdir(parents=True, exist_ok=True)
+        return
+    if not force:
+        raise SystemExit(
+            f"output directory {out} is not empty; pass --force to overwrite")
+    reason = _unsafe_to_clear(out)
+    if reason:
+        raise SystemExit(f"refusing to clear {out}: {reason}")
+    if not (out / "MANIFEST.json").exists():
+        raise SystemExit(
+            f"refusing to clear {out}: no MANIFEST.json (not a previous run directory)")
+    shutil.rmtree(out)
+    out.mkdir(parents=True, exist_ok=True)
+
+
 def cmd_run(args: argparse.Namespace, *, client_factory=None,
             oracle_factory=None, oracle_runner=None) -> int:
     if args.arm == "G0" and args.rust_mode == "codegen":
@@ -121,12 +181,7 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         return 0
 
     out = Path(args.out)
-    if out.exists() and any(out.iterdir()):
-        if not args.force:
-            raise SystemExit(
-                f"output directory {out} is not empty; pass --force to overwrite")
-        shutil.rmtree(out)
-    out.mkdir(parents=True, exist_ok=True)
+    _prepare_out(out, force=args.force)
     started_at = time.time()
     audit = AuditLog(out / "audit.jsonl", raw_dir=out / "raw")
     backend = Backend(timeout=args.timeout)

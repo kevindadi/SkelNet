@@ -265,6 +265,8 @@ def test_run_force_overwrites_out(tmp_path):
     out = tmp_path / "force"
     out.mkdir()
     (out / "stale.txt").write_text("x", encoding="utf-8")
+    # Only a previous run directory (with a MANIFEST.json) may be cleared.
+    (out / "MANIFEST.json").write_text("{}", encoding="utf-8")
     args = cli.build_parser().parse_args([
         "run", "--arm", "G0", "--tasks", "lock-order/abba_2lock", "--reps", "1",
         "--rounds", "1", "--out", str(out), "--force"])
@@ -272,6 +274,55 @@ def test_run_force_overwrites_out(tmp_path):
                      oracle_factory=lambda task_dir, terminal: FakeOracle(True))
     assert rc == 0
     assert not (out / "stale.txt").exists()
+
+
+def test_force_refuses_current_directory(tmp_path, monkeypatch):
+    work = tmp_path / "work"
+    work.mkdir()
+    sentinel = work / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+    (work / "MANIFEST.json").write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(work)
+    args = cli.build_parser().parse_args([
+        "run", "--arm", "G0", "--tasks", "lock-order/abba_2lock", "--reps", "1",
+        "--rounds", "1", "--out", ".", "--force"])
+    with pytest.raises(SystemExit):
+        cli.cmd_run(args, client_factory=lambda spec, o: RecordingClient([RUST]),
+                    oracle_factory=lambda task_dir, terminal: FakeOracle(True))
+    assert sentinel.exists()
+
+
+def test_force_refuses_repo_and_ancestor(tmp_path, monkeypatch):
+    fakerepo = tmp_path / "fakerepo"
+    fakerepo.mkdir()
+    sentinel = fakerepo / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+    (fakerepo / "MANIFEST.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(cli, "repo_root", lambda: fakerepo)
+    with pytest.raises(SystemExit):
+        cli._prepare_out(fakerepo, force=True)
+    assert sentinel.exists()
+    with pytest.raises(SystemExit):
+        cli._prepare_out(fakerepo.parent, force=True)
+    assert sentinel.exists()
+
+
+def test_force_refuses_dir_without_manifest(tmp_path):
+    out = tmp_path / "nonrun"
+    out.mkdir()
+    sentinel = out / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        cli._prepare_out(out, force=True)
+    assert sentinel.exists()
+
+
+def test_out_regular_file_is_rejected(tmp_path):
+    out = tmp_path / "afile"
+    out.write_text("x", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        cli._prepare_out(out, force=False)
+
 
 
 def test_eval_summary_only_selected_cells(tmp_path):
