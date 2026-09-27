@@ -345,16 +345,21 @@ def _report_markdown(summaries: list[dict]) -> str:
              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for s in summaries:
         cells = s.get("cells", [])
+        # G0 writes Rust directly: it has no check/verify/evidence/rounds stage.
+        is_g0 = s.get("arm") == "G0"
         rounds = [c.get("rounds_used", 0) for c in cells if c.get("rounds_used")]
-        mean_rounds = f"{(sum(rounds) / len(rounds)):.1f}" if rounds else "-"
+        mean_rounds = "-" if is_g0 else (
+            f"{(sum(rounds) / len(rounds)):.1f}" if rounds else "-")
+        verify = "-" if is_g0 else _rate(cells, lambda c: c.get("accepted"))
+        evidence = "-" if is_g0 else _rate(cells, lambda c: c.get("evidence_sufficient"))
         lines.append(
             f"| {s.get('run_id', s.get('arm', '?'))} | {s.get('arm', '?')} | "
             f"{s.get('model', '?')} | {len(cells)} | "
             f"{_rate(cells, lambda c: c.get('parse_ok'))} | "
             f"{_rate(cells, lambda c: c.get('check_ok'))} | "
-            f"{_rate(cells, lambda c: c.get('accepted'))} | "
+            f"{verify} | "
             f"{mean_rounds} | "
-            f"{_rate(cells, lambda c: c.get('evidence_sufficient'))} | "
+            f"{evidence} | "
             f"{_rate_or_dash(cells, lambda c: (c.get('oracle') or {}).get('run_ok'))} | "
             f"{_rate_or_dash(cells, lambda c: (c.get('oracle') or {}).get('functional_ok'))} |")
     return "\n".join(lines) + "\n"

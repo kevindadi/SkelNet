@@ -96,9 +96,12 @@ run directories can be compared in one call.
 
 - **parse rate**: first candidate parsed (SKEL: no `S0xx`; CIR: ConcIR JSON
   parsed; G0: non-empty Rust).
-- **check pass rate**: SKEL: `skelnet check` passed on any attempt; CIR/G0:
-  the artifact was well-formed (same as parse).
+- **check pass rate**: SKEL: `skelnet check` passed on any attempt; CIR: any
+  round returned a semantic result that is not `INVALID` (the same gate as
+  SKEL's "passed check"); G0: the artifact was well-formed (same as parse).
 - **verify pass rate**: `skelnet verify` / `concir explore` returned PASS.
+  G0 has no verification stage, so its verify pass / evidence / mean rounds
+  columns show `-`.
 - **mean rounds**: mean generation attempts used (SKEL/CIR).
 - **evidence**: `evidence_sufficient` (PASS with every property PASS).
 - **run ok**: the oracle's `run_ok` (built, exited 0, no timeout).

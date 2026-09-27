@@ -237,3 +237,15 @@ def test_report_columns(tmp_path):
     # The first column is the run id, not a duplicate of the arm.
     assert row.startswith(f"| {summary['run_id']} |")
     assert "| SKEL |" in row
+
+
+def test_report_g0_has_na_columns(tmp_path):
+    out, _ = _run_arm("G0", [RUST], tmp_path)
+    summary = json.loads((out / "SUMMARY.json").read_text())
+    table = cli._report_markdown([summary])
+    row = next(line for line in table.splitlines() if line.startswith("| run_"))
+    cols = [c.strip() for c in row.strip().strip("|").split("|")]
+    # run, arm, model, cells, parse, check, verify, mean, evidence, run ok, functional
+    assert cols[6] == "-"  # verify pass (no verification stage in G0)
+    assert cols[7] == "-"  # mean rounds
+    assert cols[8] == "-"  # evidence

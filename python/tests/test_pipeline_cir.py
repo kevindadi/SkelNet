@@ -1,9 +1,45 @@
 """Fake-LLM CIR ablation: code-block extraction, verification, then Rust."""
 
+import json
+
 from skelnet.backend import Backend, repo_root
 from skelnet.oracle import FakeOracle
 from skelnet.pipeline import extract_cir, run_cir_cell
 from skelnet.providers import ScriptedProvider
+
+TASK = "lock-order/abba_2lock"
+
+
+def _gold() -> dict:
+    return json.loads(
+        (repo_root() / "benchmarks" / "tasks" / TASK / "gold.cir.json").read_text())
+
+
+def _contract():
+    return repo_root() / "benchmarks" / "tasks" / TASK / "contract.json"
+
+
+def _invalid() -> dict:
+    program = _gold()
+    for module in program["modules"]:
+        for fn in module["functions"]:
+            if fn["name"] == "t1":
+                fn["body"] = [s for s in fn["body"]
+                              if not (s.get("kind") == "mutex_unlock"
+                                      and s.get("resource") == "main::b")]
+    return program
+
+
+def _buggy() -> dict:
+    program = _gold()
+    for module in program["modules"]:
+        for fn in module["functions"]:
+            if fn["name"] == "t2":
+                for stmt in fn["body"]:
+                    if stmt.get("kind") in ("mutex_lock", "mutex_unlock"):
+                        stmt["resource"] = ("main::b" if stmt["resource"] == "main::a"
+                                            else "main::a")
+    return program
 
 
 def test_extract_cir_handles_fences_and_bare_json():
@@ -39,6 +75,26 @@ def test_cir_arm_extracts_fenced_reply(tmp_path):
         oracle=FakeOracle(True), workdir=tmp_path, rounds=4)
     assert result.accepted, result.history
     assert result.parse_ok
+
+
+def test_cir_check_ok_is_any_non_invalid_round(tmp_path):
+    provider = ScriptedProvider([{"text": json.dumps(_invalid())},
+                                 {"text": json.dumps(_buggy())}])
+    result = run_cir_cell(
+        task=TASK, requirements="two workers, two locks", contract_path=_contract(),
+        provider=provider, backend=Backend(), oracle=FakeOracle(True),
+        workdir=tmp_path, rounds=2)
+    assert result.check_ok is True  # round 2 is FAIL, not INVALID
+    assert not result.accepted
+
+
+def test_cir_check_ok_false_for_process_errors(tmp_path):
+    provider = ScriptedProvider([{"text": "not json"}, {"text": "not json"}])
+    result = run_cir_cell(
+        task=TASK, requirements="two workers, two locks", contract_path=_contract(),
+        provider=provider, backend=Backend(), oracle=FakeOracle(True),
+        workdir=tmp_path, rounds=2)
+    assert result.check_ok is False
 
 
 def test_cir_codegen_rust_mode(tmp_path):

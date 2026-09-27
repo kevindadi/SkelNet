@@ -180,7 +180,10 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
         verify = backend.verify_cir(cir_path, contract_path)
         if attempt == 1:
             result.parse_ok = bool(candidate) and verify.kind == "semantic"
-            result.check_ok = result.parse_ok
+        # Same gate as SKEL's "passed check on any attempt": a semantic result
+        # that is not INVALID (UNSUPPORTED/FAIL/UNKNOWN all count).
+        if verify.kind == "semantic" and verify.outcome != "INVALID":
+            result.check_ok = True
         result.history.append({"attempt": attempt, "stage": "verify",
                                "outcome": verify.outcome, "complete": verify.complete})
         if verify.outcome == "PASS":
