@@ -68,8 +68,9 @@ def _run_codegen(arm: str, texts: list[str], tmp_path: Path, name: str) -> Path:
     args = cli.build_parser().parse_args([
         "run", "--arm", arm, "--tasks", TASK, "--reps", "1", "--rounds", "2",
         "--rust-mode", "codegen", "--out", str(out)])
-    rc = cli.cmd_run(args, client_factory=lambda spec, o: _Client(texts),
-                     oracle=RustOracle(runner=_runner()))
+    rc = cli.cmd_run(
+        args, client_factory=lambda spec, o: _Client(texts),
+        oracle_factory=lambda task_dir, terminal: RustOracle(runner=_runner()))
     assert rc == 0
     return out
 

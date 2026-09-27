@@ -80,7 +80,8 @@ def _system_sha(assets) -> str:
     return hashlib.sha256(_joined_system_prompt(assets).encode("utf-8")).hexdigest()
 
 
-def cmd_run(args: argparse.Namespace, *, client_factory=None, oracle=None) -> int:
+def cmd_run(args: argparse.Namespace, *, client_factory=None,
+            oracle_factory=None) -> int:
     root = repo_root()
     tasks = _select_tasks(root, args.tasks)
     budget = _budget(args.arm, len(tasks), args.reps, args.rounds)
@@ -115,8 +116,10 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None, oracle=None) -> in
         requirements = reqs.read_text(encoding="utf-8") if reqs.exists() else task
         contract = task_dir / "contract.json"
         terminal = read_terminal(task_dir)
-        task_oracle = oracle if oracle is not None else RustOracle(
-            terminal=terminal, timeout=args.timeout)
+        # The factory receives the task and its terminal line, so the terminal
+        # wiring is exercised (and testable) on every real run.
+        task_oracle = (oracle_factory(task_dir, terminal) if oracle_factory is not None
+                       else RustOracle(terminal=terminal, timeout=args.timeout))
         for rep in range(args.reps):
             workdir = out / "cells" / task / str(rep)
             workdir.mkdir(parents=True, exist_ok=True)

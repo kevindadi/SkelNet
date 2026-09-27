@@ -3,12 +3,13 @@
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from skelnet import cli, prompts
 from skelnet.backend import repo_root
-from skelnet.oracle import FakeOracle
+from skelnet.oracle import FakeOracle, RustOracle
 
 BUGGY = """```skel
 skeleton abba_bug;
@@ -84,7 +85,8 @@ def _run_arm(arm: str, responses: list[str], tmp_path: Path, *,
 
     out = tmp_path / f"run_{arm}"
     args = _args(arm, out, rounds=rounds, reps=reps)
-    rc = cli.cmd_run(args, client_factory=factory, oracle=FakeOracle(True))
+    rc = cli.cmd_run(args, client_factory=factory,
+                     oracle_factory=lambda task_dir, terminal: FakeOracle(True))
     assert rc == 0
     return out, created[0]
 
@@ -175,6 +177,45 @@ def test_audit_rounds_and_cells(tmp_path):
             assert event["system_prompt_assets"]
             assert event["system_sha256"]
         assert len(cell_events[1]["system_prompt_assets"]) == 2
+
+
+def test_terminal_wired_through_cmd_run(tmp_path):
+    seen: dict[str, str | None] = {}
+
+    def factory(task_dir, terminal):
+        seen[Path(task_dir).name] = terminal
+        return FakeOracle(True)
+
+    out = tmp_path / "run_term"
+    args = cli.build_parser().parse_args([
+        "run", "--arm", "G0", "--tasks", "*", "--reps", "1", "--rounds", "1",
+        "--out", str(out)])
+    rc = cli.cmd_run(args, client_factory=lambda spec, o: RecordingClient([]),
+                     oracle_factory=factory)
+    assert rc == 0
+    assert seen["abba_2lock"] == "DONE t1=1 t2=1"
+    assert seen["rwlock_unsupported"] is None
+
+
+def test_real_oracle_terminal_pass_through_cmd_run(tmp_path):
+    def runner(cmd, cwd, timeout):
+        if "build" in cmd:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="DONE t1=1 t2=1\n", stderr="")
+
+    out = tmp_path / "run_pass"
+    args = cli.build_parser().parse_args([
+        "run", "--arm", "G0", "--tasks", "lock-order/abba_2lock", "--reps", "1",
+        "--rounds", "1", "--out", str(out)])
+    rc = cli.cmd_run(
+        args, client_factory=lambda spec, o: RecordingClient([RUST]),
+        oracle_factory=lambda task_dir, terminal: RustOracle(
+            terminal=terminal, runner=runner))
+    assert rc == 0
+    result = json.loads(
+        (out / "cells" / "lock-order" / "abba_2lock" / "0" / "result.json").read_text())
+    assert result["oracle"]["terminal_check"] == "pass"
+    assert result["oracle"]["functional_ok"] is True
 
 
 def test_report_columns(tmp_path):
