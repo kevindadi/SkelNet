@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import hashlib
 import json
 import os
 import subprocess
@@ -71,6 +72,14 @@ def _asset_sha(asset: str) -> str | None:
     return sha256_file(path)
 
 
+def _joined_system_prompt(assets) -> str:
+    return prompts.PROMPT_SEPARATOR.join(prompts.read_asset(a) for a in assets)
+
+
+def _system_sha(assets) -> str:
+    return hashlib.sha256(_joined_system_prompt(assets).encode("utf-8")).hexdigest()
+
+
 def cmd_run(args: argparse.Namespace, *, client_factory=None, oracle=None) -> int:
     root = repo_root()
     tasks = _select_tasks(root, args.tasks)
@@ -81,8 +90,12 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None, oracle=None) -> in
             **budget,
             "dry_run": True,
             "prompt_routes": {
-                stage: {"asset": asset, "sha256": _asset_sha(asset)}
-                for stage, asset in routes.items()
+                stage: {
+                    "assets": list(assets),
+                    "sha256": [_asset_sha(a) for a in assets],
+                    "system_sha256": _system_sha(assets),
+                }
+                for stage, assets in routes.items()
             },
             "prompts": prompts.prompt_asset_record(),
         }, indent=2))

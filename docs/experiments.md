@@ -15,16 +15,21 @@ restored later if needed.
 
 ## Prompts (arm × stage)
 
-Each `(arm, stage)` maps to one system-prompt asset (`prompts.py::PROMPT_ROUTES`):
+Each `(arm, stage)` maps to an **ordered tuple** of system-prompt assets
+(`prompts.py::PROMPT_ROUTES`); the tuple is joined with the fixed separator
+`"\n\n---\n\n"`. The feedback stage carries the generation template first (the
+model still needs the DSL grammar / ConcIR schema) and the feedback-reading
+template second:
 
 | arm | generate | feedback | rust |
 | --- | --- | --- | --- |
-| `SKEL` | `skel_generation_v1.md` | `skel_feedback_v1.md` | `rust_from_skel_v1.md` |
-| `CIR` | `concir_generation_v4.md` | `concir_feedback_v1.md` | `rust_from_cir_v2.md` |
+| `SKEL` | `skel_generation_v1.md` | `skel_generation_v1.md` + `skel_feedback_v1.md` | `rust_from_skel_v1.md` |
+| `CIR` | `concir_generation_v4.md` | `concir_generation_v4.md` + `concir_feedback_v1.md` | `rust_from_cir_v2.md` |
 | `G0` | `rust_generation_v1.md` | — | — |
 
 A missing route raises; the workflow never falls back to another arm's prompt.
-`--dry-run` prints the routed assets and their sha256 for the arm.
+`--dry-run` prints, per stage, the ordered asset list, each asset's sha256, and
+the concatenated `system_sha256`.
 
 ## Terminal line
 

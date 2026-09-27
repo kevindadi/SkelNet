@@ -28,25 +28,30 @@ ASSETS = (
     RUST_GENERATION_ASSET,
 )
 
-# Explicit arm x stage -> system-prompt asset. A missing route is an error; the
-# workflow never silently falls back to another arm's prompt.
+# Explicit arm x stage -> ordered system-prompt assets. A missing route is an
+# error; the workflow never silently falls back to another arm's prompt. A
+# feedback stage carries the generation template first (the model still needs
+# the DSL grammar / ConcIR schema), then the feedback-reading template.
 STAGE_GENERATE = "generate"
 STAGE_FEEDBACK = "feedback"
 STAGE_RUST = "rust"
 
-PROMPT_ROUTES: dict[tuple[str, str], str] = {
-    ("SKEL", STAGE_GENERATE): SKEL_GENERATION_ASSET,
-    ("SKEL", STAGE_FEEDBACK): SKEL_FEEDBACK_ASSET,
-    ("SKEL", STAGE_RUST): RUST_FROM_SKEL_ASSET,
-    ("CIR", STAGE_GENERATE): CIR_GENERATION_ASSET,
-    ("CIR", STAGE_FEEDBACK): CIR_FEEDBACK_ASSET,
-    ("CIR", STAGE_RUST): RUST_FROM_CIR_ASSET,
-    ("G0", STAGE_GENERATE): RUST_GENERATION_ASSET,
+# Fixed separator used when concatenating an ordered template tuple.
+PROMPT_SEPARATOR = "\n\n---\n\n"
+
+PROMPT_ROUTES: dict[tuple[str, str], tuple[str, ...]] = {
+    ("SKEL", STAGE_GENERATE): (SKEL_GENERATION_ASSET,),
+    ("SKEL", STAGE_FEEDBACK): (SKEL_GENERATION_ASSET, SKEL_FEEDBACK_ASSET),
+    ("SKEL", STAGE_RUST): (RUST_FROM_SKEL_ASSET,),
+    ("CIR", STAGE_GENERATE): (CIR_GENERATION_ASSET,),
+    ("CIR", STAGE_FEEDBACK): (CIR_GENERATION_ASSET, CIR_FEEDBACK_ASSET),
+    ("CIR", STAGE_RUST): (RUST_FROM_CIR_ASSET,),
+    ("G0", STAGE_GENERATE): (RUST_GENERATION_ASSET,),
 }
 
 
-def route(arm: str, stage: str) -> str:
-    """Return the system-prompt asset for an arm x stage, or raise."""
+def route(arm: str, stage: str) -> tuple[str, ...]:
+    """Return the ordered system-prompt assets for an arm x stage, or raise."""
     key = (arm, stage)
     if key not in PROMPT_ROUTES:
         raise KeyError(
@@ -56,13 +61,13 @@ def route(arm: str, stage: str) -> str:
 
 
 def system_prompt_for(arm: str, stage: str) -> str:
-    """Read the routed system prompt (raises on an unmapped arm x stage)."""
-    return read_asset(route(arm, stage))
+    """Read and concatenate the routed system prompt (raises if unmapped)."""
+    return PROMPT_SEPARATOR.join(read_asset(a) for a in route(arm, stage))
 
 
-def routes_for_arm(arm: str) -> dict[str, str]:
-    """The `{stage: asset}` map for one arm (used by `--dry-run`)."""
-    return {stage: asset for (a, stage), asset in PROMPT_ROUTES.items() if a == arm}
+def routes_for_arm(arm: str) -> dict[str, tuple[str, ...]]:
+    """The `{stage: assets}` map for one arm (used by `--dry-run`)."""
+    return {stage: assets for (a, stage), assets in PROMPT_ROUTES.items() if a == arm}
 
 
 def read_asset(name: str) -> str:

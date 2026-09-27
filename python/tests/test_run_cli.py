@@ -88,18 +88,23 @@ def _run_arm(arm: str, responses: list[str], tmp_path: Path):
     return out, created[0]
 
 
-def _sha(asset: str) -> str:
-    return hashlib.sha256((prompts.PROMPT_ASSET_DIR / asset).read_bytes()).hexdigest()
+def _joined_sha(assets) -> str:
+    text = prompts.PROMPT_SEPARATOR.join(prompts.read_asset(a) for a in assets)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def test_skel_prompt_routing(tmp_path):
     out, client = _run_arm("SKEL", [BUGGY, FIXED, RUST], tmp_path)
     got = [hashlib.sha256(s.encode()).hexdigest() for s in client.system_prompts]
     assert got == [
-        _sha(prompts.SKEL_GENERATION_ASSET),
-        _sha(prompts.SKEL_FEEDBACK_ASSET),
-        _sha(prompts.RUST_FROM_SKEL_ASSET),
+        _joined_sha((prompts.SKEL_GENERATION_ASSET,)),
+        _joined_sha((prompts.SKEL_GENERATION_ASSET, prompts.SKEL_FEEDBACK_ASSET)),
+        _joined_sha((prompts.RUST_FROM_SKEL_ASSET,)),
     ]
+    # The feedback-round system prompt still contains the generation grammar.
+    feedback_prompt = client.system_prompts[1]
+    assert prompts.read_asset(prompts.SKEL_GENERATION_ASSET) in feedback_prompt
+    assert prompts.read_asset(prompts.SKEL_FEEDBACK_ASSET) in feedback_prompt
 
 
 def test_cir_prompt_routing(tmp_path):
@@ -108,16 +113,19 @@ def test_cir_prompt_routing(tmp_path):
     out, client = _run_arm("CIR", ["not json", gold, RUST], tmp_path)
     got = [hashlib.sha256(s.encode()).hexdigest() for s in client.system_prompts]
     assert got == [
-        _sha(prompts.CIR_GENERATION_ASSET),
-        _sha(prompts.CIR_FEEDBACK_ASSET),
-        _sha(prompts.RUST_FROM_CIR_ASSET),
+        _joined_sha((prompts.CIR_GENERATION_ASSET,)),
+        _joined_sha((prompts.CIR_GENERATION_ASSET, prompts.CIR_FEEDBACK_ASSET)),
+        _joined_sha((prompts.RUST_FROM_CIR_ASSET,)),
     ]
+    feedback_prompt = client.system_prompts[1]
+    assert prompts.read_asset(prompts.CIR_GENERATION_ASSET) in feedback_prompt
+    assert prompts.read_asset(prompts.CIR_FEEDBACK_ASSET) in feedback_prompt
 
 
 def test_g0_prompt_routing(tmp_path):
     out, client = _run_arm("G0", [RUST], tmp_path)
     got = [hashlib.sha256(s.encode()).hexdigest() for s in client.system_prompts]
-    assert got == [_sha(prompts.RUST_GENERATION_ASSET)]
+    assert got == [_joined_sha((prompts.RUST_GENERATION_ASSET,))]
 
 
 def test_missing_route_raises():
