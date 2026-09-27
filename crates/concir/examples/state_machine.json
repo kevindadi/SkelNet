@@ -1,0 +1,179 @@
+{
+  "program": "state_machine",
+  "version": "3.5.0",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "mtx",
+          "cv",
+          "state"
+        ],
+        "functions": [
+          "main",
+          "controller",
+          "worker"
+        ]
+      },
+      "requires": {
+        "resources": [],
+        "functions": []
+      },
+      "resources": [
+        {
+          "name": "mtx",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "cv",
+          "kind": "sync",
+          "type": "Condvar",
+          "mode": "Sync"
+        },
+        {
+          "name": "state",
+          "kind": "var",
+          "type": "Var",
+          "base": {
+            "Enum": [
+              "Init",
+              "Running",
+              "Paused",
+              "Stopped"
+            ]
+          },
+          "init": "Init"
+        }
+      ],
+      "protection": [
+        {
+          "var": "state",
+          "lock": "mtx"
+        }
+      ],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "scope",
+              "funcs": ["controller", "worker"]
+            },
+            {
+              "sid": "s2",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "controller",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "mtx"
+            },
+            {
+              "sid": "s2",
+              "kind": "write_shared",
+              "resource": "state",
+              "expr": "Running"
+            },
+            {
+              "sid": "s3",
+              "kind": "condvar_notify_all",
+              "condvar": "cv"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_unlock",
+              "resource": "mtx"
+            },
+            {
+              "sid": "s5",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "worker",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "mtx"
+            },
+            {
+              "sid": "s2",
+              "kind": "read_shared",
+              "resource": "state"
+            },
+            {
+              "sid": "s3",
+              "kind": "switch",
+              "var": "state",
+              "cases": {
+                "Init": "s4",
+                "Running": "s6",
+                "Paused": "s8",
+                "Stopped": "s10"
+              },
+              "default": "s4"
+            },
+            {
+              "sid": "s4",
+              "kind": "condvar_wait",
+              "condvar": "cv",
+              "lock": "mtx"
+            },
+            {
+              "sid": "s5",
+              "kind": "goto",
+              "target": "s2"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "mtx"
+            },
+            {
+              "sid": "s7",
+              "kind": "goto",
+              "target": "s11"
+            },
+            {
+              "sid": "s8",
+              "kind": "condvar_wait",
+              "condvar": "cv",
+              "lock": "mtx"
+            },
+            {
+              "sid": "s9",
+              "kind": "goto",
+              "target": "s2"
+            },
+            {
+              "sid": "s10",
+              "kind": "mutex_unlock",
+              "resource": "mtx"
+            },
+            {
+              "sid": "s11",
+              "kind": "return"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "entry": "main::main"
+}

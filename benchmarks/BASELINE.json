@@ -1,0 +1,662 @@
+{
+  "schema_version": "skelnet-baseline-v1",
+  "source": {
+    "repo": "/Users/kevin/local-repos/ConcPlanVerify",
+    "concir_commit": "a35dc867d6327c772d48bd7c0473a6606fcc467a",
+    "command": "concir-backend explore <gold> contract.json petri",
+    "note": "outcome / complete / per-property outcomes are frozen; states_explored is informational only (loop lowering shape may differ)."
+  },
+  "tasks": [
+    {
+      "task": "atomic-data/atomic_lost_update",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "both-increments",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::c == 2",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 65,
+      "baseline_deviation": false
+    },
+    {
+      "task": "atomic-data/bounded_counter_invariant",
+      "gold": "correct.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "counter-bound",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 31,
+      "baseline_deviation": false
+    },
+    {
+      "task": "atomic-data/counter_overflow_safety",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "counter-bound",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 40,
+      "baseline_deviation": false
+    },
+    {
+      "task": "boundary/async_select_unsupported",
+      "gold": "buggy.cir.json",
+      "outcome": "UNSUPPORTED",
+      "complete": false,
+      "properties": [],
+      "states_explored_reference": 0,
+      "baseline_deviation": false
+    },
+    {
+      "task": "boundary/rwlock_unsupported",
+      "gold": "buggy.cir.json",
+      "outcome": "UNSUPPORTED",
+      "complete": false,
+      "properties": [],
+      "states_explored_reference": 0,
+      "baseline_deviation": false
+    },
+    {
+      "task": "boundary/unbounded_int_unknown",
+      "gold": "correct.cir.json",
+      "outcome": "UNKNOWN",
+      "complete": false,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "UNKNOWN"
+        }
+      ],
+      "states_explored_reference": 65,
+      "baseline_deviation": false
+    },
+    {
+      "task": "channel/bounded_backpressure_lock_held",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::sender completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::receiver completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 20,
+      "baseline_deviation": false
+    },
+    {
+      "task": "channel/rendezvous_both_send",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::s1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: the channel is drained",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 9,
+      "baseline_deviation": false
+    },
+    {
+      "task": "channel/send_while_holding_mutex",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 9,
+      "baseline_deviation": false
+    },
+    {
+      "task": "condvar/bare_wait_no_predicate",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "ready-set",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::waiter completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::notifier completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ready == True",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 43,
+      "baseline_deviation": false
+    },
+    {
+      "task": "condvar/lost_wakeup_notify_before_wait",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "ready-set",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::waiter completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::notifier completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ready == True",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 43,
+      "baseline_deviation": false
+    },
+    {
+      "task": "condvar/notify_one_multi_waiter_wrong_pick",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 holds [main::m] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 74,
+      "baseline_deviation": false
+    },
+    {
+      "task": "condvar/same_cv_different_locks",
+      "gold": "correct.cir.json",
+      "outcome": "UNSUPPORTED",
+      "complete": false,
+      "properties": [],
+      "states_explored_reference": 0,
+      "baseline_deviation": false
+    },
+    {
+      "task": "lock-order/abba_2lock",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t1 holds [main::a, main::b] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t2 holds [main::a, main::b] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 39,
+      "baseline_deviation": false
+    },
+    {
+      "task": "lock-order/cross_module_cycle",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: other::t2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t1 holds [main::a, other::b] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: other::t2 holds [main::a, other::b] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 39,
+      "baseline_deviation": false
+    },
+    {
+      "task": "lock-order/cycle_3lock",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t3 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t1 holds [main::a, main::b] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t2 holds [main::b, main::c] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t3 holds [main::c, main::a] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 286,
+      "baseline_deviation": false
+    },
+    {
+      "task": "lock-order/partial_deadlock_bystander",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "a-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "b-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::a completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::b completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::a holds [main::a, main::b] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::b holds [main::a, main::b] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 149,
+      "baseline_deviation": false
+    },
+    {
+      "task": "lock-order/two_independent_cycles",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: t1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: t2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: t3 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: t4 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t1 holds [a, b] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t2 holds [a, b] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t3 holds [c, d] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::t4 holds [c, d] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 1371,
+      "baseline_deviation": false
+    },
+    {
+      "task": "semaphore/acquire_twice_no_release",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 holds [main::s] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 35,
+      "baseline_deviation": false
+    },
+    {
+      "task": "semaphore/permit_leak",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 holds [main::s] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 23,
+      "baseline_deviation": false
+    },
+    {
+      "task": "semaphore/throttle_n_permits",
+      "gold": "correct.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w3 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 92,
+      "baseline_deviation": false
+    },
+    {
+      "task": "structure/finite_call_loop",
+      "gold": "correct.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "deadlock",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 6,
+      "baseline_deviation": false
+    },
+    {
+      "task": "structure/nested_scope_lock_order",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::outer completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::x1 holds [a, b] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::x2 holds [a, b] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 41,
+      "baseline_deviation": false
+    },
+    {
+      "task": "structure/scope_bound_k_workers",
+      "gold": "correct.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w3 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 116,
+      "baseline_deviation": false
+    },
+    {
+      "task": "structure/scope_worker_abba",
+      "gold": "fixed.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 holds [a, b] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 holds [a, b] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 39,
+      "baseline_deviation": false
+    },
+    {
+      "task": "structure/spawn_join_loop_finite",
+      "gold": "correct.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "deadlock",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 10,
+      "baseline_deviation": false
+    },
+    {
+      "task": "structure/worker_with_payload",
+      "gold": "correct.cir.json",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 47,
+      "baseline_deviation": false
+    }
+  ]
+}

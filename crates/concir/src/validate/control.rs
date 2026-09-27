@@ -1,0 +1,329 @@
+use std::collections::{HashMap, HashSet, VecDeque};
+
+use crate::ast::*;
+use crate::diagnostic::Diagnostic;
+use crate::env::NameEnv;
+
+/// E6xx: Control flow checks.
+pub fn check(program: &Program, diags: &mut Vec<Diagnostic>) {
+    for (mi, m) in program.modules.iter().enumerate() {
+        for (fi, f) in m.functions.iter().enumerate() {
+            check_fall_off_end(m, f, mi, fi, diags);
+            if f.body.is_empty() {
+                continue;
+            }
+
+            let sid_to_idx: HashMap<&str, usize> = f
+                .body
+                .iter()
+                .enumerate()
+                .map(|(i, s)| (s.sid.as_str(), i))
+                .collect();
+
+            let n = f.body.len();
+            let mut successors = vec![Vec::new(); n];
+
+            for (i, _) in f.body.iter().enumerate() {
+                for t in f.successors(i) {
+                    if let Some(&ti) = sid_to_idx.get(t) {
+                        successors[i].push(ti);
+                    }
+                }
+            }
+
+            let env = NameEnv::build(program, m, f);
+            let fn_path = Program::fn_path(mi, fi);
+            check_reachability(m, f, &successors, n, &fn_path, diags);
+            check_return_paths(m, f, &successors, n, &fn_path, diags);
+            check_branch_targets_same(m, f, &fn_path, diags);
+            check_switch_exhaustive(m, f, &env, &fn_path, diags);
+            check_infinite_loop(m, f, &successors, n, &fn_path, diags);
+        }
+    }
+}
+
+/// E601: unreachable statements
+fn check_reachability(
+    module: &Module,
+    f: &Function,
+    successors: &[Vec<usize>],
+    n: usize,
+    fn_path: &str,
+    diags: &mut Vec<Diagnostic>,
+) {
+    let mut reachable = vec![false; n];
+    let mut queue = VecDeque::new();
+    reachable[0] = true;
+    queue.push_back(0);
+
+    while let Some(idx) = queue.pop_front() {
+        for &succ in &successors[idx] {
+            if !reachable[succ] {
+                reachable[succ] = true;
+                queue.push_back(succ);
+            }
+        }
+    }
+
+    for (i, is_reachable) in reachable.iter().enumerate() {
+        if !is_reachable {
+            diags.push(
+                Diagnostic::warning(
+                    "E601",
+                    format!(
+                        "unreachable statement '{}' in function '{}'",
+                        f.body[i].sid, f.name
+                    ),
+                )
+                .with_path(format!("{fn_path}.body[{i}]"))
+                .with_location(Program::stmt_location(module, f, &f.body[i]))
+                .with_fix("remove the statement or fix control flow to reach it"),
+            );
+        }
+    }
+}
+
+/// E114: falling off the end of a function body is an implicit `return`
+/// (doc/backend-design.md §3). This is a warning, not an error, so existing
+/// models that rely on the implicit return stay valid but are told explicitly.
+fn check_fall_off_end(
+    m: &Module,
+    f: &Function,
+    mi: usize,
+    fi: usize,
+    diags: &mut Vec<Diagnostic>,
+) {
+    let guaranteed = match f.body.last() {
+        None => false,
+        Some(stmt) => matches!(
+            stmt.op,
+            Op::Return { .. } | Op::Goto { .. } | Op::Branch { .. } | Op::Switch { .. }
+        ),
+    };
+    if guaranteed {
+        return;
+    }
+    let where_ = match f.body.last() {
+        None => format!("function '{}' has an empty body", f.name),
+        Some(stmt) => format!(
+            "function '{}' ends at '{}' without an explicit return/goto/branch/switch",
+            f.name, stmt.sid
+        ),
+    };
+    diags.push(
+        Diagnostic::warning(
+            "E114",
+            format!("{where_}; control falls off the end, which is an implicit return"),
+        )
+        .with_path(Program::fn_path(mi, fi))
+        .with_location(Program::fn_location(m, f))
+        .with_fix("add an explicit return, or rely on the documented implicit return"),
+    );
+}
+
+/// E602: missing return — every path must end with a return
+fn check_return_paths(
+    module: &Module,
+    f: &Function,
+    successors: &[Vec<usize>],
+    n: usize,
+    fn_path: &str,
+    diags: &mut Vec<Diagnostic>,
+) {
+    for (i, succs) in successors.iter().enumerate().take(n) {
+        let stmt = &f.body[i];
+        let is_return = stmt.is_return();
+        let has_no_successors = succs.is_empty();
+
+        if has_no_successors && !is_return {
+            diags.push(
+                Diagnostic::error(
+                    "E602",
+                    format!(
+                        "function '{}' has a path ending at '{}' without return",
+                        f.name, stmt.sid
+                    ),
+                )
+                .with_path(format!("{fn_path}.body[{i}]"))
+                .with_location(Program::stmt_location(module, f, stmt))
+                .with_fix("add a return statement at the end of this path"),
+            );
+        }
+    }
+}
+
+/// E603: branch with same true/false targets
+fn check_branch_targets_same(
+    module: &Module,
+    f: &Function,
+    fn_path: &str,
+    diags: &mut Vec<Diagnostic>,
+) {
+    for (si, stmt) in f.body.iter().enumerate() {
+        if let Op::Branch {
+            then, else_target, ..
+        } = &stmt.op
+        {
+            if then == else_target {
+                diags.push(
+                    Diagnostic::warning(
+                        "E603",
+                        format!(
+                            "branch at '{}' has identical then/else targets '{then}'",
+                            stmt.sid
+                        ),
+                    )
+                    .with_path(format!("{fn_path}.body[{si}]"))
+                    .with_location(Program::stmt_location(module, f, stmt))
+                    .with_fix("use goto instead, or correct the branch targets"),
+                );
+            }
+        }
+    }
+}
+
+/// E604: switch not exhaustive for Enum types
+fn check_switch_exhaustive(
+    module: &Module,
+    f: &Function,
+    env: &NameEnv,
+    fn_path: &str,
+    diags: &mut Vec<Diagnostic>,
+) {
+    for (si, stmt) in f.body.iter().enumerate() {
+        if let Some((var, cases, _)) = stmt.switch() {
+            if let Some(BaseType::Complex(ComplexBaseType::Enum(variants))) = env.ty(var) {
+                let covered: HashSet<&str> = cases.keys().map(String::as_str).collect();
+
+                let missing: Vec<&str> = variants
+                    .iter()
+                    .filter(|v| !covered.contains(v.as_str()))
+                    .map(|v| v.as_str())
+                    .collect();
+
+                if !missing.is_empty() {
+                    diags.push(
+                        Diagnostic::error(
+                            "E604",
+                            format!(
+                                "switch on '{var}' is not exhaustive; missing variants: [{}]",
+                                missing.join(", ")
+                            ),
+                        )
+                        .with_path(format!("{fn_path}.body[{si}].cases"))
+                        .with_location(Program::stmt_location(module, f, stmt))
+                        .with_fix("add case branches for the missing variants"),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// E605: infinite loop with no exit and no blocking ops
+fn check_infinite_loop(
+    module: &Module,
+    f: &Function,
+    successors: &[Vec<usize>],
+    n: usize,
+    fn_path: &str,
+    diags: &mut Vec<Diagnostic>,
+) {
+    let sccs = tarjan_scc(successors, n);
+
+    for scc in &sccs {
+        if scc.len() < 2 {
+            let idx = scc[0];
+            if !successors[idx].contains(&idx) {
+                continue;
+            }
+        }
+
+        let scc_set: HashSet<usize> = scc.iter().copied().collect();
+
+        let has_exit = scc.iter().any(|&idx| {
+            successors[idx].iter().any(|s| !scc_set.contains(s)) || f.body[idx].is_return()
+        });
+
+        if has_exit {
+            continue;
+        }
+
+        let has_blocking = scc.iter().any(|&idx| f.body[idx].op.is_blocking());
+
+        if !has_blocking {
+            let first = scc[0];
+            diags.push(
+                Diagnostic::warning(
+                    "E605",
+                    format!(
+                        "potential infinite loop with no exit in function '{}' starting at '{}'",
+                        f.name, f.body[first].sid
+                    ),
+                )
+                .with_path(format!("{fn_path}.body[{first}]"))
+                .with_location(Program::stmt_location(module, f, &f.body[first]))
+                .with_fix("add an exit condition or confirm this is an intentional event loop"),
+            );
+        }
+    }
+}
+
+/// Tarjan's SCC algorithm
+fn tarjan_scc(successors: &[Vec<usize>], n: usize) -> Vec<Vec<usize>> {
+    struct State {
+        index_counter: usize,
+        stack: Vec<usize>,
+        on_stack: Vec<bool>,
+        index: Vec<Option<usize>>,
+        lowlink: Vec<usize>,
+        sccs: Vec<Vec<usize>>,
+    }
+
+    let mut state = State {
+        index_counter: 0,
+        stack: Vec::new(),
+        on_stack: vec![false; n],
+        index: vec![None; n],
+        lowlink: vec![0; n],
+        sccs: Vec::new(),
+    };
+
+    fn strongconnect(v: usize, successors: &[Vec<usize>], s: &mut State) {
+        s.index[v] = Some(s.index_counter);
+        s.lowlink[v] = s.index_counter;
+        s.index_counter += 1;
+        s.stack.push(v);
+        s.on_stack[v] = true;
+
+        for &w in &successors[v] {
+            if s.index[w].is_none() {
+                strongconnect(w, successors, s);
+                s.lowlink[v] = s.lowlink[v].min(s.lowlink[w]);
+            } else if s.on_stack[w] {
+                s.lowlink[v] = s.lowlink[v].min(s.index[w].unwrap());
+            }
+        }
+
+        if s.lowlink[v] == s.index[v].unwrap() {
+            let mut scc = Vec::new();
+            loop {
+                let w = s.stack.pop().unwrap();
+                s.on_stack[w] = false;
+                scc.push(w);
+                if w == v {
+                    break;
+                }
+            }
+            s.sccs.push(scc);
+        }
+    }
+
+    for v in 0..n {
+        if state.index[v].is_none() {
+            strongconnect(v, successors, &mut state);
+        }
+    }
+
+    state.sccs
+}

@@ -1,0 +1,6 @@
+[package]
+name = "concir_sync"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Standard-library-only counting semaphore for the SkelNet generation harness."

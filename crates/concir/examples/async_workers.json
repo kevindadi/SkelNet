@@ -1,0 +1,181 @@
+{
+  "program": "async_workers",
+  "version": "3.5.0",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "async_mtx",
+          "sem",
+          "tx",
+          "result",
+          "task_count"
+        ],
+        "functions": [
+          "main",
+          "worker",
+          "collector"
+        ]
+      },
+      "requires": {
+        "resources": [],
+        "functions": []
+      },
+      "resources": [
+        {
+          "name": "async_mtx",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Async"
+        },
+        {
+          "name": "sem",
+          "kind": "sync",
+          "type": "Semaphore",
+          "mode": "Async",
+          "count": 3
+        },
+        {
+          "name": "tx",
+          "kind": "sync",
+          "type": "Channel",
+          "mode": "Async",
+          "base": "Int",
+          "capacity": 8
+        },
+        {
+          "name": "result",
+          "kind": "var",
+          "type": "Var",
+          "base": "Int",
+          "init": 0
+        },
+        {
+          "name": "task_count",
+          "kind": "var",
+          "type": "Atomic",
+          "base": "Int",
+          "init": 0
+        }
+      ],
+      "protection": [
+        {
+          "var": "result",
+          "lock": "async_mtx"
+        }
+      ],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "async",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "async_call",
+              "func": "worker",
+              "handle": "h_worker"
+            },
+            {
+              "sid": "s2",
+              "kind": "async_call",
+              "func": "collector",
+              "handle": "h_collector"
+            },
+            {
+              "sid": "s3",
+              "kind": "await",
+              "handle": "h_worker"
+            },
+            {
+              "sid": "s4",
+              "kind": "await",
+              "handle": "h_collector"
+            },
+            {
+              "sid": "s5",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "worker",
+          "kind": "async",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "semaphore_acquire",
+              "resource": "sem"
+            },
+            {
+              "sid": "s2",
+              "kind": "atomic_store",
+              "resource": "task_count",
+              "value": "task_count + 1"
+            },
+            {
+              "sid": "s3",
+              "kind": "channel_send",
+              "channel": "tx",
+              "value": "100"
+            },
+            {
+              "sid": "s4",
+              "kind": "semaphore_release",
+              "resource": "sem"
+            },
+            {
+              "sid": "s5",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "collector",
+          "kind": "async",
+          "locals": [
+            {
+              "name": "msg",
+              "type": "Int",
+              "modeled": true
+            }
+          ],
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "channel_recv",
+              "channel": "tx",
+              "dst": "msg"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "async_mtx"
+            },
+            {
+              "sid": "s3",
+              "kind": "read_shared",
+              "resource": "result"
+            },
+            {
+              "sid": "s4",
+              "kind": "write_shared",
+              "resource": "result",
+              "expr": "result + 100"
+            },
+            {
+              "sid": "s5",
+              "kind": "mutex_unlock",
+              "resource": "async_mtx"
+            },
+            {
+              "sid": "s6",
+              "kind": "return"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "entry": "main::main"
+}

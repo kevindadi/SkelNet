@@ -1,0 +1,236 @@
+{
+  "program": "complex_rwlock",
+  "version": "3.5.0",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "rw",
+          "cv",
+          "aux_mtx",
+          "shared_map",
+          "error_flag"
+        ],
+        "functions": [
+          "main",
+          "writer",
+          "reader",
+          "prepare_data",
+          "process_data",
+          "validate_entry"
+        ]
+      },
+      "requires": {
+        "resources": [],
+        "functions": []
+      },
+      "resources": [
+        {
+          "name": "rw",
+          "kind": "sync",
+          "type": "RwLock",
+          "mode": "Sync"
+        },
+        {
+          "name": "cv",
+          "kind": "sync",
+          "type": "Condvar",
+          "mode": "Sync"
+        },
+        {
+          "name": "aux_mtx",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "shared_map",
+          "kind": "var",
+          "type": "Var",
+          "base": {
+            "Struct": {
+              "size": "Int",
+              "ready": "Bool"
+            }
+          },
+          "init": {
+            "size": 0,
+            "ready": false
+          }
+        },
+        {
+          "name": "error_flag",
+          "kind": "var",
+          "type": "Atomic",
+          "base": "Bool",
+          "init": false
+        }
+      ],
+      "protection": [
+        {
+          "var": "shared_map",
+          "lock": "rw"
+        }
+      ],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "scope",
+              "funcs": ["writer", "reader"]
+            },
+            {
+              "sid": "s2",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "writer",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "call",
+              "func": "prepare_data",
+              "args": []
+            },
+            {
+              "sid": "s2",
+              "kind": "rwlock_write",
+              "resource": "rw"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "shared_map",
+              "expr": "{size: 100, ready: true}"
+            },
+            {
+              "sid": "s4",
+              "kind": "rwlock_unlock",
+              "resource": "rw"
+            },
+            {
+              "sid": "s5",
+              "kind": "mutex_lock",
+              "resource": "aux_mtx"
+            },
+            {
+              "sid": "s6",
+              "kind": "condvar_notify_all",
+              "condvar": "cv"
+            },
+            {
+              "sid": "s7",
+              "kind": "mutex_unlock",
+              "resource": "aux_mtx"
+            },
+            {
+              "sid": "s8",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "reader",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "aux_mtx"
+            },
+            {
+              "sid": "s2",
+              "kind": "condvar_wait",
+              "condvar": "cv",
+              "lock": "aux_mtx"
+            },
+            {
+              "sid": "s3",
+              "kind": "mutex_unlock",
+              "resource": "aux_mtx"
+            },
+            {
+              "sid": "s4",
+              "kind": "rwlock_read",
+              "resource": "rw"
+            },
+            {
+              "sid": "s5",
+              "kind": "read_shared",
+              "resource": "shared_map"
+            },
+            {
+              "sid": "s6",
+              "kind": "call",
+              "func": "process_data",
+              "args": []
+            },
+            {
+              "sid": "s7",
+              "kind": "rwlock_unlock",
+              "resource": "rw"
+            },
+            {
+              "sid": "s8",
+              "kind": "atomic_load",
+              "resource": "error_flag",
+              "dst": "_"
+            },
+            {
+              "sid": "s9",
+              "kind": "branch",
+              "cond": "error_flag == true",
+              "then": "s10",
+              "else": "s11"
+            },
+            {
+              "sid": "s10",
+              "kind": "return"
+            },
+            {
+              "sid": "s11",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "prepare_data",
+          "kind": "normal",
+          "body": []
+        },
+        {
+          "name": "process_data",
+          "kind": "normal",
+          "body": [],
+          "effects": {
+            "reads": [
+              "shared_map"
+            ],
+            "writes": []
+          }
+        },
+        {
+          "name": "validate_entry",
+          "kind": "normal",
+          "body": [],
+          "effects": {
+            "reads": [
+              "shared_map"
+            ],
+            "writes": []
+          }
+        }
+      ]
+    }
+  ],
+  "entry": "main::main"
+}
