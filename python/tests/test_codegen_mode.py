@@ -95,6 +95,21 @@ def test_codegen_cir_cell_persists_cir_trace(tmp_path):
     assert result["oracle"]["functional_ok"] is None
 
 
+def test_eval_rewrites_summary_and_report(tmp_path):
+    out = _run_codegen("SKEL", [BUGGY, FIXED], tmp_path, "evalsum")
+    (out / "SUMMARY.json").write_text('{"run_id": "bogus", "cells": []}',
+                                      encoding="utf-8")
+    (out / "REPORT.md").write_text("bogus", encoding="utf-8")
+    args = cli.build_parser().parse_args(["eval", str(out)])
+    rc = cli.cmd_eval(args, runner=_runner())
+    assert rc == 0
+    summary = json.loads((out / "SUMMARY.json").read_text())
+    assert summary["run_id"] == out.name
+    assert summary["cells"]
+    assert summary["cells"][0]["oracle"]["terminal_check"] == "not_applicable"
+    assert "SkelNet run report" in (out / "REPORT.md").read_text()
+
+
 def test_eval_rebuilds_codegen_project_with_cir_trace(tmp_path):
     out = _run_codegen("SKEL", [BUGGY, FIXED], tmp_path, "evalskel")
     cell = out / "cells" / TASK / "0"

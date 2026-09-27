@@ -308,8 +308,26 @@ def cmd_eval(args: argparse.Namespace, *, runner=None) -> int:
                           "terminal_check": outcome.terminal_check}
         result_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         updated += 1
+    # Keep the run's summary/report in sync with the re-evaluated cells.
+    summary = _summary_from_run(run_dir)
+    (run_dir / "SUMMARY.json").write_text(json.dumps(summary, indent=2),
+                                          encoding="utf-8")
+    (run_dir / "REPORT.md").write_text(_report_markdown([summary]), encoding="utf-8")
     print(f"re-evaluated {updated} cells")
     return 0
+
+
+def _summary_from_run(run_dir: Path) -> dict:
+    manifest: dict = {}
+    manifest_path = run_dir / "MANIFEST.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    cells = [json.loads(path.read_text(encoding="utf-8"))
+             for path in sorted(run_dir.glob("cells/**/result.json"))]
+    return {"run_id": manifest.get("run_id", run_dir.name),
+            "arm": manifest.get("arm", "?"),
+            "model": manifest.get("model", "?"),
+            "cells": cells}
 
 
 def cmd_report(args: argparse.Namespace) -> int:
