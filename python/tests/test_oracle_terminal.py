@@ -1,0 +1,49 @@
+"""T2: terminal-line extraction and oracle terminal pass/fail/absent handling."""
+
+from types import SimpleNamespace
+
+from skelnet.backend import repo_root
+from skelnet.cli import read_terminal
+from skelnet.oracle import RustOracle
+
+
+def test_read_terminal_from_requirements():
+    root = repo_root()
+    assert read_terminal(root / "benchmarks/tasks/lock-order/abba_2lock") == "DONE t1=1 t2=1"
+    assert read_terminal(root / "benchmarks/tasks/semaphore/permit_leak") == "DONE permits=1"
+
+
+def test_read_terminal_absent_for_boundary_tasks():
+    root = repo_root()
+    assert read_terminal(root / "benchmarks/tasks/boundary/rwlock_unsupported") is None
+    assert read_terminal(root / "benchmarks/tasks/boundary/unbounded_int_unknown") is None
+
+
+def _runner(stdout: str, run_rc: int = 0):
+    def run(cmd, cwd, timeout):
+        if "build" in cmd:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=run_rc, stdout=stdout, stderr="")
+    return run
+
+
+def test_terminal_correct(tmp_path):
+    oracle = RustOracle(terminal="DONE x", runner=_runner("DONE x\n"))
+    result = oracle.evaluate("fn main() {}", tmp_path)
+    assert result.built and result.ran
+    assert result.terminal_check == "pass"
+    assert result.functional_ok
+
+
+def test_terminal_wrong(tmp_path):
+    oracle = RustOracle(terminal="DONE x", runner=_runner("nope\n"))
+    result = oracle.evaluate("fn main() {}", tmp_path)
+    assert result.terminal_check == "fail"
+    assert not result.functional_ok
+
+
+def test_terminal_absent_is_not_a_pass(tmp_path):
+    oracle = RustOracle(terminal=None, runner=_runner("DONE x\n"))
+    result = oracle.evaluate("fn main() {}", tmp_path)
+    assert result.terminal_check == "absent"
+    assert not result.functional_ok

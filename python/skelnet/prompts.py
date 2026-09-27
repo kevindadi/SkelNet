@@ -18,13 +18,51 @@ SKEL_GENERATION_ASSET = "skel_generation_v1.md"
 SKEL_FEEDBACK_ASSET = "skel_feedback_v1.md"
 RUST_FROM_SKEL_ASSET = "rust_from_skel_v1.md"
 CIR_GENERATION_ASSET = "concir_generation_v4.md"
+CIR_FEEDBACK_ASSET = "concir_feedback_v1.md"
 RUST_FROM_CIR_ASSET = "rust_from_cir_v2.md"
 RUST_GENERATION_ASSET = "rust_generation_v1.md"
 
 ASSETS = (
     SKEL_GENERATION_ASSET, SKEL_FEEDBACK_ASSET, RUST_FROM_SKEL_ASSET,
-    CIR_GENERATION_ASSET, RUST_FROM_CIR_ASSET, RUST_GENERATION_ASSET,
+    CIR_GENERATION_ASSET, CIR_FEEDBACK_ASSET, RUST_FROM_CIR_ASSET,
+    RUST_GENERATION_ASSET,
 )
+
+# Explicit arm x stage -> system-prompt asset. A missing route is an error; the
+# workflow never silently falls back to another arm's prompt.
+STAGE_GENERATE = "generate"
+STAGE_FEEDBACK = "feedback"
+STAGE_RUST = "rust"
+
+PROMPT_ROUTES: dict[tuple[str, str], str] = {
+    ("SKEL", STAGE_GENERATE): SKEL_GENERATION_ASSET,
+    ("SKEL", STAGE_FEEDBACK): SKEL_FEEDBACK_ASSET,
+    ("SKEL", STAGE_RUST): RUST_FROM_SKEL_ASSET,
+    ("CIR", STAGE_GENERATE): CIR_GENERATION_ASSET,
+    ("CIR", STAGE_FEEDBACK): CIR_FEEDBACK_ASSET,
+    ("CIR", STAGE_RUST): RUST_FROM_CIR_ASSET,
+    ("G0", STAGE_GENERATE): RUST_GENERATION_ASSET,
+}
+
+
+def route(arm: str, stage: str) -> str:
+    """Return the system-prompt asset for an arm x stage, or raise."""
+    key = (arm, stage)
+    if key not in PROMPT_ROUTES:
+        raise KeyError(
+            f"no system-prompt route for arm={arm!r} stage={stage!r}; "
+            f"known routes: {sorted(PROMPT_ROUTES)}")
+    return PROMPT_ROUTES[key]
+
+
+def system_prompt_for(arm: str, stage: str) -> str:
+    """Read the routed system prompt (raises on an unmapped arm x stage)."""
+    return read_asset(route(arm, stage))
+
+
+def routes_for_arm(arm: str) -> dict[str, str]:
+    """The `{stage: asset}` map for one arm (used by `--dry-run`)."""
+    return {stage: asset for (a, stage), asset in PROMPT_ROUTES.items() if a == arm}
 
 
 def read_asset(name: str) -> str:
@@ -92,6 +130,19 @@ def rust_from_skel_user_prompt(requirements: str, skeleton: str) -> str:
         "`post`/`take` via `concir_sync`, and keep `// @Rn` comments.\n\n"
         "<domain_requirements>\n" + requirements.strip() + "\n</domain_requirements>\n\n"
         "<skeleton>\n" + skeleton.strip() + "\n</skeleton>\n\n"
+        "Output only one ```rust code block."
+    )
+
+
+def rust_from_cir_user_prompt(requirements: str, cir: str) -> str:
+    return (
+        "Write a single-file std-only Rust program implementing the verified "
+        "ConcIR program below. Use the program's resource and function names as "
+        "Rust identifiers, `mutex_lock`/`mutex_unlock` as a guard scope, "
+        "semaphore acquire/release via `concir_sync`, and keep `// @cir <sid>` "
+        "comments.\n\n"
+        "<domain_requirements>\n" + requirements.strip() + "\n</domain_requirements>\n\n"
+        "<concir>\n" + cir.strip() + "\n</concir>\n\n"
         "Output only one ```rust code block."
     )
 

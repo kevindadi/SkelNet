@@ -18,7 +18,8 @@ class ChannelUnavailable(TransportError):
 
 
 def build_client(spec: ModelSpec, *, budget: Any, evidence_dir: Path | str,
-                 api_key: str, timeout: float = 90.0, max_tokens: int = 4096):
+                 api_key: str, timeout: float = 90.0, max_tokens: int = 4096,
+                 temperature: float = 0.0):
     """Construct the inner client for a model, or raise ChannelUnavailable."""
 
     if spec.status != "available" or not spec.model_id:
@@ -31,7 +32,7 @@ def build_client(spec: ModelSpec, *, budget: Any, evidence_dir: Path | str,
                                 base_url=CHANNELS[spec.channel].base_url or "",
                                 model=spec.model_id, budget=budget,
                                 evidence_dir=evidence_dir, timeout=timeout,
-                                max_tokens=max_tokens,
+                                max_tokens=max_tokens, temperature=temperature,
                                 extra_body={"thinking": {"type": "disabled"}})
     if spec.channel == "dashscope-direct":
         from .direct import DirectChatClient
@@ -39,14 +40,15 @@ def build_client(spec: ModelSpec, *, budget: Any, evidence_dir: Path | str,
                                 base_url=CHANNELS[spec.channel].base_url or "",
                                 model=spec.model_id, budget=budget,
                                 evidence_dir=evidence_dir, timeout=timeout,
-                                max_tokens=max_tokens,
+                                max_tokens=max_tokens, temperature=temperature,
                                 extra_body={"enable_thinking": False})
     if spec.channel == "opencode-go":
         from .opencode_go import OpenCodeGoClient, OpenCodeGoResponsesClient
         cls = OpenCodeGoResponsesClient if spec.surface == "responses" else OpenCodeGoClient
         return cls(api_key=api_key, budget=budget,
                    evidence_dir=evidence_dir, model=spec.model_id,
-                   timeout=timeout, max_tokens=max_tokens)
+                   timeout=timeout, max_tokens=max_tokens,
+                   temperature=temperature)
     raise ChannelUnavailable(f"no client for channel {spec.channel!r}")
 
 
@@ -70,6 +72,12 @@ class AuditedClient:
     def set_stage(self, stage: str) -> None:
         self.stage = stage
         self.round = 0
+
+    def set_cell(self, cell_id: str, task_id: str, replicate: int) -> None:
+        """Bind subsequent calls to a real cell (task/replicate)."""
+        self.cell_id = cell_id
+        self.task_id = task_id
+        self.replicate = replicate
 
     def complete(self, system: str, user: str):
         self.round += 1

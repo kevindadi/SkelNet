@@ -94,7 +94,6 @@ struct Collector {
     src: String,
     sites: Vec<Site>,
     spawns: Vec<SpawnSite>,
-    spawn_count: usize,
     stmt_stack: Vec<usize>,
     main_close: Option<usize>,
 }
@@ -384,7 +383,6 @@ fn main() {
         src: src.clone(),
         sites: Vec::new(),
         spawns: Vec::new(),
-        spawn_count: 0,
         stmt_stack: Vec::new(),
         main_close: None,
     };

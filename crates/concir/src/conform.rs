@@ -457,7 +457,7 @@ pub fn conform_events(
 ) -> Conformance {
     let total = observable_sids(program).len();
     let mut post_join_main_ops: Vec<String> = Vec::new();
-    let mut wrapper_ops: Vec<String> = Vec::new();
+    let wrapper_ops: Vec<String> = Vec::new();
     let mut seen: BTreeSet<String> = BTreeSet::new();
     let it = Interpreter::new(program, AnalysisBounds::default());
     let initial = match it.initial() {
