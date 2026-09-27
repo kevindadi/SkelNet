@@ -1,0 +1,35 @@
+---
+source: crates/skel/tests/adherence.rs
+expression: md
+---
+# Skeleton adherence report (human review only)
+
+skeleton: `benchmarks/tasks/lock-order/partial_deadlock_bystander/gold.skel`
+
+## main::main
+
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 4
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 10 | spawn a | matched | 14 |
+| 10 | spawn b | reordered | 22 |
+| 10 | spawn bystander | reordered | 30 |
+
+## main::a
+
+matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 13 | lock a | reordered | 15 |
+| 13 | lock b | matched | 16 |
+
+## main::b
+
+matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 16 | lock a | nesting_mismatch | - |
+| 16 | lock b | nesting_mismatch | - |

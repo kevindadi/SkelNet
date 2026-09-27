@@ -1,0 +1,49 @@
+---
+source: crates/skel/tests/adherence.rs
+expression: md
+---
+# Skeleton adherence report (human review only)
+
+skeleton: `benchmarks/tasks/condvar/notify_one_multi_waiter_wrong_pick/gold.skel`
+
+## main::main
+
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 2
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 9 | spawn w1 | matched | 7 |
+| 9 | spawn w2 | reordered | 9 |
+| 9 | spawn notifier | missing | - |
+
+## main::w1
+
+matched Rust fn: `<none>`; DSL lock depth 1; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 12 | lock m | reordered | 8 |
+| 12 | post g12 | missing | - |
+| 12 | wait cv | matched | 8 |
+| 12 | notify_all cv | reordered | 10 |
+
+## main::w2
+
+matched Rust fn: `<none>`; DSL lock depth 1; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 15 | take g12 | missing | - |
+| 15 | lock m | missing | - |
+| 15 | post gN | missing | - |
+| 15 | wait cv | missing | - |
+
+## main::notifier
+
+matched Rust fn: `<none>`; DSL lock depth 1; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 18 | take gN | missing | - |
+| 18 | lock m | missing | - |
+| 18 | notify_all cv | missing | - |

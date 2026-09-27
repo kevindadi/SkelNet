@@ -1,0 +1,36 @@
+---
+source: crates/skel/tests/adherence.rs
+expression: md
+---
+# Skeleton adherence report (human review only)
+
+skeleton: `benchmarks/tasks/semaphore/acquire_twice_no_release/gold.skel`
+
+## main::main
+
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 6 | spawn w1 | matched | 9 |
+| 6 | spawn w2 | matched | 11 |
+
+## main::w1
+
+matched Rust fn: `<none>`; DSL lock depth 0; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 9 | take s | missing | - |
+| 9 | post s | missing | - |
+| 9 | take s | missing | - |
+| 9 | post s | missing | - |
+
+## main::w2
+
+matched Rust fn: `<none>`; DSL lock depth 0; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 12 | take s | missing | - |
+| 12 | post s | missing | - |

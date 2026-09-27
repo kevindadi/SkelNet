@@ -131,4 +131,10 @@ Prompts: new `skel_generation_v1.md`, `skel_feedback_v1.md`,
 `rust_from_skel_v1.md`; migrated `concir_generation_v4.md`,
 `rust_from_cir_v2.md`, `rust_generation_v1.md`, `examples/*`.
 
-## P6-P7 (pending)
+## P6: codegen + adhere (new code)
+
+Added `crates/skel/src/codegen.rs` and `crates/skel/src/adhere.rs`, plus the
+`skelnet codegen` / `skelnet adhere` CLI commands and insta snapshots under
+`crates/skel/tests/snapshots/`. Not migrated.
+
+## P7 (pending)

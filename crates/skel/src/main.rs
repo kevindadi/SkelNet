@@ -28,6 +28,8 @@ fn main() {
         "lower" => cmd_lower(&args[2..]),
         "check" => cmd_check(&args[2..]),
         "verify" => cmd_verify(&args[2..]),
+        "codegen" => cmd_codegen(&args[2..]),
+        "adhere" => cmd_adhere(&args[2..]),
         "--help" | "-h" | "help" => usage(),
         other => {
             eprintln!("skelnet: unknown command `{other}`");
@@ -44,7 +46,9 @@ fn usage() -> ! {
          skelnet fmt    <f.skel> [--check]\n  \
          skelnet lower  <f.skel> -o <f.cir.json> [--map <f.map.json>]\n  \
          skelnet check  <f.skel> [--reqs requirements.json] [--json]\n  \
-         skelnet verify <f.skel> <contract.json> [--engine petri|interp] [--json]"
+         skelnet verify <f.skel> <contract.json> [--engine petri|interp] [--json]\n  \
+         skelnet codegen <f.skel> [--out <dir>]\n  \
+         skelnet adhere <f.skel> <main.rs> [--json]"
     );
     process::exit(EXIT_USAGE);
 }
@@ -326,6 +330,74 @@ fn cmd_verify(args: &[String]) -> i32 {
         "PASS" => EXIT_OK,
         _ => EXIT_DIAG,
     }
+}
+
+fn cmd_codegen(args: &[String]) -> i32 {
+    let Some(path) = first_positional(args) else {
+        usage();
+    };
+    let (ast, file, text, mut errors) = parse_frontend(path);
+    if !has_frontend_error(&errors) {
+        errors.extend(check::check(&ast, None));
+    }
+    if has_frontend_error(&errors) {
+        print_errors(&file, &errors, false);
+        return EXIT_DIAG;
+    }
+    let lowered = match lower::lower(&ast, path, &text) {
+        Ok(l) => l,
+        Err(errs) => {
+            print_errors(&file, &errs, false);
+            return EXIT_DIAG;
+        }
+    };
+    match skel::codegen::codegen(&lowered.program, &lowered.map) {
+        Ok(out) => {
+            if let Some(dir) = flag_value(args, "--out") {
+                let dir = std::path::Path::new(&dir);
+                if let Err(e) = fs::create_dir_all(dir.join("src")) {
+                    eprintln!("skelnet: cannot create output dir: {e}");
+                    return EXIT_USAGE;
+                }
+                let _ = fs::write(dir.join("Cargo.toml"), &out.cargo_toml);
+                let _ = fs::write(dir.join("src/main.rs"), &out.main_rs);
+                let _ = fs::write(dir.join("src/cir_trace.rs"), &out.trace_rs);
+                println!("{}", dir.display());
+            } else {
+                print!("{}", out.main_rs);
+            }
+            EXIT_OK
+        }
+        Err(e) => {
+            eprintln!("skelnet codegen: {e}");
+            EXIT_DIAG
+        }
+    }
+}
+
+fn cmd_adhere(args: &[String]) -> i32 {
+    let positional = positional_all(args);
+    let (Some(skel_path), Some(rust_path)) = (positional.first(), positional.get(1)) else {
+        usage();
+    };
+    let skel_text = read_file(skel_path);
+    let (ast, errors) = parse_source(skel_path, &skel_text);
+    let file = SourceFile::new(skel_path.to_string(), skel_text.clone());
+    if has_frontend_error(&errors) {
+        print_errors(&file, &errors, false);
+        return EXIT_DIAG;
+    }
+    let rust_text = read_file(rust_path);
+    let report = skel::adhere::adhere(skel_path, &ast, &rust_text);
+    if has_flag(args, "--json") {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report).expect("serialize adherence")
+        );
+    } else {
+        print!("{}", skel::adhere::render_markdown(&report));
+    }
+    EXIT_OK
 }
 
 fn load_reqs(args: &[String]) -> Option<Requirements> {

@@ -46,6 +46,45 @@ Command: `git diff --cached | grep -nE '(sk-|key-)[A-Za-z0-9_-]{16,}'`
 
 ---
 
+## P6 — `skelnet codegen` comments + `skelnet adhere`
+
+### Changes
+
+- `crates/skel/src/codegen.rs` — calls ConcIR `codegen` on the lowered program
+  and annotates every generated statement line that carries `// @cir <sid>`
+  with `// skel:L<line> @R..` from the source map (lockstep over `map.stmts`).
+- `crates/skel/src/adhere.rs` — `syn`-based adherence extractor: per Rust
+  function, the synchronous op sequence (lock / wait / notify / send / recv /
+  atomic load-store-cas / spawn / scope / join / permit / post / take), aligned
+  per skeleton function and classified `matched / missing / reordered /
+  nesting_mismatch`; Markdown + JSON. **Not** wired into run/eval/report.
+- CLI: `skelnet codegen <f.skel> [--out <dir>]` and
+  `skelnet adhere <f.skel> <main.rs> [--json]`.
+
+### Tests
+
+`cargo test -p skel --offline --test adherence` → 4 tests:
+
+- `codegen_abba_snapshot` (insta) and `codegen_is_deterministic_and_annotated`
+  (idempotent output, contains `// skel:L` and `@R`).
+- `adhere_snapshots` (insta) over every task with a `rust/fixed.rs` (10 tasks),
+  using repository-relative paths so snapshots are machine-independent.
+- `check_used_for_adhere_does_not_require_backend`.
+
+Full `cargo test --workspace --offline` and the Python suite remain green.
+
+### Deviations / Open questions
+
+- `adhere` is deliberately heuristic: the reference Rust uses its own resource
+  names (e.g. `mtx_a`, `acq`), so alignment is by function name and then by
+  order of sync-bearing Rust functions, and `nesting_mismatch` is a coarse
+  (DSL lock depth vs Rust lock-call count) heuristic. It is a human-review tool
+  only and is not referenced by `run`/`eval`/`report` (checked in P7).
+- `compute` holes lower to `nop`, so `codegen` emits no `HOLE(...)` for them;
+  the hole's DSL line still appears via the `// skel:L..` annotation.
+
+---
+
 ## P5 — Python package, prompts, fake-LLM tests
 
 ### Changes

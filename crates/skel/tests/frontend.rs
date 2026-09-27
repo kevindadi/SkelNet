@@ -375,7 +375,12 @@ fn cli_check_json_and_exit_codes() {
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json diagnostics");
-    assert!(v.as_array().unwrap().iter().any(|e| e["code"] == "S101"));
+    assert!(!v["valid"].as_bool().unwrap());
+    assert!(v["diagnostics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|e| e["code"] == "S101"));
 
     let good = dir.join("good.skel");
     std::fs::write(&good, VALID_ABBA).unwrap();

@@ -1,7 +1,9 @@
 //! Skeleton DSL front-end: source -> tokens -> AST -> canonical form -> checks.
 
+pub mod adhere;
 pub mod ast;
 pub mod check;
+pub mod codegen;
 pub mod error;
 pub mod feedback;
 pub mod fmt;

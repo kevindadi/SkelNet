@@ -1,0 +1,42 @@
+---
+source: crates/skel/tests/adherence.rs
+expression: md
+---
+# Skeleton adherence report (human review only)
+
+skeleton: `benchmarks/tasks/structure/nested_scope_lock_order/gold.skel`
+
+## main::main
+
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 4
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 7 | spawn outer | matched | 7 |
+
+## main::outer
+
+matched Rust fn: `<none>`; DSL lock depth 0; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 10 | spawn x1 | matched | 7 |
+| 10 | spawn x2 | reordered | 9 |
+
+## main::x1
+
+matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 13 | lock a | nesting_mismatch | - |
+| 13 | lock b | nesting_mismatch | - |
+
+## main::x2
+
+matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 16 | lock a | nesting_mismatch | - |
+| 16 | lock b | nesting_mismatch | - |
