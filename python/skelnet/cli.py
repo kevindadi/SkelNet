@@ -109,6 +109,8 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
     started_at = time.time()
     audit = AuditLog(out / "audit.jsonl", raw_dir=out / "raw")
     backend = Backend(timeout=args.timeout)
+    manifest = _build_manifest(out, args, backend, tasks, started_at, None)
+    _write_manifest(out, manifest)
     provider = _build_provider(args, audit, out, client_factory=client_factory)
     summary: dict = {"run_id": out.name, "arm": args.arm, "model": args.model,
                      "budget": budget, "cells": []}
@@ -152,7 +154,8 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
                 (workdir / "cir_trace.rs").write_text(cell.cir_trace, encoding="utf-8")
             summary["cells"].append(json.loads(dumps(cell)))
     ended_at = time.time()
-    _write_manifest(out, args, backend, started_at, ended_at)
+    manifest["ended_at"] = ended_at
+    _write_manifest(out, manifest)
     (out / "SUMMARY.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     (out / "REPORT.md").write_text(_report_markdown([summary]), encoding="utf-8")
     print(f"wrote {out}")
@@ -168,9 +171,21 @@ def _git(args: list[str]) -> str:
     return proc.stdout if proc.returncode == 0 else ""
 
 
-def _write_manifest(out: Path, args: argparse.Namespace, backend: Backend,
-                    started_at: float, ended_at: float) -> None:
-    manifest = {
+def _tool_version(command: str) -> str | None:
+    try:
+        proc = subprocess.run([command, "-V"], capture_output=True, text=True,
+                              timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
+                    tasks: list[Path], started_at: float,
+                    ended_at: float | None) -> dict:
+    spec = resolve_model(build_registry(), args.model)
+    tasks_root = repo_root() / "benchmarks" / "tasks"
+    return {
         "run_id": out.name,
         "git_sha": _git(["rev-parse", "HEAD"]).strip(),
         "git_dirty": bool(_git(["status", "--porcelain"]).strip()),
@@ -180,15 +195,32 @@ def _write_manifest(out: Path, args: argparse.Namespace, backend: Backend,
         },
         "prompts": prompts.prompt_asset_record(),
         "model": args.model,
+        "model_id": spec.model_id,
+        "channel": spec.channel,
         "arm": args.arm,
         "rust_mode": args.rust_mode,
+        "tasks": {
+            "pattern": args.tasks,
+            "selected": [str(t.relative_to(tasks_root)) for t in tasks],
+        },
         "rounds": args.rounds,
         "reps": args.reps,
-        "seed": args.seed,
+        # `--seed` is not applied yet: recorded as null until it takes effect.
+        "seed": None,
+        "seed_applied": False,
         "temperature": args.temperature,
+        "timeout": args.timeout,
+        "versions": {
+            "rustc": _tool_version("rustc"),
+            "cargo": _tool_version("cargo"),
+            "python": sys.version.split()[0],
+        },
         "started_at": started_at,
         "ended_at": ended_at,
     }
+
+
+def _write_manifest(out: Path, manifest: dict) -> None:
     (out / "MANIFEST.json").write_text(json.dumps(manifest, indent=2),
                                        encoding="utf-8")
 

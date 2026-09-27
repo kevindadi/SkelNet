@@ -146,12 +146,19 @@ def test_missing_route_raises():
 def test_manifest_and_audit_cell_ids(tmp_path):
     out, client = _run_arm("SKEL", [BUGGY, FIXED, RUST], tmp_path)
     manifest = json.loads((out / "MANIFEST.json").read_text())
-    for key in ("git_sha", "git_dirty", "binaries", "prompts", "model", "arm",
-                "rounds", "reps", "seed", "temperature", "started_at", "ended_at"):
+    for key in ("git_sha", "git_dirty", "binaries", "prompts", "model", "model_id",
+                "channel", "arm", "rust_mode", "tasks", "rounds", "reps", "seed",
+                "seed_applied", "temperature", "timeout", "versions", "started_at",
+                "ended_at"):
         assert key in manifest, key
     assert manifest["binaries"]["skelnet"]
     assert manifest["binaries"]["concir-backend"]
     assert manifest["arm"] == "SKEL"
+    assert manifest["model_id"] and manifest["channel"]
+    assert manifest["tasks"]["selected"] == ["lock-order/abba_2lock"]
+    assert manifest["seed"] is None and manifest["seed_applied"] is False
+    assert manifest["ended_at"] is not None
+    assert manifest["versions"]["python"]
 
     events = [json.loads(line) for line in
               (out / "audit.jsonl").read_text().splitlines() if line.strip()]
@@ -223,6 +230,23 @@ def test_real_oracle_terminal_pass_through_cmd_run(tmp_path):
         (out / "cells" / "lock-order" / "abba_2lock" / "0" / "result.json").read_text())
     assert result["oracle"]["terminal_check"] == "pass"
     assert result["oracle"]["functional_ok"] is True
+
+
+def test_manifest_written_at_start_and_updated(tmp_path):
+    seen: dict = {}
+
+    def factory(spec, out):
+        # `_build_provider` runs after the start manifest is written.
+        seen["manifest"] = json.loads((out / "MANIFEST.json").read_text())
+        return RecordingClient([BUGGY, FIXED, RUST])
+
+    out = tmp_path / "run_start"
+    args = _args("SKEL", out, rounds=2, reps=1)
+    cli.cmd_run(args, client_factory=factory,
+                oracle_factory=lambda task_dir, terminal: FakeOracle(True))
+    assert seen["manifest"]["ended_at"] is None
+    final = json.loads((out / "MANIFEST.json").read_text())
+    assert final["ended_at"] is not None
 
 
 def test_report_columns(tmp_path):

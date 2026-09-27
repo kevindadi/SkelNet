@@ -56,8 +56,11 @@ mode).
 
 ```
 experiments/<run_id>/
-  MANIFEST.json          # git sha + dirty, binary sha, prompt sha, model, arm,
-                         # rounds, reps, seed, temperature, start/end time
+  MANIFEST.json          # git sha + dirty, binary sha, prompt sha, model +
+                         # model_id + channel, arm, rust_mode, tasks (pattern +
+                         # selected), rounds, reps, seed (null until applied) +
+                         # seed_applied, temperature, timeout, tool versions,
+                         # started_at, ended_at (written at start, updated at end)
   audit.jsonl            # one record per real model call (real cell/task/rep)
   raw/                   # raw prompt/response text (optional)
   cells/<task>/<rep>/
@@ -112,7 +115,11 @@ run directories can be compared in one call.
 
 ## Reproducibility
 
-- `MANIFEST.json` records the git sha, binary sha, prompt sha256, model,
-  parameters and seed.
+- `MANIFEST.json` records the git sha (+ dirty flag), binary sha256, prompt
+  sha256, model/model_id/channel, arm, rust_mode, the task pattern and selected
+  list, rounds/reps, temperature, timeout, tool versions, and start/end times.
+  It is written at run start (`ended_at: null`) and updated at the end. `--seed`
+  is recorded as `"seed": null` with `"seed_applied": false` until it actually
+  takes effect.
 - Prompts are content-addressed (`prompts.prompt_asset_record()`).
 - `eval` re-runs the oracle on stored Rust without any model calls.
