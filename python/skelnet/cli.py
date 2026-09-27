@@ -82,8 +82,19 @@ def _system_sha(assets) -> str:
     return hashlib.sha256(_joined_system_prompt(assets).encode("utf-8")).hexdigest()
 
 
+def default_oracle_factory(*, timeout: float, runner=None):
+    """The real per-task oracle factory used when none is injected.
+
+    Kept as a module-level function so the default path (the one real runs take)
+    is testable: the terminal line must reach the oracle.
+    """
+    def factory(task_dir, terminal):
+        return RustOracle(terminal=terminal, timeout=timeout, runner=runner)
+    return factory
+
+
 def cmd_run(args: argparse.Namespace, *, client_factory=None,
-            oracle_factory=None) -> int:
+            oracle_factory=None, oracle_runner=None) -> int:
     root = repo_root()
     tasks = _select_tasks(root, args.tasks)
     budget = _budget(args.arm, len(tasks), args.reps, args.rounds, args.rust_mode)
@@ -111,6 +122,9 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
     backend = Backend(timeout=args.timeout)
     manifest = _build_manifest(out, args, backend, tasks, started_at, None)
     _write_manifest(out, manifest)
+    if oracle_factory is None:
+        oracle_factory = default_oracle_factory(timeout=args.timeout,
+                                                runner=oracle_runner)
     provider = _build_provider(args, audit, out, client_factory=client_factory)
     summary: dict = {"run_id": out.name, "arm": args.arm, "model": args.model,
                      "budget": budget, "cells": []}
@@ -122,8 +136,7 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         terminal = read_terminal(task_dir)
         # The factory receives the task and its terminal line, so the terminal
         # wiring is exercised (and testable) on every real run.
-        task_oracle = (oracle_factory(task_dir, terminal) if oracle_factory is not None
-                       else RustOracle(terminal=terminal, timeout=args.timeout))
+        task_oracle = oracle_factory(task_dir, terminal)
         for rep in range(args.reps):
             workdir = out / "cells" / task / str(rep)
             workdir.mkdir(parents=True, exist_ok=True)

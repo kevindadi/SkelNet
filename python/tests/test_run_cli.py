@@ -232,6 +232,42 @@ def test_real_oracle_terminal_pass_through_cmd_run(tmp_path):
     assert result["oracle"]["functional_ok"] is True
 
 
+def _terminal_pass_runner(cmd, cwd, timeout):
+    if "build" in cmd:
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    return SimpleNamespace(returncode=0, stdout="DONE t1=1 t2=1\n", stderr="")
+
+
+def test_default_oracle_path_passes_terminal(tmp_path):
+    # No oracle_factory: exercise the real default path (the one real runs take).
+    out = tmp_path / "run_default"
+    args = cli.build_parser().parse_args([
+        "run", "--arm", "G0", "--tasks", "lock-order/abba_2lock", "--reps", "1",
+        "--rounds", "1", "--out", str(out)])
+    rc = cli.cmd_run(args, client_factory=lambda spec, o: RecordingClient([RUST]),
+                     oracle_runner=_terminal_pass_runner)
+    assert rc == 0
+    result = json.loads(
+        (out / "cells" / "lock-order" / "abba_2lock" / "0" / "result.json").read_text())
+    assert result["oracle"]["terminal_check"] == "pass"
+    assert result["oracle"]["functional_ok"] is True
+
+
+def test_default_oracle_path_absent_for_boundary(tmp_path):
+    out = tmp_path / "run_default_boundary"
+    args = cli.build_parser().parse_args([
+        "run", "--arm", "G0", "--tasks", "boundary/rwlock_unsupported", "--reps", "1",
+        "--rounds", "1", "--out", str(out)])
+    rc = cli.cmd_run(args, client_factory=lambda spec, o: RecordingClient([RUST]),
+                     oracle_runner=_terminal_pass_runner)
+    assert rc == 0
+    result = json.loads(
+        (out / "cells" / "boundary" / "rwlock_unsupported" / "0"
+         / "result.json").read_text())
+    assert result["oracle"]["terminal_check"] == "absent"
+    assert result["oracle"]["functional_ok"] is False
+
+
 def test_manifest_written_at_start_and_updated(tmp_path):
     seen: dict = {}
 
