@@ -8,6 +8,13 @@ from skelnet.cli import read_terminal
 from skelnet.oracle import RustOracle, repo_toolchain_channel
 
 
+def _expected_toolchain_channel() -> str:
+    """Independent expectation: read rust-toolchain.toml with tomllib."""
+    import tomllib
+    with (repo_root() / "rust-toolchain.toml").open("rb") as handle:
+        return tomllib.load(handle)["toolchain"]["channel"]
+
+
 def test_read_terminal_from_requirements():
     root = repo_root()
     assert read_terminal(root / "benchmarks/tasks/lock-order/abba_2lock") == "DONE t1=1 t2=1"
@@ -79,9 +86,10 @@ def test_oracle_pins_rustup_toolchain(tmp_path):
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     RustOracle(terminal=None, runner=runner).evaluate("fn main() {}", tmp_path)
-    channel = repo_toolchain_channel()
-    assert channel, "expected a channel in rust-toolchain.toml"
-    assert seen["env"].get("RUSTUP_TOOLCHAIN") == channel
+    expected = _expected_toolchain_channel()
+    assert expected, "expected a channel in rust-toolchain.toml"
+    assert repo_toolchain_channel() == expected
+    assert seen["env"].get("RUSTUP_TOOLCHAIN") == expected
 
 
 def test_terminal_not_run_on_timeout(tmp_path):

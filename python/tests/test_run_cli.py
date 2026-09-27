@@ -11,6 +11,13 @@ from skelnet import cli, prompts
 from skelnet.backend import repo_root
 from skelnet.oracle import FakeOracle, RustOracle, repo_toolchain_channel
 
+
+def _expected_toolchain_channel() -> str:
+    """Independent expectation: read rust-toolchain.toml with tomllib."""
+    import tomllib
+    with (repo_root() / "rust-toolchain.toml").open("rb") as handle:
+        return tomllib.load(handle)["toolchain"]["channel"]
+
 BUGGY = """```skel
 skeleton abba_bug;
 mutex a;
@@ -159,7 +166,8 @@ def test_manifest_and_audit_cell_ids(tmp_path):
     assert manifest["seed"] is None and manifest["seed_applied"] is False
     assert manifest["ended_at"] is not None
     assert manifest["versions"]["python"]
-    assert manifest["versions"]["toolchain"] == repo_toolchain_channel()
+    assert repo_toolchain_channel() == _expected_toolchain_channel()
+    assert manifest["versions"]["toolchain"] == _expected_toolchain_channel()
 
     events = [json.loads(line) for line in
               (out / "audit.jsonl").read_text().splitlines() if line.strip()]
@@ -323,6 +331,18 @@ def test_out_regular_file_is_rejected(tmp_path):
     with pytest.raises(SystemExit):
         cli._prepare_out(out, force=False)
 
+
+def test_tool_version_pins_rustup_toolchain(monkeypatch):
+    seen: dict = {}
+
+    def fake_run(cmd, **kwargs):
+        seen["cmd"] = cmd
+        seen["env"] = kwargs.get("env")
+        return SimpleNamespace(returncode=0, stdout="rustc 1.0.0\n", stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    assert cli._tool_version("rustc") == "rustc 1.0.0"
+    assert seen["env"]["RUSTUP_TOOLCHAIN"] == _expected_toolchain_channel()
 
 
 def test_eval_summary_only_selected_cells(tmp_path):
