@@ -363,7 +363,7 @@ fn prec(e: &Expr) -> u8 {
     }
 }
 
-fn fmt_expr(e: &Expr) -> String {
+pub fn fmt_expr(e: &Expr) -> String {
     fmt_expr_prec(e, 0)
 }
 

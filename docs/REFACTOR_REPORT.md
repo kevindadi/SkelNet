@@ -46,6 +46,68 @@ Command: `git diff --cached | grep -nE '(sk-|key-)[A-Za-z0-9_-]{16,}'`
 
 ---
 
+## P3 — lowering, source map, feedback remapping
+
+### Changes
+
+- `crates/skel/src/lower.rs` — total lowering of the checked AST to a
+  `concir::ast::Program` plus a `SourceMap` (§5.1/§5.2/§5.4). Dense `s1..sn`
+  sids per function, backpatched jump targets, `form:"closure"` for
+  scope/spawn targets, `provides`/`requires` computed, source-map `stmts`,
+  `functions`, `resources`, `json_paths`.
+- §5.3 early exits: `return`/`break`/`continue` emit
+  `implicit_release_on_exit` unlocks/releases inside-out before the jump, with
+  `block_span` on the owning lock/permit block.
+- `crates/skel/src/feedback.rs` — maps ConcIR validation diagnostics,
+  `invalid`/`unsupported`, explore diagnostics, counterexamples (`StepLabel`
+  origin, `cir_statements`, `doom_state`) back to DSL spans; counts `unmapped`;
+  renders the §5.5 counterexample table; extracts property→req from a contract.
+- `skelnet` CLI gains `lower` (`-o`, `--map`), `check` (front-end + lower +
+  `concir::validate` + `concir::sem::program::lower` support, remapped), and
+  `verify` (explore + remapped feedback, `--engine`, `--json`).
+
+### Tests
+
+`cargo test -p skel --offline` → 34 tests (31 front-end + 3 in
+`tests/verify.rs`):
+
+- `mapping_table_covers_each_row`: one skeleton exercises every §5.2 row and
+  asserts the CIR resource fields (`count`, `capacity`, `base`, `init`,
+  `protection`) and the full set of emitted op kinds.
+- `early_exit_releases_inside_out_and_maps`: nested locks with an early
+  `return` produce `mutex_unlock b`, `mutex_unlock a`, `return` with both
+  releases marked `implicit_release_on_exit` and carrying a `block_span`.
+- `feedback_remap_has_no_unmapped_and_no_goal_leak`: an ABBA-bug skeleton
+  verifies FAIL; `unmapped == 0`, every counterexample step has a DSL line, and
+  the rendered text contains no contract goal.
+
+Manual checks: `skelnet verify` on the Appendix B (ABBA) and Appendix C
+(condvar) skeletons against the real ConcPlanVerify contracts gives PASS with
+all per-property outcomes equal to BASELINE and `unmapped == 0`.
+
+### Deviations / Open questions
+
+- **`compute` lowers to ConcIR `nop`, not `seq_hole`.** §5.2 says
+  `compute` → `seq_hole`, but ConcIR `a35dc86` classifies `seq_hole` as
+  UNSUPPORTED in the precise backend ("sequential fill sites have no defined
+  semantics yet"), so *any* skeleton containing a compute hole would be
+  UNSUPPORTED and could never match a PASS baseline (e.g. Appendix B ABBA).
+  `nop` is ConcIR's supported, semantics-neutral construct; the source-map
+  entry still uses `construct: "seq_hole"` so codegen/adhere can identify the
+  hole. This is the one deliberate mapping-table deviation and is called out
+  for reviewer confirmation.
+- The source map's `span` serialises `line/col/end_line/end_col` (matching the
+  §5.4 example); byte offsets are omitted there.
+- `requires` is computed by scanning emitted ops for cross-module resource and
+  callee FQNs. Cross-module resources referenced only inside an expression
+  string (not as an op target) are not collected; no gold needs this.
+- Per-step "holds after" in the §5.5 table is not available from a ConcIR
+  `StepLabel`; the renderer prints step/thread/function/line/statement and a
+  `final:` line built from `doom_state` (holds + waits). Every step still has a
+  DSL line number, and no contract goal is disclosed.
+
+---
+
 ## P2 — `crates/skel`: lexer, parser, AST, fmt, front-end checks
 
 ### Changes

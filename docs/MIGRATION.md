@@ -94,4 +94,9 @@ New code, not migrated: `crates/skel/` with `span.rs`, `lexer.rs`, `ast.rs`,
 `skelnet`) and `tests/frontend.rs`. The parser is hand-written (lexer +
 recursive descent); no parser-generator dependency was added.
 
-## P3-P7 (pending)
+## P3: lowering + feedback (new code)
+
+Added `crates/skel/src/lower.rs` and `crates/skel/src/feedback.rs`; extended the
+`skelnet` CLI (`lower`, `check`, `verify`). Not migrated.
+
+## P4-P7 (pending)

@@ -3,8 +3,10 @@
 pub mod ast;
 pub mod check;
 pub mod error;
+pub mod feedback;
 pub mod fmt;
 pub mod lexer;
+pub mod lower;
 pub mod parser;
 pub mod span;
 
