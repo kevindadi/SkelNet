@@ -64,7 +64,13 @@ Command: `git diff --cached | grep -nE '(sk-|key-)[A-Za-z0-9_-]{16,}'`
    '\.env$'` → none. `git check-ignore -v .env` →
    `.gitignore:2:.env	.env`. `git ls-files | grep '(^|/)\.env$'` → none.
    `git grep -nE '(sk-|key-)[A-Za-z0-9_-]{16,}'` → none. `git remote -v` shows
-   only the original `origin`; no push was performed.
+   only the original `origin`.
+   **Observation (not an assistant action):** the remote-tracking ref
+   `refs/remotes/origin/main` reflog records an `update by push` at commit
+   `131c07c` (P5) — no `git push` was run by this session, and no hook/alias is
+   configured; an external actor (e.g. the editor) appears to have pushed
+   P0–P5. P6 (`83d19db`) and P7 (`ec709ea`) remain local and unpushed. No
+   force-push or remote change was performed; flagged for the human reviewer.
 2. **Source repos untouched.** ConcPlanVerify HEAD `8bf9fa49b…`, ConcIR HEAD
    `a35dc86…`, both `git status --short` empty; no tags created.
 3. **Offline build/test; no new deps.** `cargo build --workspace --offline` ok;
