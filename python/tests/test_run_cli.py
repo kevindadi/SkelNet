@@ -238,6 +238,16 @@ def _terminal_pass_runner(cmd, cwd, timeout):
     return SimpleNamespace(returncode=0, stdout="DONE t1=1 t2=1\n", stderr="")
 
 
+def test_g0_with_codegen_is_rejected(tmp_path):
+    parser = cli.build_parser()
+    for extra in (["--dry-run"], []):
+        args = parser.parse_args([
+            "run", "--arm", "G0", "--rust-mode", "codegen", *extra,
+            "--out", str(tmp_path / "g0codegen")])
+        with pytest.raises(SystemExit):
+            cli.cmd_run(args)
+
+
 def test_default_oracle_path_passes_terminal(tmp_path):
     # No oracle_factory: exercise the real default path (the one real runs take).
     out = tmp_path / "run_default"

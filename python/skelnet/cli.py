@@ -95,6 +95,10 @@ def default_oracle_factory(*, timeout: float, runner=None):
 
 def cmd_run(args: argparse.Namespace, *, client_factory=None,
             oracle_factory=None, oracle_runner=None) -> int:
+    if args.arm == "G0" and args.rust_mode == "codegen":
+        raise SystemExit(
+            "--arm G0 writes Rust directly and has no codegen stage; "
+            "use --rust-mode llm")
     root = repo_root()
     tasks = _select_tasks(root, args.tasks)
     budget = _budget(args.arm, len(tasks), args.reps, args.rounds, args.rust_mode)
