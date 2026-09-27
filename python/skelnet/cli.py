@@ -7,6 +7,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -120,11 +121,16 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         return 0
 
     out = Path(args.out)
+    if out.exists() and any(out.iterdir()):
+        if not args.force:
+            raise SystemExit(
+                f"output directory {out} is not empty; pass --force to overwrite")
+        shutil.rmtree(out)
     out.mkdir(parents=True, exist_ok=True)
     started_at = time.time()
     audit = AuditLog(out / "audit.jsonl", raw_dir=out / "raw")
     backend = Backend(timeout=args.timeout)
-    manifest = _build_manifest(out, args, backend, tasks, started_at, None)
+    manifest = _build_manifest(out, args, backend, tasks, started_at, None, budget)
     _write_manifest(out, manifest)
     if oracle_factory is None:
         oracle_factory = default_oracle_factory(timeout=args.timeout,
@@ -203,11 +209,12 @@ def _tool_version(command: str) -> str | None:
 
 def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
                     tasks: list[Path], started_at: float,
-                    ended_at: float | None) -> dict:
+                    ended_at: float | None, budget: dict | None = None) -> dict:
     spec = resolve_model(build_registry(), args.model)
     tasks_root = repo_root() / "benchmarks" / "tasks"
     return {
         "run_id": out.name,
+        "budget": budget,
         "git_sha": _git(["rev-parse", "HEAD"]).strip(),
         "git_dirty": bool(_git(["status", "--porcelain"]).strip()),
         "binaries": {
@@ -376,12 +383,34 @@ def _summary_from_run(run_dir: Path) -> dict:
     manifest_path = run_dir / "MANIFEST.json"
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    cells = [json.loads(path.read_text(encoding="utf-8"))
-             for path in sorted(run_dir.glob("cells/**/result.json"))]
-    return {"run_id": manifest.get("run_id", run_dir.name),
-            "arm": manifest.get("arm", "?"),
-            "model": manifest.get("model", "?"),
-            "cells": cells}
+    cells = _selected_cells(run_dir, manifest)
+    summary = {"run_id": manifest.get("run_id", run_dir.name),
+               "arm": manifest.get("arm", "?"),
+               "model": manifest.get("model", "?"),
+               "cells": cells}
+    if "budget" in manifest:
+        summary["budget"] = manifest["budget"]
+    return summary
+
+
+def _selected_cells(run_dir: Path, manifest: dict) -> list[dict]:
+    """Cells declared by the manifest (selected tasks x reps), else all cells.
+
+    A run directory is single-run: stale cells from another task must not leak
+    into the summary.
+    """
+    selected = (manifest.get("tasks") or {}).get("selected")
+    reps = manifest.get("reps")
+    if isinstance(selected, list) and isinstance(reps, int):
+        cells = []
+        for task in selected:
+            for rep in range(reps):
+                path = run_dir / "cells" / task / str(rep) / "result.json"
+                if path.exists():
+                    cells.append(json.loads(path.read_text(encoding="utf-8")))
+        return cells
+    return [json.loads(path.read_text(encoding="utf-8"))
+            for path in sorted(run_dir.glob("cells/**/result.json"))]
 
 
 def cmd_report(args: argparse.Namespace) -> int:
@@ -449,6 +478,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--rounds", type=int, default=4)
     run.add_argument("--out", default="experiments/run")
     run.add_argument("--rust-mode", default="llm", choices=["llm", "codegen"])
+    run.add_argument("--force", action="store_true",
+                     help="overwrite a non-empty output directory")
     run.add_argument("--seed", type=int, default=0)
     run.add_argument("--temperature", type=float, default=0.0)
     run.add_argument("--dry-run", action="store_true")

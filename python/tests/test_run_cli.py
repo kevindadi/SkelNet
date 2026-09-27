@@ -249,6 +249,49 @@ def test_g0_with_codegen_is_rejected(tmp_path):
             cli.cmd_run(args)
 
 
+def test_run_refuses_nonempty_out(tmp_path):
+    out = tmp_path / "nonempty"
+    out.mkdir()
+    (out / "stale.txt").write_text("x", encoding="utf-8")
+    args = cli.build_parser().parse_args([
+        "run", "--arm", "G0", "--tasks", "lock-order/abba_2lock", "--reps", "1",
+        "--rounds", "1", "--out", str(out)])
+    with pytest.raises(SystemExit):
+        cli.cmd_run(args, client_factory=lambda spec, o: RecordingClient([RUST]),
+                    oracle_factory=lambda task_dir, terminal: FakeOracle(True))
+
+
+def test_run_force_overwrites_out(tmp_path):
+    out = tmp_path / "force"
+    out.mkdir()
+    (out / "stale.txt").write_text("x", encoding="utf-8")
+    args = cli.build_parser().parse_args([
+        "run", "--arm", "G0", "--tasks", "lock-order/abba_2lock", "--reps", "1",
+        "--rounds", "1", "--out", str(out), "--force"])
+    rc = cli.cmd_run(args, client_factory=lambda spec, o: RecordingClient([RUST]),
+                     oracle_factory=lambda task_dir, terminal: FakeOracle(True))
+    assert rc == 0
+    assert not (out / "stale.txt").exists()
+
+
+def test_eval_summary_only_selected_cells(tmp_path):
+    out, _ = _run_arm("G0", [RUST], tmp_path)
+    before = json.loads((out / "SUMMARY.json").read_text())
+    # A stray cell from another task must not leak into the summary.
+    stray = out / "cells" / "lock-order" / "cycle_3lock" / "0"
+    stray.mkdir(parents=True)
+    (stray / "result.json").write_text(json.dumps(
+        {"arm": "G0", "task": "lock-order/cycle_3lock", "replicate": 0}),
+        encoding="utf-8")
+    cli.cmd_eval(cli.build_parser().parse_args(["eval", str(out)]),
+                 runner=_terminal_pass_runner)
+    after = json.loads((out / "SUMMARY.json").read_text())
+    assert set(after.keys()) == set(before.keys())
+    assert len(after["cells"]) == len(before["cells"])
+    assert after.get("budget") == before.get("budget")
+    assert {c["task"] for c in after["cells"]} == {"lock-order/abba_2lock"}
+
+
 def test_default_oracle_path_passes_terminal(tmp_path):
     # No oracle_factory: exercise the real default path (the one real runs take).
     out = tmp_path / "run_default"
