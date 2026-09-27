@@ -198,10 +198,11 @@ fn cmd_check(args: &[String]) -> i32 {
     }
     if has_frontend_error(&errors) {
         if json {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&errors).expect("serialize")
-            );
+            let out = serde_json::json!({
+                "valid": false, "unmapped": 0, "diagnostics": errors,
+                "support_error": serde_json::Value::Null,
+            });
+            println!("{}", serde_json::to_string_pretty(&out).expect("serialize"));
         } else {
             print_errors(&file, &errors, false);
         }
@@ -211,10 +212,11 @@ fn cmd_check(args: &[String]) -> i32 {
         Ok(l) => l,
         Err(errs) => {
             if json {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&errs).expect("serialize")
-                );
+                let out = serde_json::json!({
+                    "valid": false, "unmapped": 0, "diagnostics": errs,
+                    "support_error": serde_json::Value::Null,
+                });
+                println!("{}", serde_json::to_string_pretty(&out).expect("serialize"));
             } else {
                 print_errors(&file, &errs, false);
             }

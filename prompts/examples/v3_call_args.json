@@ -1,0 +1,34 @@
+{
+  "program": "call_with_args",
+  "version": "3.5.0",
+  "entry": "main::main",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {"resources": [], "functions": ["main", "step"]},
+      "requires": {"resources": [], "functions": []},
+      "resources": [],
+      "protection": [],
+      "functions": [
+        {
+          "name": "step",
+          "kind": "normal",
+          "params": [{"name": "n", "type": "Int", "modeled": true}],
+          "locals": [{"name": "tmp", "type": "Int", "modeled": true, "init": 0}],
+          "body": [
+            {"sid": "s1", "kind": "assign_local", "target": "tmp", "expr": "n"},
+            {"sid": "s2", "kind": "return", "value": "tmp"}
+          ]
+        },
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {"sid": "s1", "kind": "call", "func": "main::step", "args": ["1"]},
+            {"sid": "s2", "kind": "return"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -111,4 +111,24 @@ Brought in from `ConcPlanVerify/benchmarks/families` (commit `8bf9fa49b`) into
 New: 25 `gold.skel` files, `benchmarks/MANIFEST.json` (sha256 + source path),
 `benchmarks/DEVIATIONS.json`.
 
-## P5-P7 (pending)
+## P5: Python orchestration + prompts
+
+Brought in from `ConcPlanVerify/python/cir_workflow` (commit `8bf9fa49b`),
+verbatim with import fixes: `env.py`, `models.py`, `json_utils.py`, `llm.py`,
+`transport.py`, `providers.py`, `direct.py`, `opencode_go.py`.
+
+Reimplemented compactly (dependencies on removed/network modules): `audit.py`,
+`channels.py`, `backend.py`, `prompts.py`, `pipeline.py`, `oracle.py`,
+`evidence.py`, `cli.py`, `__main__.py`.
+
+Not migrated: `arms.py`, `experiments_v2.py`, `results.py`, `gen_results.py`,
+`flash_smoke.py`, `normalize.py`, `extract.py`, `patch_repair.py`,
+`offline_workflow.py`, `mutation_protocol.py`, `detection.py`, `structural.py`,
+`contract_strength.py`, `scale.py`, `live.py`, `cursor_harness.py`, all
+`scripts/`, and the ConcIR repair-client paths in `concir_client.py`.
+
+Prompts: new `skel_generation_v1.md`, `skel_feedback_v1.md`,
+`rust_from_skel_v1.md`; migrated `concir_generation_v4.md`,
+`rust_from_cir_v2.md`, `rust_generation_v1.md`, `examples/*`.
+
+## P6-P7 (pending)

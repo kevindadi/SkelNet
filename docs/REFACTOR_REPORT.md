@@ -46,6 +46,77 @@ Command: `git diff --cached | grep -nE '(sk-|key-)[A-Za-z0-9_-]{16,}'`
 
 ---
 
+## P5 — Python package, prompts, fake-LLM tests
+
+### Changes
+
+`python/skelnet/`:
+
+- Verbatim from ConcPlanVerify (imports adjusted): `env.py`, `models.py`,
+  `json_utils.py`, `llm.py`, `transport.py`, `providers.py`, `direct.py`,
+  `opencode_go.py`. `providers.CandidateRequest` gained a `stage` field.
+- `channels.py` — adapted: direct channels use `DirectChatClient`; the Cursor
+  channel is removed (no `cursor_harness` in this repo); `AuditedClient`
+  unchanged in spirit.
+- `audit.py` — compact `AuditLog.model_call` (sha256 prompt/response, optional
+  raw dir; never stores keys).
+- `backend.py` — wraps the `skelnet` / `concir-backend` binaries (check /
+  verify / lower / verify_cir) and archives exit codes and output.
+- `prompts.py` — prompt loading + `build_check_feedback` /
+  `build_explore_feedback` (disclosure-safe: property ids, outcomes, DSL-mapped
+  positions, counterexamples; never the contract goal).
+- `pipeline.py` — the three arms (`run_g0_cell`, `run_skel_cell`,
+  `run_cir_cell`) with one shared revision loop.
+- `oracle.py` — external Rust evaluator (build/run/terminal check) with
+  `FakeOracle` for offline tests.
+- `evidence.py` — per-property ledger + sufficiency.
+- `cli.py` + `__main__.py` — `run` (incl. `--dry-run`), `eval`, `report`.
+
+Prompts: new `skel_generation_v1.md`, `skel_feedback_v1.md`,
+`rust_from_skel_v1.md`; migrated `concir_generation_v4.md`,
+`rust_from_cir_v2.md`, `rust_generation_v1.md` and `examples/*`.
+`python/requirements.txt` (openai, cursor-sdk) and
+`python/requirements-dev.txt` (pytest).
+
+### Tests
+
+- `python/tests` (16 tests) pass. Canonical command
+  `python -m pytest python/tests` requires pytest (dev dep). In this
+  environment pytest is not installed in the system interpreter, so the suite
+  was run as `PYTHONPATH=python <pytest> python/tests` (pytest 9.1.1) → 16
+  passed.
+- `test_pipeline_skel.py`: fake provider returns a deadlocking ABBA skeleton,
+  then a fixed one; the real `skelnet` backend returns FAIL (with remapped
+  feedback carrying a DSL line number), then PASS; then Rust is generated and
+  the shared oracle passes.
+- `test_pipeline_cir.py`, `test_pipeline_g0.py`: same evaluator, other arms.
+- `test_feedback_disclosure.py`: feedback has per-step DSL lines and contains no
+  `goal`/`function_completed`/`holds_all`.
+- `test_env_not_tracked.py`: `.env` is ignored, untracked, and `.env.example`
+  has no values.
+- `test_backend.py` exercises the real `skelnet` binary (check/lower/verify).
+- `python -m skelnet run --arm SKEL --tasks all --reps 3 --rounds 4 --dry-run`
+  prints the request budget and prompt shas without calling a model.
+
+### Deviations / Open questions
+
+- The large ConcPlanVerify modules (`generation.py`, `revision_workflow.py`,
+  `rust_oracle.py`, `rust_arm.py`, `evidence_v2.py`, `candidate_eval.py`,
+  `binding.py`, `conformance.py`, `bounded_monitor.py`) were **reimplemented
+  compactly** as `pipeline.py` / `oracle.py` / `evidence.py` rather than copied
+  verbatim, because they depend on removed modules (repair, live clients,
+  cursor) or on network. Their public responsibilities and the disclosure
+  policy are preserved; `oracle.py` currently does build/run/terminal scoring,
+  with instrumentation/monitor left as an explicit TODO fallback.
+- `python -m pytest` needs pytest, which is not in the base interpreter here;
+  added `requirements-dev.txt`. The suite was verified with the available
+  pytest binary. Reviewer action: install `python/requirements-dev.txt` and run
+  `python -m pytest python/tests`.
+- The Cursor channel is dropped (its SDK harness is out of scope); the registry
+  keeps the entry marked blocked.
+
+---
+
 ## P4 — benchmark migration + gold.skel + equivalence
 
 ### Changes

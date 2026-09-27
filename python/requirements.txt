@@ -1,0 +1,2 @@
+openai>=1.68,<=2
+cursor-sdk>=1.0
