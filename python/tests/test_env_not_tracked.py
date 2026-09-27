@@ -12,7 +12,7 @@ def _git(*args: str) -> subprocess.CompletedProcess:
 
 
 def test_env_is_ignored():
-    assert (REPO / ".env").exists(), "expected a local .env (copied in P0)"
+    # Independent of whether a local .env exists: it must be ignored by git.
     out = _git("check-ignore", "-v", ".env")
     assert out.returncode == 0
     assert ".env" in out.stdout

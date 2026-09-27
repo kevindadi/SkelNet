@@ -1,19 +1,41 @@
 """External Rust evaluator shared by all arms.
 
 Every arm's final Rust is scored by this one evaluator: build (std-only +
-``concir_sync``), run, and check the required terminal line. Instrumentation /
-runtime monitoring is a best-effort fallback and is not mixed into the code
-score. Tests inject :class:`FakeOracle`; no network or LLM is involved.
+``concir_sync``), run, and check the task's required terminal line. A missing
+terminal line is recorded as ``terminal_check: "absent"`` and is never counted
+as a pass. Instrumentation / runtime monitoring is a best-effort fallback and is
+not mixed into the code score. Tests inject :class:`FakeOracle` or a fake
+``runner``; no network or LLM is involved.
 """
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 CONCIR_SYNC_CRATE = Path(__file__).resolve().parents[2] / "runtime/concir_sync"
+
+
+def repo_toolchain_channel() -> str | None:
+    """The `channel` from the repository's rust-toolchain.toml, or None.
+
+    rustup resolves a toolchain relative to the working directory, so a cargo
+    run outside the repo would otherwise pick up the default toolchain. The
+    oracle pins `RUSTUP_TOOLCHAIN` to this value explicitly.
+    """
+    path = Path(__file__).resolve().parents[2] / "rust-toolchain.toml"
+    if not path.exists():
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("channel"):
+            _, _, value = stripped.partition("=")
+            value = value.strip().strip('"').strip("'")
+            return value or None
+    return None
 
 
 def cargo_toml(name: str, *, bin_path: str = "src/main.rs") -> str:
@@ -35,44 +57,81 @@ concir_sync = {{ path = "{CONCIR_SYNC_CRATE}" }}
 class OracleResult:
     built: bool = False
     ran: bool = False
-    functional_ok: bool = False
+    # run_ok: built, exited 0, and did not time out (recorded in every mode).
+    run_ok: bool = False
+    # functional_ok is None when the terminal line is not checked (codegen mode).
+    functional_ok: bool | None = None
     monitor_ok: bool | None = None
+    # "pass" | "fail" | "absent" | "not_applicable" | "not_run"
+    terminal_check: str = "not_run"
     stdout: str = ""
     stderr: str = ""
     details: dict[str, Any] = field(default_factory=dict)
 
 
+def _default_runner(cmd: list[str], cwd: Path, timeout: float, env: dict[str, str]):
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                          timeout=timeout, env=env)
+
+
 class RustOracle:
     def __init__(self, *, terminal: str | None = None, timeout: float = 180.0,
-                 cargo: str = "cargo") -> None:
+                 cargo: str = "cargo",
+                 runner: Callable[[list[str], Path, float, dict], Any] | None = None,
+                 toolchain: str | None = None) -> None:
         self.terminal = terminal
         self.timeout = timeout
         self.cargo = cargo
+        self.runner = runner or _default_runner
+        # Pin the toolchain so a cargo run outside the repo uses the same one
+        # the MANIFEST records.
+        self.toolchain = toolchain if toolchain is not None else repo_toolchain_channel()
 
-    def evaluate(self, rust_source: str, workdir: Path | str) -> OracleResult:
+    def evaluate(self, rust_source: str, workdir: Path | str, *,
+                 extra_files: dict[str, str] | None = None,
+                 check_terminal: bool = True) -> OracleResult:
         workdir = Path(workdir)
         src = workdir / "src"
         src.mkdir(parents=True, exist_ok=True)
         (workdir / "Cargo.toml").write_text(cargo_toml("probe"), encoding="utf-8")
         (src / "main.rs").write_text(rust_source, encoding="utf-8")
+        for rel, content in (extra_files or {}).items():
+            target = workdir / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+        env = dict(os.environ)
+        if self.toolchain:
+            env["RUSTUP_TOOLCHAIN"] = self.toolchain
         try:
-            build = subprocess.run([self.cargo, "build", "--offline"],
-                                   cwd=workdir, capture_output=True, text=True,
-                                   timeout=self.timeout)
+            build = self.runner([self.cargo, "build", "--offline"], workdir,
+                                self.timeout, env)
         except (OSError, subprocess.TimeoutExpired) as exc:
-            return OracleResult(built=False, stderr=str(exc))
+            return OracleResult(built=False, run_ok=False, terminal_check="not_run",
+                                stderr=str(exc))
         if build.returncode != 0:
-            return OracleResult(built=False, stderr=build.stderr)
+            return OracleResult(built=False, run_ok=False, terminal_check="not_run",
+                                stderr=build.stderr)
         try:
-            run = subprocess.run([self.cargo, "run", "--offline", "--quiet"],
-                                 cwd=workdir, capture_output=True, text=True,
-                                 timeout=self.timeout)
+            run = self.runner([self.cargo, "run", "--offline", "--quiet"],
+                              workdir, self.timeout, env)
         except (OSError, subprocess.TimeoutExpired) as exc:
-            return OracleResult(built=True, ran=False, stderr=str(exc))
-        ok = run.returncode == 0
-        if self.terminal is not None:
-            ok = ok and self.terminal in run.stdout
-        return OracleResult(built=True, ran=True, functional_ok=ok,
+            return OracleResult(built=True, ran=False, run_ok=False,
+                                terminal_check="not_run", stderr=str(exc))
+        run_ok = run.returncode == 0
+        if not check_terminal:
+            # Deterministic codegen: there is no task-specific terminal line.
+            return OracleResult(built=True, ran=True, run_ok=run_ok,
+                                functional_ok=None, terminal_check="not_applicable",
+                                stdout=run.stdout, stderr=run.stderr)
+        if self.terminal is None:
+            terminal_check = "absent"
+        elif self.terminal in run.stdout:
+            terminal_check = "pass"
+        else:
+            terminal_check = "fail"
+        functional_ok = run_ok and terminal_check == "pass"
+        return OracleResult(built=True, ran=True, run_ok=run_ok,
+                            functional_ok=functional_ok, terminal_check=terminal_check,
                             stdout=run.stdout, stderr=run.stderr)
 
 
@@ -81,9 +140,21 @@ class FakeOracle:
 
     def __init__(self, functional_ok: bool = True) -> None:
         self.functional_ok = functional_ok
+        self.terminal_check = "pass" if functional_ok else "fail"
         self.calls: list[str] = []
 
-    def evaluate(self, rust_source: str, workdir: Path | str) -> OracleResult:
+    def evaluate(self, rust_source: str, workdir: Path | str, *,
+                 extra_files: dict[str, str] | None = None,
+                 check_terminal: bool = True) -> OracleResult:
         self.calls.append(rust_source)
-        return OracleResult(built=True, ran=True, functional_ok=self.functional_ok,
-                            stdout="DONE\n", details={"fake": True})
+        if check_terminal:
+            terminal_check = "pass" if self.functional_ok else "fail"
+            functional_ok = self.functional_ok
+        else:
+            terminal_check = "not_applicable"
+            functional_ok = None
+        return OracleResult(built=True, ran=True, run_ok=True,
+                            functional_ok=functional_ok,
+                            terminal_check=terminal_check, stdout="DONE\n",
+                            details={"fake": True,
+                                     "extra_files": sorted((extra_files or {}).keys())})

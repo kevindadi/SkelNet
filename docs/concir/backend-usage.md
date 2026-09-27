@@ -1,49 +1,45 @@
 # ConcIR backend: usage, support matrix, and migration
 
+> **SkelNet migration note.** The repair experiment line was removed from this
+> vendored copy: the `repair`, `replay`, `bench`, `repair-context`, and
+> `evaluate-patch` subcommands, the `src_mutate` mode of `concir-instrument`,
+> and the validate-only `cir` binary no longer exist. Sections below that
+> describe repair (`## Structured patch and repair`, the repair search, and the
+> `repair`/`replay`/`bench` reproducible checks) are **historical** and kept for
+> provenance; the current CLI is listed under "Commands". See
+> [`../MIGRATION.md`](../MIGRATION.md).
+
 This page is the operator-facing companion to [`backend-design.md`](backend-design.md).
 It documents what the non-LLM backend supports, the commands, the model
 boundaries, and the static-validator changes.
 
 ## Commands
 
-Build once:
+From the workspace root, after `cargo build --workspace`:
 
 ```bash
-cargo build --release
-```
+# Static validation (was the removed `cir` binary; now a `concir-backend` subcommand).
+./target/debug/concir-backend check   crates/concir/examples/producer_consumer.json
 
-Static validation (unchanged, `concir` binary):
-
-```bash
-./target/release/concir examples/producer_consumer.json
-```
-
-Backend (`concir-backend` binary):
-
-```bash
 # Property verification. Optional contract JSON and engine (petri default).
-./target/release/concir-backend explore examples/producer_consumer.json
-./target/release/concir-backend explore examples/lockorder_bug.json examples/lockorder_contract.json
-./target/release/concir-backend explore <program.json> <contract.json> interp
+./target/debug/concir-backend explore crates/concir/examples/producer_consumer.json
+./target/debug/concir-backend explore crates/concir/examples/lockorder_bug.json crates/concir/examples/lockorder_contract.json
+./target/debug/concir-backend explore <program.json> <contract.json> interp
 
 # Supportability report (prints every Unsupported construct).
-./target/release/concir-backend support examples/complex_rwlock.json
+./target/debug/concir-backend support crates/concir/examples/complex_rwlock.json
 
-# Deterministic, LLM-free repair. Optional candidate file and budget.
-./target/release/concir-backend repair examples/lockorder_bug.json examples/lockorder_contract.json
-./target/release/concir-backend repair <program.json> <contract.json> <patches.json> 16
-./target/release/concir-backend repair <program.json> <contract.json> --strategy c --artifact out.json
-./target/release/concir-backend replay out.json
-./target/release/concir-backend bench [--artifact bench.json]
+# Deterministic Rust project generation and trace conformance.
+./target/debug/concir-backend codegen <program.json> --out <dir>
+./target/debug/concir-backend conform <program.json> trace.jsonl
+./target/debug/concir-backend monitor --contract <contract.json> --traces <dir>
 
 # List enabled steps from the initial state (reference interpreter).
-./target/release/concir-backend run examples/producer_consumer.json
+./target/debug/concir-backend run crates/concir/examples/producer_consumer.json
 ```
 
-Exit codes: `0` PASS / repaired / already satisfied, `1` FAIL / no acceptable
-candidate / budget exhausted, `2` usage or input error, `3` UNKNOWN, `4`
-INVALID (static, semantic, or configuration), `5` UNSUPPORTED. `repair` uses
-the same categories as `explore`.
+Exit codes: `0` PASS, `1` FAIL, `2` usage or input error, `3` UNKNOWN, `4`
+INVALID (static, semantic, or configuration), `5` UNSUPPORTED.
 
 Verification output is a JSON `VerificationReport` with an `outcome` of
 `PASS` / `FAIL` / `UNKNOWN` / `INVALID` / `UNSUPPORTED`, per-property results,
@@ -99,11 +95,14 @@ as a no-op, and it never yields `PASS`.
 
 ## Verification contract
 
-See `doc/backend-design.md` §6 and `examples/lockorder_contract.json`. A
-contract fixes the required properties, preserved behaviour, assumptions,
-analysis bounds, and the allowed patch scope. It is immutable during repair.
+See [`backend-design.md`](backend-design.md) §6 and
+`crates/concir/examples/lockorder_contract.json`. A contract fixes the required
+properties, preserved behaviour, assumptions, and analysis bounds.
 
-## Structured patch and repair
+## Structured patch and repair (removed in the SkelNet migration)
+
+> The `repair`/`replay`/`bench` commands and the `repair` module were removed
+> from this vendored copy; this section is retained for provenance only.
 
 `CirPatch` targets a `(module, function)`, records the target's content hash,
 and carries structured changes with provenance. Supported changes:
@@ -330,16 +329,13 @@ cargo test --test differential
 cargo test --test semantics_regression
 cargo test --test validator_risks
 cargo test --test interp_petri_diff
-cargo test --test repair_e2e
-cargo test --test repair_search
-cargo test --test benchmark
 cargo test --test dot_export
 ```
 
 `tests/repro_round2/` … `tests/repro_round5/` contain the review
-counterexamples (CIR, contracts, patches) as fixtures; `tests/repro_bench/`
-contains the development-benchmark cases. See `CODE_REVIEW_ROUND2.md` …
-`CODE_REVIEW_ROUND5.md` and `REPAIR_LOOP_HANDOFF.md`.
+counterexamples (CIR and contracts) as fixtures. The repair tests
+(`repair_e2e`, `repair_search`, `benchmark`) and the `src_mutate` test were
+removed with the repair line; see [`../MIGRATION.md`](../MIGRATION.md).
 
 Toolchain used for the recorded results: `rustc 1.100.0-nightly`, on macOS.
 The crate pins its toolchain with a root `rust-toolchain.toml`; the 2026-09-18

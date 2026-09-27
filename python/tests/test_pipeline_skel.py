@@ -49,3 +49,18 @@ def test_skel_arm_revises_then_accepts(tmp_path):
     # The second request actually carried remapped feedback with a line number.
     assert provider.calls[1].feedback is not None
     assert '"line"' in provider.calls[1].feedback
+
+
+def test_skel_codegen_rust_mode_skips_llm_rust(tmp_path):
+    root = repo_root()
+    contract = root / "benchmarks/tasks/lock-order/abba_2lock/contract.json"
+    provider = ScriptedProvider([{"text": BUGGY}, {"text": FIXED}])
+    oracle = FakeOracle(functional_ok=True)
+    result = run_skel_cell(
+        task="lock-order/abba_2lock", requirements="two workers, two locks",
+        contract_path=contract, provider=provider, backend=Backend(),
+        oracle=oracle, workdir=tmp_path, rounds=4, rust_mode="codegen")
+    assert result.accepted, result.history
+    assert result.rust and "fn main" in result.rust
+    assert len(provider.calls) == 2  # no Rust LLM call in codegen mode
+    assert result.oracle.details["extra_files"] == ["src/cir_trace.rs"]

@@ -14,7 +14,7 @@ fn tmp(name: &str) -> PathBuf {
 }
 
 fn run(args: &[&str]) -> (i32, String) {
-    let out = Command::new(env!("CARGO_BIN_EXE_bind_check")).args(args).output().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_bind-check")).args(args).output().unwrap();
     (out.status.code().unwrap_or(-1), String::from_utf8_lossy(&out.stdout).to_string())
 }
 

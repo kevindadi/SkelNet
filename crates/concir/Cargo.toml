@@ -20,7 +20,7 @@ name = "concir-instrument"
 path = "src/bin/instrument.rs"
 
 [[bin]]
-name = "bind_check"
+name = "bind-check"
 path = "src/bin/bind_check.rs"
 
 [dev-dependencies]

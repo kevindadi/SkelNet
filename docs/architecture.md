@@ -12,7 +12,7 @@ LLM ──writes──▶ .skel ──skelnet check/verify──▶ ConcIR ─�
 
 - `crates/concir` — the trimmed ConcIR: AST, validation, interpreter, Petri-net
   exploration, codegen, conformance, monitoring. Bins `concir-backend`,
-  `concir-instrument`, `bind_check`. It is the single source of semantics.
+  `concir-instrument`, `bind-check`. It is the single source of semantics.
 - `crates/skel` — the Skeleton DSL front-end:
   - `lexer.rs` + `parser.rs` → `ast.rs` (hand-written; no parser generator),
   - `check.rs` → `S###` diagnostics,

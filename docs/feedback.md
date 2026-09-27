@@ -24,9 +24,18 @@ the counterexample, blocked/holds state, `complete`, boundary events and
 diagnostics with mapped positions.
 
 Feedback **never** contains the contract's `goal` formulas or the contract file.
-`python/skelnet/prompts.py::build_explore_feedback` enforces this and
-`test_feedback_disclosure.py` asserts it (no `goal`, `function_completed`, or
-`holds_all`).
+Both feedback builders (`build_explore_feedback` for SKEL and
+`build_cir_feedback` for CIR) share `prompts.sanitize_detail`:
+
+- a property whose id starts with `preserved:` always gets the fixed detail
+  `"preserved behaviour is not reachable in any explored schedule"`;
+- any other `detail` containing `holds_all(`, `completed(`,
+  `function_completed` or `goal` is replaced with a neutral text.
+
+The property **id** is kept unchanged for now (e.g.
+`preserved: main::t1 holds [main::a, main::b] at once`); whether ids may remain
+is **pending a decision**. `test_feedback_disclosure.py` asserts the rendered
+feedback has no `goal`, `function_completed`, `holds_all`, or `completed(`.
 
 ## `--json` schema
 

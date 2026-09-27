@@ -52,7 +52,7 @@ test. `take` is `acquire().forget()`; `forget` was added to `Permit`. The old
 - `crates/concir/src/src_mutate.rs`
 - `crates/concir/src/main.rs` — validate-only duplicate binary; `concir-backend
   check` covers it. Cargo.toml now sets `autobins = false` and declares
-  `concir-backend`, `concir-instrument`, `bind_check` explicitly.
+  `concir-backend`, `concir-instrument`, `bind-check` explicitly.
 - `crates/concir/examples/pilot_tool.rs` — depended on `concir::repair`.
 - CLI subcommands `repair`, `replay`, `repair-context`, `evaluate-patch`, `bench`
   (and the `--src-mutate` mode of `concir-instrument`).
@@ -77,9 +77,10 @@ test. `take` is `acquire().forget()`; `forget` was added to `Permit`. The old
 
 ### Note
 
-- `bind_check` keeps its underscore name (not `bind-check`) so
-  `CARGO_BIN_EXE_bind_check` and the documented bin name stay as specified;
-  Cargo emits a cosmetic kebab-case warning.
+- The `bind_check` bin was renamed to `bind-check` (Round 1b, S5) to clear the
+  Cargo kebab-case manifest warning; the integration test now uses
+  `env!("CARGO_BIN_EXE_bind-check")`. The source file stays
+  `src/bin/bind_check.rs`.
 - Inert test fixtures under `tests/repro_*` that were only used by the deleted
   repair tests are retained as data (they do not compile into the test binary).
   They can be pruned later; none are referenced by any remaining test.

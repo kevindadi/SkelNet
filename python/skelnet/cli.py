@@ -4,19 +4,22 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import hashlib
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
 
 from . import prompts
 from .audit import AuditLog
-from .backend import Backend, repo_root
-from .oracle import RustOracle
+from .backend import Backend, repo_root, sha256_file
+from .oracle import RustOracle, repo_toolchain_channel
 from .pipeline import (dumps, run_cir_cell, run_g0_cell, run_skel_cell)
-from .providers import CandidateProvider, CandidateResponse
-from .transport import available_models, build_registry, resolve_model
+from .providers import CandidateResponse
+from .transport import build_registry, resolve_model
 
 
 def _task_dirs(root: Path) -> list[Path]:
@@ -36,90 +39,308 @@ def _select_tasks(root: Path, pattern: str) -> list[Path]:
     return out
 
 
-def _budget(arm: str, tasks: int, reps: int, rounds: int) -> dict:
+def read_terminal(task_dir: Path) -> str | None:
+    """The required terminating stdout line for a task.
+
+    Canonical source: ``requirements.json["terminal"]``. Tasks without a
+    ``requirements.json`` (the boundary tasks) have no terminal line, which is
+    recorded as ``terminal_check: "absent"`` and never counted as a pass.
+    """
+    reqs = Path(task_dir) / "requirements.json"
+    if not reqs.exists():
+        return None
+    try:
+        data = json.loads(reqs.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    terminal = data.get("terminal")
+    return terminal if isinstance(terminal, str) and terminal else None
+
+
+def _budget(arm: str, tasks: int, reps: int, rounds: int,
+            rust_mode: str = "llm") -> dict:
     if arm == "G0":
         per_task = reps
     else:
-        per_task = reps * (rounds + 2)  # rounds of skeleton/CIR + 1 rust call
+        # Exact pipeline upper bound: up to `rounds` skeleton/CIR attempts, plus
+        # one Rust call only when the Rust stage calls the LLM (not codegen).
+        per_task = reps * (rounds + (1 if rust_mode == "llm" else 0))
     return {"arm": arm, "tasks": tasks, "reps": reps, "rounds": rounds,
+            "rust_mode": rust_mode,
             "requests": tasks * per_task, "requests_per_task": per_task}
 
 
-class _DryRunProvider(CandidateProvider):
-    """Provider used by ``--dry-run``; never called for real."""
-
-    name = "dry-run"
-
-    def propose(self, request):  # pragma: no cover - never invoked
-        return CandidateResponse(text="", source="dry-run", provider=self.name,
-                                 error="dry run")
+def _asset_sha(asset: str) -> str | None:
+    path = prompts.PROMPT_ASSET_DIR / asset
+    return sha256_file(path)
 
 
-def cmd_run(args: argparse.Namespace) -> int:
+def _joined_system_prompt(assets) -> str:
+    return prompts.PROMPT_SEPARATOR.join(prompts.read_asset(a) for a in assets)
+
+
+def _system_sha(assets) -> str:
+    return hashlib.sha256(_joined_system_prompt(assets).encode("utf-8")).hexdigest()
+
+
+def default_oracle_factory(*, timeout: float, runner=None):
+    """The real per-task oracle factory used when none is injected.
+
+    Kept as a module-level function so the default path (the one real runs take)
+    is testable: the terminal line must reach the oracle.
+    """
+    def factory(task_dir, terminal):
+        return RustOracle(terminal=terminal, timeout=timeout, runner=runner)
+    return factory
+
+
+def _is_ancestor(ancestor: Path, descendant: Path) -> bool:
+    """True when `ancestor` is `descendant` or a strict ancestor of it."""
+    try:
+        descendant.relative_to(ancestor)
+        return True
+    except ValueError:
+        return False
+
+
+def _unsafe_to_clear(out: Path) -> str | None:
+    """A human reason why `out` must not be recursively deleted, or None."""
+    if out.is_symlink():
+        return "it is a symlink"
+    resolved = out.resolve()
+    protected = {
+        "the repository": repo_root(),
+        "the current directory": Path.cwd(),
+        "the home directory": Path.home(),
+        "the filesystem root": Path(resolved.anchor),
+    }
+    for label, path in protected.items():
+        try:
+            target = path.resolve()
+        except OSError:  # pragma: no cover - unresolvable protected path
+            target = path
+        if resolved == target:
+            return f"it is {label}"
+        # `out` is an ancestor of a protected path (so clearing it would
+        # destroy that path).
+        if _is_ancestor(resolved, target):
+            return f"it is an ancestor of {label}"
+    return None
+
+
+def _prepare_out(out: Path, *, force: bool) -> None:
+    """Validate/clear the output directory before a run.
+
+    `--force` only clears a *previous run directory* (one that carries a
+    MANIFEST.json) and refuses the repository, the current directory, the home
+    directory, the filesystem root, symlinks, and their ancestors.
+    """
+    out = Path(out)
+    if (out.exists() or out.is_symlink()) and not out.is_dir():
+        raise SystemExit(f"output path {out} exists and is not a directory")
+    if not out.exists() or not any(out.iterdir()):
+        out.mkdir(parents=True, exist_ok=True)
+        return
+    if not force:
+        raise SystemExit(
+            f"output directory {out} is not empty; pass --force to overwrite")
+    reason = _unsafe_to_clear(out)
+    if reason:
+        raise SystemExit(f"refusing to clear {out}: {reason}")
+    if not (out / "MANIFEST.json").exists():
+        raise SystemExit(
+            f"refusing to clear {out}: no MANIFEST.json (not a previous run directory)")
+    shutil.rmtree(out)
+    out.mkdir(parents=True, exist_ok=True)
+
+
+def cmd_run(args: argparse.Namespace, *, client_factory=None,
+            oracle_factory=None, oracle_runner=None) -> int:
+    if args.arm == "G0" and args.rust_mode == "codegen":
+        raise SystemExit(
+            "--arm G0 writes Rust directly and has no codegen stage; "
+            "use --rust-mode llm")
     root = repo_root()
     tasks = _select_tasks(root, args.tasks)
-    budget = _budget(args.arm, len(tasks), args.reps, args.rounds)
+    budget = _budget(args.arm, len(tasks), args.reps, args.rounds, args.rust_mode)
     if args.dry_run:
-        print(json.dumps({**budget, "dry_run": True,
-                          "prompts": prompts.prompt_asset_record()}, indent=2))
+        routes = prompts.routes_for_arm(args.arm)
+        print(json.dumps({
+            **budget,
+            "dry_run": True,
+            "prompt_routes": {
+                stage: {
+                    "assets": list(assets),
+                    "sha256": [_asset_sha(a) for a in assets],
+                    "system_sha256": _system_sha(assets),
+                }
+                for stage, assets in routes.items()
+            },
+            "prompts": prompts.prompt_asset_record(),
+        }, indent=2))
         return 0
 
     out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
+    _prepare_out(out, force=args.force)
+    started_at = time.time()
     audit = AuditLog(out / "audit.jsonl", raw_dir=out / "raw")
-    oracle = RustOracle(timeout=args.timeout)
     backend = Backend(timeout=args.timeout)
-    provider = _build_provider(args, audit, out)
-    summary: dict = {"arm": args.arm, "model": args.model, "budget": budget,
-                     "cells": []}
+    manifest = _build_manifest(out, args, backend, tasks, started_at, None, budget)
+    _write_manifest(out, manifest)
+    if oracle_factory is None:
+        oracle_factory = default_oracle_factory(timeout=args.timeout,
+                                                runner=oracle_runner)
+    provider = _build_provider(args, audit, out, client_factory=client_factory)
+    summary: dict = {"run_id": out.name, "arm": args.arm, "model": args.model,
+                     "budget": budget, "cells": []}
     for task_dir in tasks:
         task = str(task_dir.relative_to(root / "benchmarks" / "tasks"))
         reqs = (task_dir / "requirements.json")
         requirements = reqs.read_text(encoding="utf-8") if reqs.exists() else task
         contract = task_dir / "contract.json"
+        terminal = read_terminal(task_dir)
+        # The factory receives the task and its terminal line, so the terminal
+        # wiring is exercised (and testable) on every real run.
+        task_oracle = oracle_factory(task_dir, terminal)
         for rep in range(args.reps):
             workdir = out / "cells" / task / str(rep)
             workdir.mkdir(parents=True, exist_ok=True)
+            if hasattr(provider, "set_cell"):
+                provider.set_cell(f"{task}/{rep}", task, rep)
             if args.arm == "G0":
                 cell = run_g0_cell(task=task, requirements=requirements,
-                                   provider=provider, oracle=oracle,
+                                   provider=provider, oracle=task_oracle,
                                    workdir=workdir, replicate=rep)
             elif args.arm == "SKEL":
                 cell = run_skel_cell(task=task, requirements=requirements,
                                      contract_path=contract, provider=provider,
-                                     backend=backend, oracle=oracle,
-                                     workdir=workdir, rounds=args.rounds, replicate=rep)
+                                     backend=backend, oracle=task_oracle,
+                                     workdir=workdir, rounds=args.rounds,
+                                     replicate=rep, rust_mode=args.rust_mode)
             elif args.arm == "CIR":
                 cell = run_cir_cell(task=task, requirements=requirements,
                                     contract_path=contract, provider=provider,
-                                    backend=backend, oracle=oracle,
-                                    workdir=workdir, rounds=args.rounds, replicate=rep)
+                                    backend=backend, oracle=task_oracle,
+                                    workdir=workdir, rounds=args.rounds,
+                                    replicate=rep, rust_mode=args.rust_mode)
             else:
                 raise SystemExit(f"unknown arm {args.arm!r}")
             (workdir / "result.json").write_text(dumps(cell), encoding="utf-8")
             if cell.rust:
                 (workdir / "candidate.rs").write_text(cell.rust, encoding="utf-8")
+            if cell.cir_trace:
+                (workdir / "cir_trace.rs").write_text(cell.cir_trace, encoding="utf-8")
             summary["cells"].append(json.loads(dumps(cell)))
+    ended_at = time.time()
+    manifest["ended_at"] = ended_at
+    _write_manifest(out, manifest)
     (out / "SUMMARY.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     (out / "REPORT.md").write_text(_report_markdown([summary]), encoding="utf-8")
     print(f"wrote {out}")
     return 0
 
 
+def _git(args: list[str]) -> str:
+    try:
+        proc = subprocess.run(["git", "-C", str(repo_root()), *args],
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return proc.stdout if proc.returncode == 0 else ""
+
+
+def _tool_version(command: str) -> str | None:
+    env = dict(os.environ)
+    channel = repo_toolchain_channel()
+    if channel:
+        env["RUSTUP_TOOLCHAIN"] = channel
+    try:
+        proc = subprocess.run([command, "-V"], capture_output=True, text=True,
+                              timeout=30, env=env)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
+                    tasks: list[Path], started_at: float,
+                    ended_at: float | None, budget: dict | None = None) -> dict:
+    spec = resolve_model(build_registry(), args.model)
+    tasks_root = repo_root() / "benchmarks" / "tasks"
+    return {
+        "run_id": out.name,
+        "budget": budget,
+        "git_sha": _git(["rev-parse", "HEAD"]).strip(),
+        "git_dirty": bool(_git(["status", "--porcelain"]).strip()),
+        "binaries": {
+            "skelnet": sha256_file(backend.skelnet),
+            "concir-backend": sha256_file(backend.concir),
+        },
+        "prompts": prompts.prompt_asset_record(),
+        "model": args.model,
+        "model_id": spec.model_id,
+        "channel": spec.channel,
+        "arm": args.arm,
+        "rust_mode": args.rust_mode,
+        "tasks": {
+            "pattern": args.tasks,
+            "selected": [str(t.relative_to(tasks_root)) for t in tasks],
+        },
+        "rounds": args.rounds,
+        "reps": args.reps,
+        # `--seed` is not applied yet: recorded as null until it takes effect.
+        "seed": None,
+        "seed_applied": False,
+        "temperature": args.temperature,
+        "timeout": args.timeout,
+        "versions": {
+            "toolchain": repo_toolchain_channel(),
+            "rustc": _tool_version("rustc"),
+            "cargo": _tool_version("cargo"),
+            "python": sys.version.split()[0],
+        },
+        "started_at": started_at,
+        "ended_at": ended_at,
+    }
+
+
+def _write_manifest(out: Path, manifest: dict) -> None:
+    (out / "MANIFEST.json").write_text(json.dumps(manifest, indent=2),
+                                       encoding="utf-8")
+
+
 class _ChatProvider:
-    """Adapt an audited ``complete(system, user)`` client to the provider API."""
+    """Adapt an audited ``complete(system, user)`` client to the provider API.
+
+    The system prompt is selected per request from the explicit arm x stage
+    routing table; a missing route raises (never a silent fallback).
+    """
 
     name = "llm"
 
-    def __init__(self, client, system_prompt: str, user_prompt_builder) -> None:
+    def __init__(self, client, *, arm: str) -> None:
         self.client = client
-        self.system_prompt = system_prompt
-        self.user_prompt_builder = user_prompt_builder
+        self.arm = arm
+
+    def set_cell(self, cell_id: str, task_id: str, replicate: int) -> None:
+        if hasattr(self.client, "set_cell"):
+            self.client.set_cell(cell_id, task_id, replicate)
 
     def propose(self, request):
-        user = self.user_prompt_builder(request)
+        stage = _stage_for(self.arm, request)
+        assets = prompts.route(self.arm, stage)
+        if hasattr(self.client, "set_stage"):
+            self.client.set_stage(stage)
+        if hasattr(self.client, "set_attempt"):
+            self.client.set_attempt(getattr(request, "attempt", 1))
+        # Hash the system prompt actually sent, not a re-derived join.
+        system = prompts.system_prompt_for(self.arm, stage)
+        if hasattr(self.client, "set_prompt_meta"):
+            self.client.set_prompt_meta(
+                assets, hashlib.sha256(system.encode("utf-8")).hexdigest())
+        user = _user_prompt_for(self.arm, stage, request)
         try:
-            outcome = self.client.complete(self.system_prompt, user)
+            outcome = self.client.complete(system, user)
         except Exception as exc:  # noqa: BLE001
             return CandidateResponse(text="", source="llm", provider=self.name,
                                      error=str(exc))
@@ -129,28 +350,49 @@ class _ChatProvider:
             usage=getattr(outcome, "usage", None))
 
 
-def _build_provider(args: argparse.Namespace, audit: AuditLog, out: Path):
-    spec = resolve_model(build_registry(), args.model)
-    from .channels import AuditedClient, build_client, key_for
-    from .transport import CHANNELS
-    channel = CHANNELS[spec.channel]
-    key = key_for(spec, dict(os.environ), channel.api_key_env)
-    inner = build_client(spec, budget=_Budget(), evidence_dir=out / "evidence",
-                         api_key=key)
-    audited = AuditedClient(inner, audit=audit, run_id=out.name, cell_id="run",
-                            spec=spec, arm=args.arm, task_id="*", replicate=0)
-    return _ChatProvider(audited, prompts.skel_generation_system_prompt(),
-                         _user_prompt_builder)
-
-
-def _user_prompt_builder(request) -> str:
+def _stage_for(arm: str, request) -> str:
+    """Resolve the prompt stage for a request from the arm and its content."""
+    if arm == "G0":
+        return prompts.STAGE_GENERATE
     if request.stage == "rust":
-        from .prompts import rust_from_skel_user_prompt
-        return rust_from_skel_user_prompt(request.requirements,
-                                          request.previous_candidate or "")
+        return prompts.STAGE_RUST
+    if request.feedback:
+        return prompts.STAGE_FEEDBACK
+    return prompts.STAGE_GENERATE
+
+
+def _user_prompt_for(arm: str, stage: str, request) -> str:
+    if stage == prompts.STAGE_RUST:
+        if arm == "CIR":
+            return prompts.rust_from_cir_user_prompt(
+                request.requirements, request.previous_candidate or "")
+        return prompts.rust_from_skel_user_prompt(
+            request.requirements, request.previous_candidate or "")
     return prompts.requirements_only_user_prompt(
         request.requirements, previous_candidate=request.previous_candidate,
         feedback=request.feedback)
+
+
+def _build_provider(args: argparse.Namespace, audit: AuditLog, out: Path,
+                    *, client_factory=None):
+    spec = resolve_model(build_registry(), args.model)
+    if client_factory is None:
+        from .channels import build_client, key_for
+        from .transport import CHANNELS
+        channel = CHANNELS[spec.channel]
+        key = key_for(spec, dict(os.environ), channel.api_key_env)
+        inner = build_client(spec, budget=_Budget(), evidence_dir=out / "evidence",
+                             api_key=key, temperature=args.temperature)
+    else:
+        inner = client_factory(spec, out)
+    audited = _make_audited(inner, audit=audit, out=out, spec=spec, arm=args.arm)
+    return _ChatProvider(audited, arm=args.arm)
+
+
+def _make_audited(inner, *, audit, out, spec, arm):
+    from .channels import AuditedClient
+    return AuditedClient(inner, audit=audit, run_id=out.name, cell_id="run",
+                         spec=spec, arm=arm, task_id="*", replicate=0)
 
 
 class _Budget:
@@ -158,22 +400,74 @@ class _Budget:
         return None
 
 
-def cmd_eval(args: argparse.Namespace) -> int:
+def cmd_eval(args: argparse.Namespace, *, runner=None) -> int:
     run_dir = Path(args.run_dir)
-    oracle = RustOracle(timeout=args.timeout)
     updated = 0
-    for result_path in run_dir.glob("cells/*/*/result.json"):
+    for result_path in sorted(run_dir.glob("cells/**/result.json")):
         data = json.loads(result_path.read_text(encoding="utf-8"))
-        rust = result_path.parent / "candidate.rs"
+        workdir = result_path.parent
+        rust = workdir / "candidate.rs"
         if not rust.exists():
             continue
-        outcome = oracle.evaluate(rust.read_text(encoding="utf-8"), result_path.parent)
+        task = workdir.parent.relative_to(run_dir / "cells").as_posix()
+        terminal = read_terminal(repo_root() / "benchmarks" / "tasks" / task)
+        extra: dict[str, str] = {}
+        trace = workdir / "cir_trace.rs"
+        if trace.exists():
+            extra["src/cir_trace.rs"] = trace.read_text(encoding="utf-8")
+        rust_mode = data.get("rust_mode", "llm")
+        oracle = RustOracle(terminal=terminal, timeout=args.timeout, runner=runner)
+        outcome = oracle.evaluate(rust.read_text(encoding="utf-8"), workdir,
+                                  extra_files=extra or None,
+                                  check_terminal=rust_mode != "codegen")
         data["oracle"] = {"built": outcome.built, "ran": outcome.ran,
-                          "functional_ok": outcome.functional_ok}
+                          "run_ok": outcome.run_ok,
+                          "functional_ok": outcome.functional_ok,
+                          "terminal_check": outcome.terminal_check}
         result_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         updated += 1
+    # Keep the run's summary/report in sync with the re-evaluated cells.
+    summary = _summary_from_run(run_dir)
+    (run_dir / "SUMMARY.json").write_text(json.dumps(summary, indent=2),
+                                          encoding="utf-8")
+    (run_dir / "REPORT.md").write_text(_report_markdown([summary]), encoding="utf-8")
     print(f"re-evaluated {updated} cells")
     return 0
+
+
+def _summary_from_run(run_dir: Path) -> dict:
+    manifest: dict = {}
+    manifest_path = run_dir / "MANIFEST.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    cells = _selected_cells(run_dir, manifest)
+    summary = {"run_id": manifest.get("run_id", run_dir.name),
+               "arm": manifest.get("arm", "?"),
+               "model": manifest.get("model", "?"),
+               "cells": cells}
+    if "budget" in manifest:
+        summary["budget"] = manifest["budget"]
+    return summary
+
+
+def _selected_cells(run_dir: Path, manifest: dict) -> list[dict]:
+    """Cells declared by the manifest (selected tasks x reps), else all cells.
+
+    A run directory is single-run: stale cells from another task must not leak
+    into the summary.
+    """
+    selected = (manifest.get("tasks") or {}).get("selected")
+    reps = manifest.get("reps")
+    if isinstance(selected, list) and isinstance(reps, int):
+        cells = []
+        for task in selected:
+            for rep in range(reps):
+                path = run_dir / "cells" / task / str(rep) / "result.json"
+                if path.exists():
+                    cells.append(json.loads(path.read_text(encoding="utf-8")))
+        return cells
+    return [json.loads(path.read_text(encoding="utf-8"))
+            for path in sorted(run_dir.glob("cells/**/result.json"))]
 
 
 def cmd_report(args: argparse.Namespace) -> int:
@@ -186,17 +480,46 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _rate(cells: list[dict], predicate) -> str:
+    if not cells:
+        return "-"
+    hits = sum(1 for c in cells if predicate(c))
+    return f"{hits / len(cells):.0%}"
+
+
+def _rate_or_dash(cells: list[dict], getter) -> str:
+    """Rate over cells whose value is not None; '-' when all are None."""
+    values = [getter(c) for c in cells]
+    values = [v for v in values if v is not None]
+    if not values:
+        return "-"
+    return f"{sum(1 for v in values if v) / len(values):.0%}"
+
+
 def _report_markdown(summaries: list[dict]) -> str:
     lines = ["# SkelNet run report", "",
-             "| run | arm | model | cells | accepted | oracle functional |",
-             "| --- | --- | --- | --- | --- | --- |"]
+             "| run | arm | model | cells | parse rate | check pass | "
+             "verify pass | mean rounds | evidence | run ok | functional |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for s in summaries:
         cells = s.get("cells", [])
-        accepted = sum(1 for c in cells if c.get("accepted"))
-        functional = sum(1 for c in cells
-                         if (c.get("oracle") or {}).get("functional_ok"))
-        lines.append(f"| {s.get('arm')} | {s.get('arm')} | {s.get('model')} | "
-                     f"{len(cells)} | {accepted} | {functional} |")
+        # G0 writes Rust directly: it has no check/verify/evidence/rounds stage.
+        is_g0 = s.get("arm") == "G0"
+        rounds = [c.get("rounds_used", 0) for c in cells if c.get("rounds_used")]
+        mean_rounds = "-" if is_g0 else (
+            f"{(sum(rounds) / len(rounds)):.1f}" if rounds else "-")
+        verify = "-" if is_g0 else _rate(cells, lambda c: c.get("accepted"))
+        evidence = "-" if is_g0 else _rate(cells, lambda c: c.get("evidence_sufficient"))
+        lines.append(
+            f"| {s.get('run_id', s.get('arm', '?'))} | {s.get('arm', '?')} | "
+            f"{s.get('model', '?')} | {len(cells)} | "
+            f"{_rate(cells, lambda c: c.get('parse_ok'))} | "
+            f"{_rate(cells, lambda c: c.get('check_ok'))} | "
+            f"{verify} | "
+            f"{mean_rounds} | "
+            f"{evidence} | "
+            f"{_rate_or_dash(cells, lambda c: (c.get('oracle') or {}).get('run_ok'))} | "
+            f"{_rate_or_dash(cells, lambda c: (c.get('oracle') or {}).get('functional_ok'))} |")
     return "\n".join(lines) + "\n"
 
 
@@ -212,7 +535,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--rounds", type=int, default=4)
     run.add_argument("--out", default="experiments/run")
     run.add_argument("--rust-mode", default="llm", choices=["llm", "codegen"])
-    run.add_argument("--provider", default="real")
+    run.add_argument("--force", action="store_true",
+                     help="overwrite a non-empty output directory")
+    run.add_argument("--seed", type=int, default=0)
+    run.add_argument("--temperature", type=float, default=0.0)
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--timeout", type=float, default=300.0)
     run.set_defaults(func=cmd_run)

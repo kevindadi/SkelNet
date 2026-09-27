@@ -125,6 +125,30 @@ class Backend:
                              stdout=proc.stdout, stderr=proc.stderr,
                              error=None if proc.returncode == 0 else proc.stderr.strip())
 
+    # ── deterministic codegen (fallback Rust) ────────────────────────
+    def codegen_skel(self, skel: Path | str, out_dir: Path | str) -> "CodegenResult":
+        return self._codegen([str(self.skelnet), "codegen", str(skel),
+                              "--out", str(out_dir)], out_dir)
+
+    def codegen_cir(self, cir: Path | str, out_dir: Path | str) -> "CodegenResult":
+        return self._codegen([str(self.concir), "codegen", str(cir),
+                              "--out", str(out_dir)], out_dir)
+
+    def _codegen(self, args: list[str], out_dir: Path | str) -> "CodegenResult":
+        out_dir = Path(out_dir)
+        proc = _run(args, timeout=self.timeout)
+        if proc.returncode != 0:
+            return CodegenResult(ok=False, error=proc.stderr.strip() or proc.stdout.strip())
+        main_rs = out_dir / "src" / "main.rs"
+        trace_rs = out_dir / "src" / "cir_trace.rs"
+        if not main_rs.exists():
+            return CodegenResult(ok=False, error="codegen produced no src/main.rs")
+        return CodegenResult(
+            ok=True,
+            main_rs=main_rs.read_text(encoding="utf-8"),
+            trace_rs=trace_rs.read_text(encoding="utf-8") if trace_rs.exists() else "",
+        )
+
     # ── ConcIR (CIR arm) ─────────────────────────────────────────────
     def verify_cir(self, cir: Path | str, contract: Path | str, *,
                    engine: str = "petri") -> BackendResult:
@@ -141,6 +165,14 @@ class Backend:
                              complete=payload.get("complete"), payload=payload,
                              exit_code=proc.returncode, stdout=proc.stdout,
                              stderr=proc.stderr)
+
+
+@dataclass
+class CodegenResult:
+    ok: bool
+    main_rs: str = ""
+    trace_rs: str = ""
+    error: str | None = None
 
 
 def _status_for(outcome: str | None) -> str:
