@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from skelnet.backend import repo_root
 from skelnet.cli import read_terminal
-from skelnet.oracle import RustOracle
+from skelnet.oracle import RustOracle, repo_toolchain_channel
 
 
 def test_read_terminal_from_requirements():
@@ -21,7 +21,7 @@ def test_read_terminal_absent_for_boundary_tasks():
 
 
 def _runner(stdout: str, run_rc: int = 0):
-    def run(cmd, cwd, timeout):
+    def run(cmd, cwd, timeout, env):
         if "build" in cmd:
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         return SimpleNamespace(returncode=run_rc, stdout=stdout, stderr="")
@@ -59,7 +59,7 @@ def test_terminal_not_applicable_when_not_checked(tmp_path):
 
 
 def test_terminal_not_run_on_build_failure(tmp_path):
-    def runner(cmd, cwd, timeout):
+    def runner(cmd, cwd, timeout, env):
         if "build" in cmd:
             return SimpleNamespace(returncode=1, stdout="", stderr="boom")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -69,8 +69,23 @@ def test_terminal_not_run_on_build_failure(tmp_path):
     assert not result.built
 
 
+def test_oracle_pins_rustup_toolchain(tmp_path):
+    seen: dict = {}
+
+    def runner(cmd, cwd, timeout, env):
+        seen["env"] = env
+        if "build" in cmd:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    RustOracle(terminal=None, runner=runner).evaluate("fn main() {}", tmp_path)
+    channel = repo_toolchain_channel()
+    assert channel, "expected a channel in rust-toolchain.toml"
+    assert seen["env"].get("RUSTUP_TOOLCHAIN") == channel
+
+
 def test_terminal_not_run_on_timeout(tmp_path):
-    def runner(cmd, cwd, timeout):
+    def runner(cmd, cwd, timeout, env):
         raise subprocess.TimeoutExpired(cmd, timeout)
     result = RustOracle(terminal="DONE x", runner=runner).evaluate("fn main() {}", tmp_path)
     assert result.terminal_check == "not_run"

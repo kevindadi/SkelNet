@@ -10,12 +10,32 @@ not mixed into the code score. Tests inject :class:`FakeOracle` or a fake
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 CONCIR_SYNC_CRATE = Path(__file__).resolve().parents[2] / "runtime/concir_sync"
+
+
+def repo_toolchain_channel() -> str | None:
+    """The `channel` from the repository's rust-toolchain.toml, or None.
+
+    rustup resolves a toolchain relative to the working directory, so a cargo
+    run outside the repo would otherwise pick up the default toolchain. The
+    oracle pins `RUSTUP_TOOLCHAIN` to this value explicitly.
+    """
+    path = Path(__file__).resolve().parents[2] / "rust-toolchain.toml"
+    if not path.exists():
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("channel"):
+            _, _, value = stripped.partition("=")
+            value = value.strip().strip('"').strip("'")
+            return value or None
+    return None
 
 
 def cargo_toml(name: str, *, bin_path: str = "src/main.rs") -> str:
@@ -49,19 +69,23 @@ class OracleResult:
     details: dict[str, Any] = field(default_factory=dict)
 
 
-def _default_runner(cmd: list[str], cwd: Path, timeout: float):
+def _default_runner(cmd: list[str], cwd: Path, timeout: float, env: dict[str, str]):
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
-                          timeout=timeout)
+                          timeout=timeout, env=env)
 
 
 class RustOracle:
     def __init__(self, *, terminal: str | None = None, timeout: float = 180.0,
                  cargo: str = "cargo",
-                 runner: Callable[[list[str], Path, float], Any] | None = None) -> None:
+                 runner: Callable[[list[str], Path, float, dict], Any] | None = None,
+                 toolchain: str | None = None) -> None:
         self.terminal = terminal
         self.timeout = timeout
         self.cargo = cargo
         self.runner = runner or _default_runner
+        # Pin the toolchain so a cargo run outside the repo uses the same one
+        # the MANIFEST records.
+        self.toolchain = toolchain if toolchain is not None else repo_toolchain_channel()
 
     def evaluate(self, rust_source: str, workdir: Path | str, *,
                  extra_files: dict[str, str] | None = None,
@@ -75,8 +99,12 @@ class RustOracle:
             target = workdir / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
+        env = dict(os.environ)
+        if self.toolchain:
+            env["RUSTUP_TOOLCHAIN"] = self.toolchain
         try:
-            build = self.runner([self.cargo, "build", "--offline"], workdir, self.timeout)
+            build = self.runner([self.cargo, "build", "--offline"], workdir,
+                                self.timeout, env)
         except (OSError, subprocess.TimeoutExpired) as exc:
             return OracleResult(built=False, run_ok=False, terminal_check="not_run",
                                 stderr=str(exc))
@@ -85,7 +113,7 @@ class RustOracle:
                                 stderr=build.stderr)
         try:
             run = self.runner([self.cargo, "run", "--offline", "--quiet"],
-                              workdir, self.timeout)
+                              workdir, self.timeout, env)
         except (OSError, subprocess.TimeoutExpired) as exc:
             return OracleResult(built=True, ran=False, run_ok=False,
                                 terminal_check="not_run", stderr=str(exc))

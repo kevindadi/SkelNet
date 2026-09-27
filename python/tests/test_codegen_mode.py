@@ -53,7 +53,7 @@ class _Client:
 
 
 def _runner(recorder: list[bool] | None = None, run_rc: int = 0):
-    def run(cmd, cwd, timeout):
+    def run(cmd, cwd, timeout, env):
         cwd = Path(cwd)
         if recorder is not None:
             recorder.append((cwd / "src" / "cir_trace.rs").exists())

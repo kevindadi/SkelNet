@@ -15,7 +15,7 @@ from pathlib import Path
 from . import prompts
 from .audit import AuditLog
 from .backend import Backend, repo_root, sha256_file
-from .oracle import RustOracle
+from .oracle import RustOracle, repo_toolchain_channel
 from .pipeline import (dumps, run_cir_cell, run_g0_cell, run_skel_cell)
 from .providers import CandidateResponse
 from .transport import build_registry, resolve_model
@@ -189,9 +189,13 @@ def _git(args: list[str]) -> str:
 
 
 def _tool_version(command: str) -> str | None:
+    env = dict(os.environ)
+    channel = repo_toolchain_channel()
+    if channel:
+        env["RUSTUP_TOOLCHAIN"] = channel
     try:
         proc = subprocess.run([command, "-V"], capture_output=True, text=True,
-                              timeout=30)
+                              timeout=30, env=env)
     except (OSError, subprocess.TimeoutExpired):
         return None
     return proc.stdout.strip() if proc.returncode == 0 else None
@@ -228,6 +232,7 @@ def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
         "temperature": args.temperature,
         "timeout": args.timeout,
         "versions": {
+            "toolchain": repo_toolchain_channel(),
             "rustc": _tool_version("rustc"),
             "cargo": _tool_version("cargo"),
             "python": sys.version.split()[0],

@@ -9,7 +9,7 @@ import pytest
 
 from skelnet import cli, prompts
 from skelnet.backend import repo_root
-from skelnet.oracle import FakeOracle, RustOracle
+from skelnet.oracle import FakeOracle, RustOracle, repo_toolchain_channel
 
 BUGGY = """```skel
 skeleton abba_bug;
@@ -159,6 +159,7 @@ def test_manifest_and_audit_cell_ids(tmp_path):
     assert manifest["seed"] is None and manifest["seed_applied"] is False
     assert manifest["ended_at"] is not None
     assert manifest["versions"]["python"]
+    assert manifest["versions"]["toolchain"] == repo_toolchain_channel()
 
     events = [json.loads(line) for line in
               (out / "audit.jsonl").read_text().splitlines() if line.strip()]
@@ -212,7 +213,7 @@ def test_terminal_wired_through_cmd_run(tmp_path):
 
 
 def test_real_oracle_terminal_pass_through_cmd_run(tmp_path):
-    def runner(cmd, cwd, timeout):
+    def runner(cmd, cwd, timeout, env):
         if "build" in cmd:
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         return SimpleNamespace(returncode=0, stdout="DONE t1=1 t2=1\n", stderr="")
@@ -232,7 +233,7 @@ def test_real_oracle_terminal_pass_through_cmd_run(tmp_path):
     assert result["oracle"]["functional_ok"] is True
 
 
-def _terminal_pass_runner(cmd, cwd, timeout):
+def _terminal_pass_runner(cmd, cwd, timeout, env):
     if "build" in cmd:
         return SimpleNamespace(returncode=0, stdout="", stderr="")
     return SimpleNamespace(returncode=0, stdout="DONE t1=1 t2=1\n", stderr="")
