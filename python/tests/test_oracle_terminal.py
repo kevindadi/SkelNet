@@ -1,5 +1,6 @@
-"""T2: terminal-line extraction and oracle terminal pass/fail/absent handling."""
+"""T2/F5: terminal-line extraction and oracle terminal/run outcome handling."""
 
+import subprocess
 from types import SimpleNamespace
 
 from skelnet.backend import repo_root
@@ -47,3 +48,30 @@ def test_terminal_absent_is_not_a_pass(tmp_path):
     result = oracle.evaluate("fn main() {}", tmp_path)
     assert result.terminal_check == "absent"
     assert not result.functional_ok
+
+
+def test_terminal_not_applicable_when_not_checked(tmp_path):
+    oracle = RustOracle(terminal="DONE x", runner=_runner("DONE x\n"))
+    result = oracle.evaluate("fn main() {}", tmp_path, check_terminal=False)
+    assert result.terminal_check == "not_applicable"
+    assert result.functional_ok is None
+    assert result.run_ok is True
+
+
+def test_terminal_not_run_on_build_failure(tmp_path):
+    def runner(cmd, cwd, timeout):
+        if "build" in cmd:
+            return SimpleNamespace(returncode=1, stdout="", stderr="boom")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    result = RustOracle(terminal="DONE x", runner=runner).evaluate("fn main() {}", tmp_path)
+    assert result.terminal_check == "not_run"
+    assert result.run_ok is False
+    assert not result.built
+
+
+def test_terminal_not_run_on_timeout(tmp_path):
+    def runner(cmd, cwd, timeout):
+        raise subprocess.TimeoutExpired(cmd, timeout)
+    result = RustOracle(terminal="DONE x", runner=runner).evaluate("fn main() {}", tmp_path)
+    assert result.terminal_check == "not_run"
+    assert result.run_ok is False

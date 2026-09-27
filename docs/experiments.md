@@ -36,8 +36,21 @@ the concatenated `system_sha256`.
 The required terminating stdout line is read from
 `benchmarks/tasks/<task>/requirements.json["terminal"]` (e.g.
 `"DONE t1=1 t2=1"`). Tasks without a `requirements.json` (the boundary tasks)
-have no terminal line. The oracle records `terminal_check` as `"pass"`,
-`"fail"`, or `"absent"`; `"absent"` is **never** counted as a pass.
+have no terminal line.
+
+The oracle records `terminal_check` as one of:
+
+| value | meaning |
+| --- | --- |
+| `pass` | the terminal line appeared in stdout |
+| `fail` | the program ran but the line did not appear |
+| `absent` | the task has no terminal line; **never** counted as a pass |
+| `not_applicable` | `check_terminal=False` (deterministic codegen mode) |
+| `not_run` | the build failed or a step timed out |
+
+It also records `run_ok` (built, exited 0, did not time out) in every mode, and
+`functional_ok` (`run_ok` and `terminal_check == "pass"`; `null` in codegen
+mode).
 
 ## Run layout
 
@@ -57,7 +70,11 @@ experiments/<run_id>/
 ```
 
 `--rust-mode codegen` skips the Rust LLM call after a PASS and uses
-`skelnet codegen` (SKEL) or `concir-backend codegen` (CIR) instead.
+`skelnet codegen` (SKEL) or `concir-backend codegen` (CIR) instead. The
+generated skeleton prints nothing, so codegen mode is scored on whether the
+verified design **builds and exits cleanly** (`terminal_check:
+"not_applicable"`, `run_ok`), **not** on the functional output; it is therefore
+not comparable to the LLM modes' `functional_ok`.
 
 ## Commands
 
@@ -84,8 +101,11 @@ run directories can be compared in one call.
 - **verify pass rate**: `skelnet verify` / `concir explore` returned PASS.
 - **mean rounds**: mean generation attempts used (SKEL/CIR).
 - **evidence**: `evidence_sufficient` (PASS with every property PASS).
+- **run ok**: the oracle's `run_ok` (built, exited 0, no timeout).
 - **functional pass**: the oracle's `functional_ok` (built, ran, and the
-  terminal line matched).
+  terminal line matched). Cells whose `functional_ok` is `null` (codegen mode)
+  are excluded from the denominator; when every cell is `null` the column shows
+  `-`.
 
 ## Reproducibility
 

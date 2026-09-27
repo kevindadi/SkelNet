@@ -37,9 +37,13 @@ concir_sync = {{ path = "{CONCIR_SYNC_CRATE}" }}
 class OracleResult:
     built: bool = False
     ran: bool = False
-    functional_ok: bool = False
+    # run_ok: built, exited 0, and did not time out (recorded in every mode).
+    run_ok: bool = False
+    # functional_ok is None when the terminal line is not checked (codegen mode).
+    functional_ok: bool | None = None
     monitor_ok: bool | None = None
-    terminal_check: str = "absent"  # "pass" | "fail" | "absent"
+    # "pass" | "fail" | "absent" | "not_applicable" | "not_run"
+    terminal_check: str = "not_run"
     stdout: str = ""
     stderr: str = ""
     details: dict[str, Any] = field(default_factory=dict)
@@ -60,7 +64,8 @@ class RustOracle:
         self.runner = runner or _default_runner
 
     def evaluate(self, rust_source: str, workdir: Path | str, *,
-                 extra_files: dict[str, str] | None = None) -> OracleResult:
+                 extra_files: dict[str, str] | None = None,
+                 check_terminal: bool = True) -> OracleResult:
         workdir = Path(workdir)
         src = workdir / "src"
         src.mkdir(parents=True, exist_ok=True)
@@ -73,25 +78,33 @@ class RustOracle:
         try:
             build = self.runner([self.cargo, "build", "--offline"], workdir, self.timeout)
         except (OSError, subprocess.TimeoutExpired) as exc:
-            return OracleResult(built=False, stderr=str(exc))
+            return OracleResult(built=False, run_ok=False, terminal_check="not_run",
+                                stderr=str(exc))
         if build.returncode != 0:
-            return OracleResult(built=False, stderr=build.stderr)
+            return OracleResult(built=False, run_ok=False, terminal_check="not_run",
+                                stderr=build.stderr)
         try:
             run = self.runner([self.cargo, "run", "--offline", "--quiet"],
                               workdir, self.timeout)
         except (OSError, subprocess.TimeoutExpired) as exc:
-            return OracleResult(built=True, ran=False, stderr=str(exc))
-        ran_ok = run.returncode == 0
+            return OracleResult(built=True, ran=False, run_ok=False,
+                                terminal_check="not_run", stderr=str(exc))
+        run_ok = run.returncode == 0
+        if not check_terminal:
+            # Deterministic codegen: there is no task-specific terminal line.
+            return OracleResult(built=True, ran=True, run_ok=run_ok,
+                                functional_ok=None, terminal_check="not_applicable",
+                                stdout=run.stdout, stderr=run.stderr)
         if self.terminal is None:
             terminal_check = "absent"
         elif self.terminal in run.stdout:
             terminal_check = "pass"
         else:
             terminal_check = "fail"
-        functional_ok = ran_ok and terminal_check == "pass"
-        return OracleResult(built=True, ran=True, functional_ok=functional_ok,
-                            terminal_check=terminal_check, stdout=run.stdout,
-                            stderr=run.stderr)
+        functional_ok = run_ok and terminal_check == "pass"
+        return OracleResult(built=True, ran=True, run_ok=run_ok,
+                            functional_ok=functional_ok, terminal_check=terminal_check,
+                            stdout=run.stdout, stderr=run.stderr)
 
 
 class FakeOracle:
@@ -103,9 +116,17 @@ class FakeOracle:
         self.calls: list[str] = []
 
     def evaluate(self, rust_source: str, workdir: Path | str, *,
-                 extra_files: dict[str, str] | None = None) -> OracleResult:
+                 extra_files: dict[str, str] | None = None,
+                 check_terminal: bool = True) -> OracleResult:
         self.calls.append(rust_source)
-        return OracleResult(built=True, ran=True, functional_ok=self.functional_ok,
-                            terminal_check=self.terminal_check, stdout="DONE\n",
+        if check_terminal:
+            terminal_check = "pass" if self.functional_ok else "fail"
+            functional_ok = self.functional_ok
+        else:
+            terminal_check = "not_applicable"
+            functional_ok = None
+        return OracleResult(built=True, ran=True, run_ok=True,
+                            functional_ok=functional_ok,
+                            terminal_check=terminal_check, stdout="DONE\n",
                             details={"fake": True,
                                      "extra_files": sorted((extra_files or {}).keys())})

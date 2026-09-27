@@ -93,8 +93,10 @@ def _generate_rust(*, arm: str, rust_mode: str, accepted_path: Path, candidate: 
         if not art.ok:
             return None, None, None, art.error
         extra = {"src/cir_trace.rs": art.trace_rs} if art.trace_rs else None
+        # Deterministic codegen has no task-specific terminal line: score the
+        # build + clean exit, not the functional output.
         return art.main_rs, art.trace_rs, oracle.evaluate(
-            art.main_rs, workdir, extra_files=extra), None
+            art.main_rs, workdir, extra_files=extra, check_terminal=False), None
     response = provider.propose(CandidateRequest(
         requirements=requirements, contract=None, feedback=None,
         attempt=attempt, previous_candidate=candidate, stage="rust"))
@@ -228,6 +230,7 @@ def result_to_dict(result: CellResult) -> dict[str, Any]:
         "evidence_sufficient": result.evidence_sufficient,
         "oracle": None if result.oracle is None else {
             "built": result.oracle.built, "ran": result.oracle.ran,
+            "run_ok": getattr(result.oracle, "run_ok", None),
             "functional_ok": result.oracle.functional_ok,
             "terminal_check": getattr(result.oracle, "terminal_check", None),
         },

@@ -143,6 +143,8 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None, oracle=None) -> in
             (workdir / "result.json").write_text(dumps(cell), encoding="utf-8")
             if cell.rust:
                 (workdir / "candidate.rs").write_text(cell.rust, encoding="utf-8")
+            if cell.cir_trace:
+                (workdir / "cir_trace.rs").write_text(cell.cir_trace, encoding="utf-8")
             summary["cells"].append(json.loads(dumps(cell)))
     ended_at = time.time()
     _write_manifest(out, args, backend, started_at, ended_at)
@@ -174,6 +176,7 @@ def _write_manifest(out: Path, args: argparse.Namespace, backend: Backend,
         "prompts": prompts.prompt_asset_record(),
         "model": args.model,
         "arm": args.arm,
+        "rust_mode": args.rust_mode,
         "rounds": args.rounds,
         "reps": args.reps,
         "seed": args.seed,
@@ -274,7 +277,7 @@ class _Budget:
         return None
 
 
-def cmd_eval(args: argparse.Namespace) -> int:
+def cmd_eval(args: argparse.Namespace, *, runner=None) -> int:
     run_dir = Path(args.run_dir)
     updated = 0
     for result_path in sorted(run_dir.glob("cells/**/result.json")):
@@ -289,10 +292,13 @@ def cmd_eval(args: argparse.Namespace) -> int:
         trace = workdir / "cir_trace.rs"
         if trace.exists():
             extra["src/cir_trace.rs"] = trace.read_text(encoding="utf-8")
-        oracle = RustOracle(terminal=terminal, timeout=args.timeout)
+        rust_mode = data.get("rust_mode", "llm")
+        oracle = RustOracle(terminal=terminal, timeout=args.timeout, runner=runner)
         outcome = oracle.evaluate(rust.read_text(encoding="utf-8"), workdir,
-                                  extra_files=extra or None)
+                                  extra_files=extra or None,
+                                  check_terminal=rust_mode != "codegen")
         data["oracle"] = {"built": outcome.built, "ran": outcome.ran,
+                          "run_ok": outcome.run_ok,
                           "functional_ok": outcome.functional_ok,
                           "terminal_check": outcome.terminal_check}
         result_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -318,11 +324,20 @@ def _rate(cells: list[dict], predicate) -> str:
     return f"{hits / len(cells):.0%}"
 
 
+def _rate_or_dash(cells: list[dict], getter) -> str:
+    """Rate over cells whose value is not None; '-' when all are None."""
+    values = [getter(c) for c in cells]
+    values = [v for v in values if v is not None]
+    if not values:
+        return "-"
+    return f"{sum(1 for v in values if v) / len(values):.0%}"
+
+
 def _report_markdown(summaries: list[dict]) -> str:
     lines = ["# SkelNet run report", "",
              "| run | arm | model | cells | parse rate | check pass | "
-             "verify pass | mean rounds | evidence | functional |",
-             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+             "verify pass | mean rounds | evidence | run ok | functional |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for s in summaries:
         cells = s.get("cells", [])
         rounds = [c.get("rounds_used", 0) for c in cells if c.get("rounds_used")]
@@ -335,7 +350,8 @@ def _report_markdown(summaries: list[dict]) -> str:
             f"{_rate(cells, lambda c: c.get('accepted'))} | "
             f"{mean_rounds} | "
             f"{_rate(cells, lambda c: c.get('evidence_sufficient'))} | "
-            f"{_rate(cells, lambda c: (c.get('oracle') or {}).get('functional_ok'))} |")
+            f"{_rate_or_dash(cells, lambda c: (c.get('oracle') or {}).get('run_ok'))} | "
+            f"{_rate_or_dash(cells, lambda c: (c.get('oracle') or {}).get('functional_ok'))} |")
     return "\n".join(lines) + "\n"
 
 
