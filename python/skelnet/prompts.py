@@ -217,12 +217,8 @@ def build_check_feedback(result) -> dict[str, Any]:
 def build_explore_feedback(result, *, preserved_ids: list[str] | None = None) -> dict[str, Any]:
     """Disclosure-safe verification feedback (no contract goal, ever)."""
     payload = result.payload or {}
-    properties = payload.get("properties", []) or []
-    failed = [
-        {"id": p.get("id"), "outcome": p.get("outcome"), "detail": p.get("detail"),
-         "reqs": p.get("reqs")}
-        for p in properties if p.get("outcome") not in (None, "PASS")
-    ]
+    # `detail` is sanitized (preserved goals are replaced) by the shared helper.
+    failed = _failed_properties(payload)
     preserved_unmet = [p for p in failed if str(p.get("id", "")).startswith("preserved:")]
     diagnostics = []
     for d in payload.get("diagnostics", []) or []:
