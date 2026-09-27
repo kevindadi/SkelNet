@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -152,6 +153,54 @@ def rust_from_cir_user_prompt(requirements: str, cir: str) -> str:
     )
 
 
+# ── disclosure sanitisation (shared by the SKEL and CIR feedback builders) ──
+
+PRESERVED_DETAIL = "preserved behaviour is not reachable in any explored schedule"
+REDACTED_DETAIL = "property is not reachable in any explored schedule"
+
+# Substrings that betray a contract goal formula in a property `detail`.
+_GOAL_MARKERS = ("holds_all(", "completed(", "function_completed", "goal")
+
+# A process error such as "JSON parse error in '/abs/path.json': ..." must not
+# leak the file path.
+_PROCESS_PATH_RE = re.compile(r"\bin '[^']*':\s*")
+
+
+def sanitize_detail(pid: Any, detail: Any) -> Any:
+    """Replace goal-revealing `detail` text; keep the id/outcome untouched."""
+    if detail is None:
+        return None
+    text = str(detail)
+    if str(pid or "").startswith("preserved:"):
+        return PRESERVED_DETAIL
+    if any(marker in text for marker in _GOAL_MARKERS):
+        return REDACTED_DETAIL
+    return detail
+
+
+def sanitize_process_error(error: str | None) -> str | None:
+    """Drop the file path from a backend process error."""
+    if not error:
+        return error
+    return _PROCESS_PATH_RE.sub(": ", error, count=1)
+
+
+def _failed_properties(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    properties = payload.get("properties", []) or []
+    failed = []
+    for p in properties:
+        if p.get("outcome") in (None, "PASS"):
+            continue
+        pid = p.get("id")
+        failed.append({
+            "id": pid,
+            "outcome": p.get("outcome"),
+            "detail": sanitize_detail(pid, p.get("detail")),
+            "reqs": p.get("reqs"),
+        })
+    return failed
+
+
 def build_check_feedback(result) -> dict[str, Any]:
     payload = result.payload or {}
     return {
@@ -208,6 +257,59 @@ def build_explore_feedback(result, *, preserved_ids: list[str] | None = None) ->
         "unmapped": payload.get("unmapped"),
         "note": ("UNKNOWN means the analysis did not complete; it is not a proof "
                  "of safety. FAIL may already contain a counterexample."),
+    }
+
+
+def build_cir_feedback(result) -> dict[str, Any]:
+    """Disclosure-safe feedback from ``concir-backend explore`` (CIR arm).
+
+    The CIR backend output has a different shape from the skeleton feedback:
+    JSON-parse failures are process errors, static errors are in ``invalid[]``,
+    and counterexamples live in ``diagnostics[].counterexample_names`` /
+    ``doom_state``. Aligned with ``concir_feedback_v1.md``; never includes
+    ``repair_hints``, ``proven_facts``, contract fingerprints, bounds, or any
+    contract field.
+    """
+    payload = result.payload or {}
+    process_error = None
+    if result.kind != "semantic":
+        process_error = sanitize_process_error(result.error)
+
+    diagnostics = [
+        {"code": inv.get("code"), "location": inv.get("location"),
+         "message": inv.get("message")}
+        for inv in payload.get("invalid", []) or []
+    ]
+
+    failed = _failed_properties(payload)
+    preserved_unmet = [p for p in failed if str(p.get("id", "")).startswith("preserved:")]
+
+    counterexamples = []
+    for d in payload.get("diagnostics", []) or []:
+        names = d.get("counterexample_names") or []
+        if not names:
+            continue
+        final_state = [
+            {"function": t.get("function"), "at_sid": t.get("at_sid"),
+             "holds": t.get("holds"), "waiting_on": t.get("waiting_on")}
+            for t in (d.get("doom_state") or {}).get("threads", []) or []
+        ]
+        counterexamples.append({
+            "property": d.get("property"),
+            "message": d.get("message"),
+            "steps": list(names),
+            "final_state": final_state,
+        })
+
+    return {
+        "stage": "explore",
+        "outcome": result.outcome,
+        "complete": result.complete,
+        "process_error": process_error,
+        "diagnostics": diagnostics,
+        "failed_properties": failed,
+        "preserved_unmet": preserved_unmet,
+        "counterexamples": counterexamples,
     }
 
 

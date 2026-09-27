@@ -187,7 +187,7 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
             result.ledger = evidence.property_ledger(verify.payload)
             result.evidence_sufficient = evidence.evidence_sufficient(verify.payload)
             break
-        feedback = prompts.render_feedback(prompts.build_explore_feedback(verify))
+        feedback = prompts.render_feedback(prompts.build_cir_feedback(verify))
 
     if result.accepted and candidate is not None and accepted_path is not None:
         rust, trace, oracle_result, error = _generate_rust(
