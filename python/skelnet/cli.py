@@ -56,14 +56,16 @@ def read_terminal(task_dir: Path) -> str | None:
     return terminal if isinstance(terminal, str) and terminal else None
 
 
-def _budget(arm: str, tasks: int, reps: int, rounds: int) -> dict:
+def _budget(arm: str, tasks: int, reps: int, rounds: int,
+            rust_mode: str = "llm") -> dict:
     if arm == "G0":
         per_task = reps
     else:
-        # Up to `rounds` skeleton/CIR attempts, plus one Rust call, plus one
-        # spare request as headroom.
-        per_task = reps * (rounds + 2)
+        # Exact pipeline upper bound: up to `rounds` skeleton/CIR attempts, plus
+        # one Rust call only when the Rust stage calls the LLM (not codegen).
+        per_task = reps * (rounds + (1 if rust_mode == "llm" else 0))
     return {"arm": arm, "tasks": tasks, "reps": reps, "rounds": rounds,
+            "rust_mode": rust_mode,
             "requests": tasks * per_task, "requests_per_task": per_task}
 
 
@@ -84,7 +86,7 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
             oracle_factory=None) -> int:
     root = repo_root()
     tasks = _select_tasks(root, args.tasks)
-    budget = _budget(args.arm, len(tasks), args.reps, args.rounds)
+    budget = _budget(args.arm, len(tasks), args.reps, args.rounds, args.rust_mode)
     if args.dry_run:
         routes = prompts.routes_for_arm(args.arm)
         print(json.dumps({

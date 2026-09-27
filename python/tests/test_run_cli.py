@@ -131,6 +131,13 @@ def test_g0_prompt_routing(tmp_path):
     assert got == [_joined_sha((prompts.RUST_GENERATION_ASSET,))]
 
 
+def test_budget_exact_upper_bound():
+    assert cli._budget("G0", 1, 1, 4)["requests_per_task"] == 1
+    assert cli._budget("SKEL", 1, 1, 4, "llm")["requests_per_task"] == 5
+    assert cli._budget("SKEL", 1, 1, 4, "codegen")["requests_per_task"] == 4
+    assert cli._budget("CIR", 2, 3, 4, "codegen")["requests"] == 2 * 3 * 4
+
+
 def test_missing_route_raises():
     with pytest.raises(KeyError):
         prompts.system_prompt_for("SKEL", "nonexistent-stage")
