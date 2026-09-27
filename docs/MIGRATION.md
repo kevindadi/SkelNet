@@ -87,4 +87,11 @@ test. `take` is `acquire().forget()`; `forget` was added to `Permit`. The old
   `concir-backend explore <gold> contract.json petri` over all 27 Appendix A
   tasks; outcome / complete / per-property outcomes match Appendix A exactly.
 
-## P2-P7 (pending)
+## P2: `crates/skel` (new crate)
+
+New code, not migrated: `crates/skel/` with `span.rs`, `lexer.rs`, `ast.rs`,
+`parser.rs`, `fmt.rs`, `check.rs`, `error.rs`, `lib.rs`, `main.rs` (bin
+`skelnet`) and `tests/frontend.rs`. The parser is hand-written (lexer +
+recursive descent); no parser-generator dependency was added.
+
+## P3-P7 (pending)

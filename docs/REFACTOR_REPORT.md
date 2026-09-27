@@ -46,6 +46,60 @@ Command: `git diff --cached | grep -nE '(sk-|key-)[A-Za-z0-9_-]{16,}'`
 
 ---
 
+## P2 — `crates/skel`: lexer, parser, AST, fmt, front-end checks
+
+### Changes
+
+New crate `crates/skel` (lib + bin `skelnet`):
+
+- `span.rs` — `Span { start, end, line, col, end_line, end_col }` + `SourceFile`.
+- `lexer.rs` — hand-written lexer: identifiers, ints, strings (`\" \\ \n`),
+  `//` comments, all punctuation/operators, keywords, and the out-of-subset
+  reserved words which emit `S002` + hint.
+- `ast.rs` — full DSL AST; every node carries a `Span`; serializable for
+  `skelnet parse --json`.
+- `parser.rs` — hand-written recursive descent implementing §4.3 EBNF exactly;
+  `;`/`}` error recovery; `S003`; at most 20 syntax errors.
+- `fmt.rs` — canonical pretty-printer (idempotent, round-trip stable).
+- `check.rs` — `S101`–`S109` and `S201`/`S202`; builds the module/resource/function
+  tables that lowering will reuse.
+- `error.rs` — `S###` diagnostics, rustc-style rendering with caret + hint, and
+  the `--json` schema `{code,severity,message,span,hint,origin,concir_code?}`.
+- `main.rs` — `skelnet parse|fmt|check` (lower/verify/codegen/adhere land in
+  P3/P6). Exit codes 0/1/2.
+
+### Tests
+
+`cargo test -p skel --offline` → 31 tests pass in `tests/frontend.rs`:
+
+- one negative (and one positive) test per `S` code: S001, S002, S003, S101,
+  S102, S103, S104, S105, S106, S107, S108, S109, S201, S202. `S104` and `S002`
+  also assert the hint text.
+- `fmt` round-trip on the Appendix B/C examples plus a mixed atomic/semaphore/
+  channel example: reparse is error-free, `fmt` is idempotent, and the AST
+  serialization with all span fields zeroed compares equal.
+- CLI smoke test: `skelnet check --json` emits `S101` and exits 1; a valid
+  program exits 0.
+
+`cargo build --workspace --offline` and `cargo test --workspace --offline` green.
+
+### Deviations / Open questions
+
+- `Span` does not carry the file name; the source file is passed at render time.
+  The §4.4 prose lists `file` in the span, but the `--json` schema in the same
+  section does not, and omitting it keeps `Span` `Copy`. Recorded here.
+- `S106` fires when a `scope` spawn target resolves to a resource rather than a
+  function; an undefined target is `S101`. The grammar forbids arguments inside
+  `scope`, so "spawn with arguments" in a `scope` is an `S003` syntax error.
+- `S101` vs `S103` for "name exists but is the wrong kind": `S103` is used when
+  the name resolves and the kind is wrong (e.g. `lock s` on a semaphore,
+  `c.load()` on a non-atomic); `S101` when it does not resolve.
+- `S201`/`S202` warnings compare tags against the `R<n>` ids that appear in
+  `requirements.json` `clauses` (recursive string scan). `unverifiable` numbers
+  are integers, so they are not treated as requirements to annotate.
+
+---
+
 ## P1 — ConcIR migration + trim, runtime `concir_sync`
 
 ### Changes
