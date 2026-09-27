@@ -1,0 +1,9 @@
+skeleton unbounded_int;
+
+shared x: Int = 0;
+
+@R1
+fn main() { scope { spawn w(); } }
+
+@R1
+fn w() { loop { x = x + 1; } }

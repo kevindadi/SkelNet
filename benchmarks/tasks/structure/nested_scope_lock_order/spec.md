@@ -1,0 +1,1 @@
+Design a worker that starts a nested scope of two tasks; the two inner tasks both need mutexes A and B and must not form a circular wait. Every interleaving must terminate and the outer worker must complete. The inner tasks must hold both mutexes at once.

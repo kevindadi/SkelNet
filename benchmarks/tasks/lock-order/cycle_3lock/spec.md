@@ -1,0 +1,1 @@
+Design a program with three mutexes A, B, C and three worker threads. Worker 1 uses A and B, worker 2 uses B and C, worker 3 uses C and A. Each worker holds its two mutexes simultaneously, releases them, and terminates. Main spawns all three and joins them. Every interleaving must terminate and all three workers must complete. Every worker must hold its pair of mutexes at once.

@@ -1,0 +1,1 @@
+Design two workers that each increment a bounded integer counter (declared range 0..2) under a mutex, while a safety invariant requires the counter never to exceed 1. Every reachable state must keep the invariant and every interleaving must terminate.

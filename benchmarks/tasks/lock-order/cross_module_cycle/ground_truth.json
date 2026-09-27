@@ -1,0 +1,15 @@
+{
+  "defect_family": "lock_order",
+  "resources": [
+    "main::a",
+    "other::b"
+  ],
+  "statements": [
+    "main::t1.l1",
+    "other::t2.l1"
+  ],
+  "expected_outcome_buggy": "FAIL",
+  "expected_outcome_fixed": "PASS",
+  "expected_repair": "unify cross-module lock order",
+  "provenance": "LLM-generated pilot-v1 t3_cross_module_abba (frozen) + authored fixed twin, declared llm_generated"
+}

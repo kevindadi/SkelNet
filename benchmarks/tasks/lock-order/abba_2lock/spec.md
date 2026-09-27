@@ -1,0 +1,1 @@
+Design a program with two mutexes A and B and two worker threads. Each worker acquires both mutexes, works inside the critical section, releases both, and terminates. Main spawns both workers and joins them. Every interleaving must terminate and both workers must complete. Each worker must hold both mutexes at once; a fix that removes the nested critical section is not a repair.

@@ -1,0 +1,9 @@
+{
+  "defect_family": "atomic_data",
+  "resources": [
+    "main::c"
+  ],
+  "statements": [],
+  "expected_outcome_correct": "PASS",
+  "provenance": "authored; exercises bounded Int + safety invariant (a capability with no paper Table 1 coverage)"
+}

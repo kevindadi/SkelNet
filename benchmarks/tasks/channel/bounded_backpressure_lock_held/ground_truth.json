@@ -1,0 +1,14 @@
+{
+  "defect_family": "channel",
+  "resources": [
+    "main::m",
+    "main::ch"
+  ],
+  "statements": [
+    "main::sender.s3"
+  ],
+  "expected_outcome_buggy": "FAIL",
+  "expected_outcome_fixed": "PASS",
+  "expected_repair": "release the lock before the channel op",
+  "provenance": "authored"
+}

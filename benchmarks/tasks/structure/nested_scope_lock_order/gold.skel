@@ -1,0 +1,16 @@
+skeleton nested_scope;
+
+mutex a;
+mutex b;
+
+@R4 @R6 @R5 @R3
+fn main() { scope { spawn outer(); } }
+
+@R4 @R6
+fn outer() { scope { spawn x1(); spawn x2(); } }
+
+@R4 @R6
+fn x1() { lock a { lock b { } } }
+
+@R4 @R6
+fn x2() { lock a { lock b { } } }

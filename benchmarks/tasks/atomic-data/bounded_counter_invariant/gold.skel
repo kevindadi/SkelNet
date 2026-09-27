@@ -1,0 +1,13 @@
+skeleton bounded_counter_invariant;
+
+mutex m;
+shared c: Int[0..=2] = 0 guarded_by m;
+
+@R3 @R4 @R6 @R2 @R5 @R1
+fn main() { scope { spawn w1(); spawn w2(); } }
+
+@R3 @R4 @R6 @R2 @R5
+fn w1() { lock m { c = c + 1; } }
+
+@R3 @R4 @R6 @R2 @R5
+fn w2() { lock m { c = c + 1; } }

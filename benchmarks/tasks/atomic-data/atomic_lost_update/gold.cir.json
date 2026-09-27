@@ -1,0 +1,147 @@
+{
+  "program": "lost_update",
+  "version": "3.5.0",
+  "entry": "main::main",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "c"
+        ],
+        "functions": [
+          "main",
+          "w1",
+          "w2"
+        ]
+      },
+      "requires": {
+        "resources": [],
+        "functions": []
+      },
+      "resources": [
+        {
+          "name": "c",
+          "kind": "var",
+          "type": "Atomic",
+          "base": {
+            "Int": [
+              0,
+              2
+            ]
+          },
+          "init": 0
+        }
+      ],
+      "protection": [],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "scope",
+              "funcs": [
+                "main::w1",
+                "main::w2"
+              ]
+            },
+            {
+              "sid": "s2",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "w1",
+          "kind": "normal",
+          "form": "closure",
+          "locals": [
+            {
+              "name": "l",
+              "type": "Int",
+              "modeled": true
+            },
+            {
+              "name": "l2",
+              "type": "Int",
+              "modeled": true
+            }
+          ],
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "atomic_load",
+              "resource": "main::c",
+              "dst": "l"
+            },
+            {
+              "sid": "s2",
+              "kind": "atomic_cas",
+              "resource": "main::c",
+              "expected": "l",
+              "desired": "l + 1",
+              "dst": "l2"
+            },
+            {
+              "sid": "s3",
+              "kind": "branch",
+              "cond": "l2 == l",
+              "then": "s5",
+              "else": "s1"
+            },
+            {
+              "sid": "s5",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "w2",
+          "kind": "normal",
+          "form": "closure",
+          "locals": [
+            {
+              "name": "l",
+              "type": "Int",
+              "modeled": true
+            },
+            {
+              "name": "l2",
+              "type": "Int",
+              "modeled": true
+            }
+          ],
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "atomic_load",
+              "resource": "main::c",
+              "dst": "l"
+            },
+            {
+              "sid": "s2",
+              "kind": "atomic_cas",
+              "resource": "main::c",
+              "expected": "l",
+              "desired": "l + 1",
+              "dst": "l2"
+            },
+            {
+              "sid": "s3",
+              "kind": "branch",
+              "cond": "l2 == l",
+              "then": "s5",
+              "else": "s1"
+            },
+            {
+              "sid": "s5",
+              "kind": "return"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

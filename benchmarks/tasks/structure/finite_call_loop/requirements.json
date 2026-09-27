@@ -1,0 +1,32 @@
+{
+  "task": "structure/finite_call_loop",
+  "requirements": [
+    "A main task calls an auxiliary routine and then begins the same call sequence again.",
+    "The main task and the auxiliary routine share no mutexes, counters, or other shared state, so no two tasks contend for a resource.",
+    "Each auxiliary call runs to completion before the calling task starts the next call.",
+    "Every schedule and interleaving of the tasks must terminate.",
+    "The program must print exactly the line `DONE done=1` and then exit."
+  ],
+  "unverifiable": [
+    1,
+    5
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R2",
+        "R3",
+        "R4"
+      ]
+    ],
+    "preserved": []
+  },
+  "terminal": "DONE done=1",
+  "entities": {
+    "roles": [
+      "helper"
+    ],
+    "resources": []
+  },
+  "contract": "structure/finite_call_loop/contract.json"
+}

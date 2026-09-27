@@ -1,0 +1,1 @@
+Design a waiter that blocks on a condition variable until a predicate protected by the mutex becomes true, and a notifier that makes the predicate true and signals. The waiter must terminate even if the notifier signals before the waiter waits. The design requires the ready flag to become true.

@@ -1,0 +1,13 @@
+skeleton send_while_holding_mutex;
+
+channel ch1: Int cap 0;
+channel ch2: Int cap 0;
+
+@R1 @R2 @R3 @R4
+fn main() { scope { spawn s(); spawn r(); } }
+
+@R1 @R2 @R3 @R4
+fn s() { ch1.send(1); }
+
+@R1 @R2 @R3 @R4
+fn r() { ch1.recv(); }

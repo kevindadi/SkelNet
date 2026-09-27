@@ -1,0 +1,12 @@
+skeleton acquire_twice;
+
+semaphore s = 1;
+
+@R4 @R5 @R6 @R1 @R2 @R3
+fn main() { scope { spawn w1(); spawn w2(); } }
+
+@R4 @R5 @R6
+fn w1() { s.take(); s.post(); s.take(); s.post(); }
+
+@R4 @R5 @R6
+fn w2() { s.take(); s.post(); }

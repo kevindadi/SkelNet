@@ -1,0 +1,7 @@
+{
+  "defect_family": "boundary",
+  "resources": [],
+  "statements": [],
+  "expected_outcome_buggy": "UNSUPPORTED",
+  "provenance": "ConcIR example; async/await is unsupported in the backend"
+}

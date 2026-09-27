@@ -99,4 +99,16 @@ recursive descent); no parser-generator dependency was added.
 Added `crates/skel/src/lower.rs` and `crates/skel/src/feedback.rs`; extended the
 `skelnet` CLI (`lower`, `check`, `verify`). Not migrated.
 
-## P4-P7 (pending)
+## P4: benchmarks (migrated + new)
+
+Brought in from `ConcPlanVerify/benchmarks/families` (commit `8bf9fa49b`) into
+`benchmarks/tasks/<family>/<task>/`: `contract.json`, `spec.md`,
+`ground_truth.json`, `requirements.json` + `REQUIREMENTS.md`,
+`gold.cir.json` (from `fixed.cir.json`/`correct.cir.json`), and
+`rust/fixed.rs`. Not brought in: `buggy.cir.json`, `repair_input/`,
+`repair_task.json`, `rust/buggy.rs`.
+
+New: 25 `gold.skel` files, `benchmarks/MANIFEST.json` (sha256 + source path),
+`benchmarks/DEVIATIONS.json`.
+
+## P5-P7 (pending)

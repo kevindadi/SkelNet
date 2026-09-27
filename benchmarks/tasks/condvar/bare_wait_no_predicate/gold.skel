@@ -1,0 +1,14 @@
+skeleton bare_wait;
+
+mutex m;
+condvar cv for m;
+shared ready: Bool = false guarded_by m;
+
+@R6 @R7 @R3 @R4 @R8 @R9 @R1 @R5
+fn main() { scope { spawn waiter(); spawn notifier(); } }
+
+@R6 @R7 @R3 @R4 @R8 @R9
+fn waiter() { lock m { while ready == false { cv.wait(); } } }
+
+@R6 @R7 @R3 @R4 @R8 @R9
+fn notifier() { lock m { ready = true; cv.notify_one(); } }

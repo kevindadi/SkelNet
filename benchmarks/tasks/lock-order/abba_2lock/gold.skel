@@ -1,0 +1,13 @@
+skeleton abba_2lock;
+
+mutex a;
+mutex b;
+
+@R4 @R5 @R7 @R8 @R1 @R6 @R2 @R3
+fn main() { scope { spawn t1(); spawn t2(); } }
+
+@R4 @R5 @R7 @R8
+fn t1() { lock a { lock b { } } }
+
+@R4 @R5 @R7 @R8
+fn t2() { lock a { lock b { } } }

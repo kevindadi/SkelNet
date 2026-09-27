@@ -1,0 +1,14 @@
+{
+  "defect_family": "condvar",
+  "resources": [
+    "main::m",
+    "main::cv"
+  ],
+  "statements": [
+    "main::waiter.s2"
+  ],
+  "expected_outcome_buggy": "FAIL",
+  "expected_outcome_fixed": "PASS",
+  "expected_repair": "re-check a predicate in a loop and set it before notify",
+  "provenance": "authored"
+}

@@ -1,0 +1,72 @@
+{
+  "task": "condvar/lost_wakeup_notify_before_wait",
+  "requirements": [
+    "A main task starts a waiter role and a notifier role that run at the same time.",
+    "The waiter and the notifier share one lock, one condition variable, and one boolean flag that the lock guards.",
+    "The notifier sets the shared flag to true while holding the lock, signals the condition variable, and then releases the lock.",
+    "The waiter checks the flag while holding the lock, waits on the condition variable only while the flag is false, and re-checks the flag after every wake.",
+    "The waiter must complete even when the notifier's signal happens before the waiter starts waiting.",
+    "The flag must be set to true before the signal is issued, so a waiting role never misses the notification.",
+    "The flag is read and written only while the lock is held, and the waiter releases the lock while blocked.",
+    "Every schedule and interleaving must terminate with the waiter and the notifier both finished.",
+    "The shared flag becomes true in every schedule.",
+    "The program must print exactly the line `DONE ready=true` and then exit."
+  ],
+  "unverifiable": [
+    2,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R7",
+        "R8"
+      ],
+      [
+        "R3",
+        "R4",
+        "R6"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R4",
+        "R5",
+        "R8"
+      ],
+      [
+        "R1",
+        "R3",
+        "R8"
+      ],
+      [
+        "R3",
+        "R6",
+        "R9"
+      ]
+    ]
+  },
+  "terminal": "DONE ready=true",
+  "entities": {
+    "roles": [
+      "waiter",
+      "notifier"
+    ],
+    "resources": [
+      {
+        "name": "m",
+        "kind": "lock"
+      },
+      {
+        "name": "cv",
+        "kind": "condition variable"
+      },
+      {
+        "name": "ready",
+        "kind": "shared variable"
+      }
+    ]
+  },
+  "contract": "condvar/lost_wakeup_notify_before_wait/contract.json"
+}

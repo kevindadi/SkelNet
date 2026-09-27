@@ -1,0 +1,68 @@
+{
+  "task": "lock-order/cross_module_cycle",
+  "requirements": [
+    "The design contains two modules, where one module owns the first shared resource and the other module owns the second shared resource.",
+    "One task runs in the first module and another task runs in the second module, and both tasks need both resources.",
+    "Each task must declare that it depends on the resource owned by the other module.",
+    "Each task must hold both resources at the same time while it performs its work.",
+    "It must never be possible for the two tasks to leave each other waiting forever, each holding one resource and needing the other.",
+    "Every task must release each resource it holds before it finishes.",
+    "A starting thread launches both tasks and only finishes after both tasks have finished.",
+    "Both tasks must finish even though they run in different modules.",
+    "Every possible schedule or interleaving must terminate.",
+    "The program must print exactly the line `DONE done=1` and then exit."
+  ],
+  "unverifiable": [
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R5",
+        "R6",
+        "R8",
+        "R9"
+      ]
+    ],
+    "preserved": [
+      [
+        "R2",
+        "R7",
+        "R8"
+      ],
+      [
+        "R2",
+        "R7",
+        "R8"
+      ],
+      [
+        "R1",
+        "R3",
+        "R4"
+      ],
+      [
+        "R1",
+        "R3",
+        "R4"
+      ]
+    ]
+  },
+  "terminal": "DONE done=1",
+  "entities": {
+    "roles": [
+      "t1",
+      "t2"
+    ],
+    "resources": [
+      {
+        "name": "a",
+        "kind": "lock"
+      },
+      {
+        "name": "b",
+        "kind": "lock"
+      }
+    ]
+  },
+  "contract": "lock-order/cross_module_cycle/contract.json"
+}

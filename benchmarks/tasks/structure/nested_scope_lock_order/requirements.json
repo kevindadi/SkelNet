@@ -1,0 +1,55 @@
+{
+  "task": "structure/nested_scope_lock_order",
+  "requirements": [
+    "A main task starts one outer worker.",
+    "The outer worker starts a nested group of two inner tasks.",
+    "Each inner task takes mutex A and mutex B and, at some point, holds both of them at the same time.",
+    "The two inner tasks take the mutexes in the same order so that no wait cycle can form.",
+    "The outer worker completes, and it only completes after both inner tasks have finished.",
+    "Every schedule and interleaving of the tasks must terminate.",
+    "The program must print exactly the line `DONE done=1` and then exit."
+  ],
+  "unverifiable": [
+    1,
+    2,
+    7
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R4",
+        "R6"
+      ]
+    ],
+    "preserved": [
+      [
+        "R5"
+      ],
+      [
+        "R3"
+      ],
+      [
+        "R3"
+      ]
+    ]
+  },
+  "terminal": "DONE done=1",
+  "entities": {
+    "roles": [
+      "outer",
+      "x1",
+      "x2"
+    ],
+    "resources": [
+      {
+        "name": "a",
+        "kind": "lock"
+      },
+      {
+        "name": "b",
+        "kind": "lock"
+      }
+    ]
+  },
+  "contract": "structure/nested_scope_lock_order/contract.json"
+}

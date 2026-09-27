@@ -1,0 +1,12 @@
+skeleton permit_leak;
+
+semaphore s = 1;
+
+@R4 @R5 @R6 @R1 @R2 @R3
+fn main() { scope { spawn w1(); spawn w2(); } }
+
+@R4 @R5 @R6
+fn w1() { permit s { } }
+
+@R4 @R5 @R6
+fn w2() { permit s { } }

@@ -1,0 +1,14 @@
+{
+  "defect_family": "atomic_data",
+  "resources": [
+    "main::c"
+  ],
+  "statements": [
+    "main::w1.s2",
+    "main::w2.s2"
+  ],
+  "expected_outcome_buggy": "FAIL",
+  "expected_outcome_fixed": "PASS",
+  "expected_repair": "use compare-and-swap with retry instead of load-then-store",
+  "provenance": "authored; atomics + always_reachable"
+}

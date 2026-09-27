@@ -1,0 +1,60 @@
+{
+  "name": "backpressure",
+  "properties": [
+    {
+      "kind": "deadlock_free",
+      "id": "no-deadlock",
+      "req": [
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7"
+      ]
+    }
+  ],
+  "preserved": [
+    {
+      "kind": "reachable",
+      "description": "main::sender completes",
+      "goal": {
+        "kind": "function_completed",
+        "function": "main::sender"
+      },
+      "req": [
+        "R1",
+        "R3",
+        "R5",
+        "R6"
+      ]
+    },
+    {
+      "kind": "reachable",
+      "description": "main::receiver completes",
+      "goal": {
+        "kind": "function_completed",
+        "function": "main::receiver"
+      },
+      "req": [
+        "R1",
+        "R3",
+        "R5",
+        "R6"
+      ]
+    }
+  ],
+  "assumptions": {
+    "sequential_consistency": true,
+    "no_spurious_wakeups": true
+  },
+  "bounds": {
+    "max_threads": 8,
+    "max_frames_per_thread": 8,
+    "max_states": 20000,
+    "max_depth": 64,
+    "max_boundary_events": 256
+  },
+  "allowed_scope": {
+    "allow_lock_reorder": true
+  }
+}

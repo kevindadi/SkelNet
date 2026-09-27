@@ -1,0 +1,65 @@
+{
+  "task": "condvar/notify_one_multi_waiter_wrong_pick",
+  "requirements": [
+    "A main task starts two waiter roles and one notifier role that run at the same time.",
+    "Each waiter blocks on a shared condition variable until it is told to proceed.",
+    "The notifier must wake every waiter that is still blocked, so no waiter is left waiting forever.",
+    "A waiter must hold the lock while it waits on the condition variable.",
+    "The notifier must take the lock before it wakes the waiters and release the lock afterwards.",
+    "The waiters and the notifier use a separate permit counter so that the notifier only wakes the waiters after both are ready to wait.",
+    "Waking a single waiter is not enough; every blocked waiter must be woken.",
+    "Every schedule and interleaving must terminate with every waiter and the notifier finished.",
+    "Every waiter completes in every schedule.",
+    "The program must print exactly the line `DONE waiters=0` and then exit."
+  ],
+  "unverifiable": [
+    1,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R2",
+        "R3",
+        "R5",
+        "R7",
+        "R8",
+        "R9"
+      ]
+    ],
+    "preserved": [
+      [
+        "R4",
+        "R5",
+        "R6"
+      ]
+    ]
+  },
+  "terminal": "DONE waiters=0",
+  "entities": {
+    "roles": [
+      "w1",
+      "w2",
+      "notifier"
+    ],
+    "resources": [
+      {
+        "name": "m",
+        "kind": "lock"
+      },
+      {
+        "name": "cv",
+        "kind": "condition variable"
+      },
+      {
+        "name": "g12",
+        "kind": "semaphore"
+      },
+      {
+        "name": "gN",
+        "kind": "semaphore"
+      }
+    ]
+  },
+  "contract": "condvar/notify_one_multi_waiter_wrong_pick/contract.json"
+}

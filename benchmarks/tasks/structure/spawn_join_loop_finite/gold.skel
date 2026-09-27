@@ -1,0 +1,7 @@
+skeleton spawn_join_loop;
+
+@R3 @R4 @R5
+fn main() { loop { let h = spawn worker(); h.join(); } }
+
+@R3 @R4 @R5
+fn worker() { }

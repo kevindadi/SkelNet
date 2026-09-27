@@ -1,0 +1,33 @@
+{
+  "schema_version": "skelnet-deviations-v1",
+  "note": "Deviations from the frozen BASELINE / mapping rules that need human confirmation. BASELINE.json itself is never modified.",
+  "deviations": [
+    {
+      "kind": "baseline_deviation",
+      "task": "condvar/same_cv_different_locks",
+      "baseline_outcome": "UNSUPPORTED",
+      "baseline_reason": "condvar_multiple_locks: one condvar waited on with two mutexes",
+      "dsl_gold_skel_outcome": "PASS",
+      "action": "The original structure is inexpressible in the DSL (a condvar is bound to one mutex; `lock m2 { cv.wait(); }` for a cv bound to m1 is S104 - covered by a test). A subset gold.skel satisfying the requirement text was written with one condvar per waiter (cv1 for m1, cv2 for m2) and its explore result recorded. Awaiting human confirmation.",
+      "tests": [
+        "crates/skel/tests/equivalence.rs::same_cv_different_locks_direct_translation_is_s104",
+        "crates/skel/tests/equivalence.rs::gold_skels_match_baseline"
+      ]
+    },
+    {
+      "kind": "mapping_deviation",
+      "mapping": "compute -> ConcIR nop (not seq_hole)",
+      "reason": "ConcIR a35dc86 classifies seq_hole as UNSUPPORTED in the precise backend. Emitting seq_hole would make every skeleton containing a compute hole UNSUPPORTED, so no PASS baseline could be reproduced.",
+      "mitigation": "Source-map construct remains `seq_hole` so codegen/adhere can identify the hole.",
+      "tests": [
+        "crates/skel/tests/verify.rs::mapping_table_covers_each_row"
+      ]
+    },
+    {
+      "kind": "naming_deviation",
+      "mapping": "worker_with_payload extern helper",
+      "reason": "The plan's `extern fn compute();` uses `compute`, which is a DSL keyword (the compute hole). The sequential helper is named `helper` in gold.skel; the contract does not reference the helper by name, so verification is unaffected.",
+      "action": "Awaiting human confirmation; could be avoided by allowing `compute` in name position."
+    }
+  ]
+}

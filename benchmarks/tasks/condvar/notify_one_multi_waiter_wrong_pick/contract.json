@@ -1,0 +1,39 @@
+{
+  "name": "notify_choice_false_pass",
+  "properties": [
+    {
+      "kind": "deadlock_free",
+      "id": "deadlock",
+      "req": [
+        "R2",
+        "R3",
+        "R5",
+        "R7",
+        "R8",
+        "R9"
+      ]
+    }
+  ],
+  "bounds": {
+    "max_depth": 40,
+    "max_states": 10000
+  },
+  "preserved": [
+    {
+      "kind": "reachable",
+      "description": "main::w1 holds [main::m] at once",
+      "goal": {
+        "kind": "holds_all",
+        "function": "main::w1",
+        "resources": [
+          "main::m"
+        ]
+      },
+      "req": [
+        "R4",
+        "R5",
+        "R6"
+      ]
+    }
+  ]
+}

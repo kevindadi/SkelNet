@@ -1,0 +1,55 @@
+{
+  "task": "semaphore/throttle_n_permits",
+  "requirements": [
+    "The program starts a supervising task that launches three worker threads and waits for all of them to finish.",
+    "All three worker threads share one counting permit pool that begins with exactly two permits.",
+    "Each worker acquires one permit, performs its work, releases the permit, and then finishes.",
+    "At most two workers may hold permits at the same time, so a third worker waits until a permit is released.",
+    "While a worker waits for a permit, a holder must remain able to release it so the waiting worker can eventually proceed.",
+    "Every possible schedule and interleaving of the three workers must terminate.",
+    "The program must print exactly the line `DONE done=1` and then exit."
+  ],
+  "unverifiable": [
+    7
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R6"
+      ],
+      [
+        "R1",
+        "R6"
+      ],
+      [
+        "R1",
+        "R6"
+      ]
+    ]
+  },
+  "terminal": "DONE done=1",
+  "entities": {
+    "roles": [
+      "w1",
+      "w2",
+      "w3"
+    ],
+    "resources": [
+      {
+        "name": "s",
+        "kind": "semaphore"
+      }
+    ]
+  },
+  "contract": "semaphore/throttle_n_permits/contract.json"
+}

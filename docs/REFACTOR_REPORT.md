@@ -46,6 +46,54 @@ Command: `git diff --cached | grep -nE '(sk-|key-)[A-Za-z0-9_-]{16,}'`
 
 ---
 
+## P4 — benchmark migration + gold.skel + equivalence
+
+### Changes
+
+- Migrated all 27 tasks to `benchmarks/tasks/<family>/<task>/`, per §6.1:
+  `contract.json`, `spec.md`, `ground_truth.json`, `requirements.json` +
+  `REQUIREMENTS.md` (where a `generation_input/` exists), `gold.cir.json`
+  (the `fixed.cir.json` or `correct.cir.json`), and `rust/fixed.rs` where
+  present. Excluded: `buggy.cir.json`, `repair_input/`, `repair_task.json`,
+  `rust/buggy.rs`.
+- Wrote 25 new `gold.skel` files (24 generation tasks + boundary/unbounded_int;
+  boundary rwlock/async intentionally have none).
+- Generated `benchmarks/MANIFEST.json` (sha256 + source path per file) and
+  `benchmarks/DEVIATIONS.json` (the same_cv and compute mapping deviations).
+- Added `crates/skel/tests/equivalence.rs`.
+
+### Tests
+
+`cargo test -p skel --offline` (incl. `equivalence.rs`) → all green:
+
+- `gold_skels_match_baseline`: for each of the 23 comparable tasks, lowering
+  `gold.skel` and exploring against the task contract reproduces BASELINE
+  `outcome`, `complete` and the exact per-property outcome list.
+- `unbounded_int_is_unknown`: UNKNOWN, incomplete, `no-deadlock = UNKNOWN`.
+- `rwlock_is_rejected_with_s002`, `async_and_select_are_rejected_with_s002`:
+  the two boundary tasks without a gold skeleton are represented as DSL and
+  rejected with `S002`.
+- `same_cv_different_locks_direct_translation_is_s104`: the original structure
+  (one condvar, two mutexes) is inexpressible and yields `S104`; the subset
+  `gold.skel` (one condvar per waiter) explores to PASS, recorded as a
+  `baseline_deviation`.
+- `skelnet check --reqs` on golds is clean (warnings only; e.g. the empty extern
+  helper body warns E114, mapped to its DSL line with `unmapped == 0`).
+
+### Deviations / Open questions
+
+- `condvar/same_cv_different_locks` (baseline UNSUPPORTED): a subset skeleton
+  gives PASS; recorded in `benchmarks/DEVIATIONS.json` for human confirmation.
+- `compute -> nop` (from P3) is re-confirmed as necessary by P4.
+- `worker_with_payload`: the sequential helper is named `helper` instead of
+  `compute` because `compute` is a DSL keyword; the contract does not name it.
+- Tag distribution in gold.skel: `main` carries the union of the task's
+  `clauses` ids and worker functions carry the `properties` ids, so `S201`/
+  `S202` are clean under `--reqs` while the skeleton stays readable. (The plan
+  notes Appendix tags are illustrative only.)
+
+---
+
 ## P3 — lowering, source map, feedback remapping
 
 ### Changes

@@ -1,0 +1,15 @@
+{
+  "defect_family": "structure",
+  "resources": [
+    "main::a",
+    "main::b"
+  ],
+  "statements": [
+    "main::x2.s1",
+    "main::x2.s2"
+  ],
+  "expected_outcome_buggy": "FAIL",
+  "expected_outcome_fixed": "PASS",
+  "expected_repair": "unify the inner lock order",
+  "provenance": "authored; nested scope"
+}

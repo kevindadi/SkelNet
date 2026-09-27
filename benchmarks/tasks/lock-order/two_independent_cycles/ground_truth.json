@@ -1,0 +1,8 @@
+{
+  "defect_family": "lock-order",
+  "resources": [],
+  "statements": [],
+  "expected_outcome_buggy": "FAIL",
+  "provenance": "concir regression seed (two independent cycles)",
+  "expected_outcome_fixed": "PASS"
+}

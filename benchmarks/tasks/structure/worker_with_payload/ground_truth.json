@@ -1,0 +1,9 @@
+{
+  "defect_family": "structure",
+  "resources": [
+    "main::acc"
+  ],
+  "statements": [],
+  "expected_outcome_correct": "PASS",
+  "provenance": "authored; nobody helper gives codegen a HOLE"
+}

@@ -1,0 +1,14 @@
+skeleton lost_wakeup;
+
+mutex m;
+condvar cv for m;
+shared ready: Bool = false guarded_by m;
+
+@R7 @R8 @R3 @R4 @R6 @R1 @R5 @R9
+fn main() { scope { spawn waiter(); spawn notifier(); } }
+
+@R7 @R8 @R3 @R4 @R6
+fn waiter() { lock m { while ready == false { cv.wait(); } } }
+
+@R7 @R8 @R3 @R4 @R6
+fn notifier() { lock m { ready = true; cv.notify_one(); } }

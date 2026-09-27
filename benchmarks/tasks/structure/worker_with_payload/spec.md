@@ -1,0 +1,1 @@
+Design a group of two workers. Each worker acquires a mutex, calls a sequential helper that performs local computation, updates a shared counter under the mutex, releases the mutex and returns. All interleavings must terminate and both workers must complete.

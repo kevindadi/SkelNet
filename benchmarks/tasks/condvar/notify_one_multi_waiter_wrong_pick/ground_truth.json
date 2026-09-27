@@ -1,0 +1,7 @@
+{
+  "defect_family": "condvar",
+  "resources": [],
+  "statements": [],
+  "expected_outcome_buggy": "FAIL",
+  "provenance": "concir round2 regression seed (notify_one choice)"
+}

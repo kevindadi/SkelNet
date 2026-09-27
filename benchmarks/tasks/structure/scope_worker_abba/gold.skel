@@ -1,0 +1,13 @@
+skeleton scope_abba;
+
+mutex a;
+mutex b;
+
+@R4 @R5 @R6 @R7 @R8 @R2
+fn main() { scope { spawn w1(); spawn w2(); } }
+
+@R4 @R5 @R6 @R7
+fn w1() { lock a { lock b { } } }
+
+@R4 @R5 @R6 @R7
+fn w2() { lock a { lock b { } } }

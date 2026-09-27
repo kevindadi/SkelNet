@@ -1,0 +1,7 @@
+{
+  "defect_family": "channel",
+  "resources": [],
+  "statements": [],
+  "expected_outcome_buggy": "FAIL",
+  "provenance": "concir regression seed (channel rendezvous mismatch)"
+}

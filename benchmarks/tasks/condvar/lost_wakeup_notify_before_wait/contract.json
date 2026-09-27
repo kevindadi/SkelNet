@@ -1,0 +1,84 @@
+{
+  "name": "lost-wakeup",
+  "properties": [
+    {
+      "kind": "deadlock_free",
+      "id": "no-deadlock",
+      "req": [
+        "R7",
+        "R8"
+      ]
+    },
+    {
+      "kind": "reachability",
+      "id": "ready-set",
+      "goal": {
+        "kind": "var_eq",
+        "resource": "main::ready",
+        "value": true
+      },
+      "req": [
+        "R3",
+        "R4",
+        "R6"
+      ]
+    }
+  ],
+  "preserved": [
+    {
+      "kind": "reachable",
+      "description": "main::waiter completes",
+      "goal": {
+        "kind": "function_completed",
+        "function": "main::waiter"
+      },
+      "req": [
+        "R1",
+        "R4",
+        "R5",
+        "R8"
+      ]
+    },
+    {
+      "kind": "reachable",
+      "description": "main::notifier completes",
+      "goal": {
+        "kind": "function_completed",
+        "function": "main::notifier"
+      },
+      "req": [
+        "R1",
+        "R3",
+        "R8"
+      ]
+    },
+    {
+      "kind": "reachable",
+      "description": "main::ready == True",
+      "goal": {
+        "kind": "var_eq",
+        "resource": "main::ready",
+        "value": true
+      },
+      "req": [
+        "R3",
+        "R6",
+        "R9"
+      ]
+    }
+  ],
+  "assumptions": {
+    "sequential_consistency": true,
+    "no_spurious_wakeups": true
+  },
+  "bounds": {
+    "max_threads": 8,
+    "max_frames_per_thread": 8,
+    "max_states": 20000,
+    "max_depth": 64,
+    "max_boundary_events": 256
+  },
+  "allowed_scope": {
+    "allow_lock_reorder": true
+  }
+}

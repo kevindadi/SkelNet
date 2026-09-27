@@ -1,0 +1,15 @@
+{
+  "defect_family": "lock_order",
+  "resources": [
+    "main::a",
+    "main::b"
+  ],
+  "statements": [
+    "main::t2.l1",
+    "main::t2.l1b"
+  ],
+  "expected_outcome_buggy": "FAIL",
+  "expected_outcome_fixed": "PASS",
+  "expected_repair": "unify lock order",
+  "provenance": "authored; buggy CIR equals the LLM-generated pilot-v1 t2_abba model (sha d2d4958b...)"
+}

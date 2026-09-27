@@ -1,0 +1,19 @@
+skeleton partial_bystander;
+
+mutex a;
+mutex b;
+semaphore sa = 0;
+semaphore sb = 0;
+shared flag: Bool = false;
+
+@R6 @R9 @R10 @R11 @R7 @R8 @R1 @R3 @R4 @R5
+fn main() { scope { spawn a(); spawn b(); spawn bystander(); } }
+
+@R6 @R9 @R10 @R11 @R7 @R8
+fn a() { lock a { lock b { } } }
+
+@R6 @R9 @R10 @R11 @R7 @R8
+fn b() { lock a { lock b { } } }
+
+@R6 @R9 @R10 @R11 @R7 @R8
+fn bystander() { loop { if flag == true { break; } } }

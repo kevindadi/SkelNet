@@ -1,0 +1,52 @@
+{
+  "task": "semaphore/permit_leak",
+  "requirements": [
+    "The program starts a supervising task that launches two worker threads and waits for both of them to finish.",
+    "Both worker threads share one counting permit pool that begins with exactly one permit.",
+    "A worker must hold a permit while it performs its work, so the two workers never work at the same time.",
+    "Each worker acquires one permit, performs its work, and must release that permit before it finishes.",
+    "While a worker waits for the permit, the worker holding it must remain able to release it so the waiting worker can eventually proceed.",
+    "Every possible schedule and interleaving of the two workers must terminate.",
+    "The program must print exactly the line `DONE permits=1` and then exit."
+  ],
+  "unverifiable": [
+    7
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R4",
+        "R5",
+        "R6"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R6"
+      ],
+      [
+        "R1",
+        "R6"
+      ],
+      [
+        "R2",
+        "R3"
+      ]
+    ]
+  },
+  "terminal": "DONE permits=1",
+  "entities": {
+    "roles": [
+      "w1",
+      "w2"
+    ],
+    "resources": [
+      {
+        "name": "s",
+        "kind": "semaphore"
+      }
+    ]
+  },
+  "contract": "semaphore/permit_leak/contract.json"
+}

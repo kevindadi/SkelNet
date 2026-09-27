@@ -1,0 +1,55 @@
+{
+  "task": "structure/worker_with_payload",
+  "requirements": [
+    "A main task starts a group of two workers.",
+    "Each worker takes a shared mutex, calls a sequential helper routine that performs only local computation, then updates a shared counter while still holding the mutex.",
+    "Each worker releases the mutex it took before it finishes.",
+    "At most one worker may hold the shared mutex at any moment.",
+    "A worker that cannot take a held mutex waits until it becomes free.",
+    "Every schedule and interleaving of the workers must terminate.",
+    "Both workers complete.",
+    "The program must print exactly the line `DONE done=1` and then exit."
+  ],
+  "unverifiable": [
+    1,
+    2,
+    3,
+    8
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R4",
+        "R5",
+        "R6"
+      ]
+    ],
+    "preserved": [
+      [
+        "R7"
+      ],
+      [
+        "R7"
+      ]
+    ]
+  },
+  "terminal": "DONE done=1",
+  "entities": {
+    "roles": [
+      "w1",
+      "w2",
+      "compute"
+    ],
+    "resources": [
+      {
+        "name": "m",
+        "kind": "lock"
+      },
+      {
+        "name": "acc",
+        "kind": "shared variable"
+      }
+    ]
+  },
+  "contract": "structure/worker_with_payload/contract.json"
+}

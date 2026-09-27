@@ -1,0 +1,1 @@
+Design two workers sharing a counting semaphore with one permit. Each worker may acquire the permit more than once, but must release it the same number of times before returning. Every interleaving must terminate and both workers must complete. A worker must hold the permit while it works.

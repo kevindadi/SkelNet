@@ -11,7 +11,7 @@ use concir::explore::VerificationReport;
 use concir::sem::outcome::StepLabel;
 use serde::Serialize;
 
-use crate::lower::{MapStmt, SourceMap};
+use crate::lower::{MapFn, MapRes, MapStmt, SourceMap};
 use crate::span::SourceFile;
 
 #[derive(Debug, Clone, Serialize)]
@@ -93,9 +93,10 @@ pub struct VerifyFeedback {
 }
 
 pub struct Mapper<'a> {
-    program: &'a Program,
     stmts: HashMap<String, &'a MapStmt>,
     json_paths: &'a BTreeMap<String, String>,
+    functions: &'a BTreeMap<String, MapFn>,
+    resources: &'a BTreeMap<String, MapRes>,
     /// Flattened `(module, function, sids-in-order)` indexed by FunctionId.
     funcs: Vec<(String, String, Vec<String>)>,
 }
@@ -114,9 +115,10 @@ impl<'a> Mapper<'a> {
             }
         }
         Mapper {
-            program,
             stmts,
             json_paths: &map.json_paths,
+            functions: &map.functions,
+            resources: &map.resources,
             funcs,
         }
     }
@@ -132,8 +134,34 @@ impl<'a> Mapper<'a> {
         if let Some(s) = self.stmts.get(&key) {
             return Some(SkelRef::from_stmt(s));
         }
-        // Function-level location: map to the first statement of that function
-        // if present, else leave unmapped.
+        // Function-level location `module::function` -> the function's span.
+        if let Some((m, f)) = loc.rsplit_once("::") {
+            let _ = m;
+            if let Some(finfo) = self.functions.get(loc) {
+                return Some(SkelRef {
+                    loc: loc.to_string(),
+                    construct: "function".into(),
+                    line: finfo.span.line,
+                    col: finfo.span.col,
+                    end_line: finfo.span.end_line,
+                    end_col: finfo.span.end_col,
+                    reqs: finfo.reqs.clone(),
+                });
+            }
+            let _ = f;
+        }
+        // Resource-level location `module::resource`.
+        if let Some(rinfo) = self.resources.get(loc) {
+            return Some(SkelRef {
+                loc: loc.to_string(),
+                construct: "resource".into(),
+                line: rinfo.span.line,
+                col: rinfo.span.col,
+                end_line: rinfo.span.end_line,
+                end_col: rinfo.span.end_col,
+                reqs: Vec::new(),
+            });
+        }
         None
     }
 

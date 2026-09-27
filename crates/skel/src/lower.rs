@@ -779,16 +779,6 @@ impl<'a> FnLower<'a> {
         }
     }
 
-    fn footprint_name(&self, name: &Name) -> String {
-        if !name.is_qualified()
-            && self.modules[self.mi].resources.contains_key(&name.ident)
-        {
-            format!("{}::{}", self.module_name(), name.ident)
-        } else {
-            name.text()
-        }
-    }
-
     fn emit_if(
         &mut self,
         s: &Stmt,

@@ -1,0 +1,1 @@
+Design two workers that each increment a bounded integer counter (range 0..2) while holding a mutex. Every reachable state must keep the counter within its declared bound and every interleaving must terminate.

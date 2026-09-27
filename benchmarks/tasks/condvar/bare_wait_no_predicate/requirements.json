@@ -1,0 +1,74 @@
+{
+  "task": "condvar/bare_wait_no_predicate",
+  "requirements": [
+    "A main task starts a waiter role and a notifier role that run at the same time.",
+    "The waiter and the notifier share one lock and one condition variable, and the lock guards a boolean flag.",
+    "The notifier sets the shared flag to true while holding the lock, signals the condition variable, and then releases the lock.",
+    "While holding the lock, the waiter checks the flag first, waits on the condition variable only while the flag is false, and re-checks the flag after each wake.",
+    "The waiter must complete even when the notifier signals before the waiter starts waiting.",
+    "The waiter must not wait on the condition variable while the flag is already true, and must not keep the lock while blocked.",
+    "Every schedule and interleaving of the two roles must terminate with both roles finished.",
+    "The shared flag becomes true in every schedule.",
+    "The waiter must not pass its wait until the flag is true.",
+    "The program must print exactly the line `DONE ready=true` and then exit."
+  ],
+  "unverifiable": [
+    2,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R6",
+        "R7"
+      ],
+      [
+        "R3",
+        "R4",
+        "R8",
+        "R9"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R9"
+      ],
+      [
+        "R1",
+        "R3",
+        "R7"
+      ],
+      [
+        "R3",
+        "R8"
+      ]
+    ]
+  },
+  "terminal": "DONE ready=true",
+  "entities": {
+    "roles": [
+      "waiter",
+      "notifier"
+    ],
+    "resources": [
+      {
+        "name": "m",
+        "kind": "lock"
+      },
+      {
+        "name": "cv",
+        "kind": "condition variable"
+      },
+      {
+        "name": "ready",
+        "kind": "shared variable"
+      }
+    ]
+  },
+  "contract": "condvar/bare_wait_no_predicate/contract.json"
+}

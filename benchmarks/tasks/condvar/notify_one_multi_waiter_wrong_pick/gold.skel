@@ -1,0 +1,18 @@
+skeleton notify_choice;
+
+mutex m;
+condvar cv for m;
+semaphore g12 = 0;
+semaphore gN = 0;
+
+@R2 @R3 @R5 @R7 @R8 @R9 @R4 @R6
+fn main() { scope { spawn w1(); spawn w2(); spawn notifier(); } }
+
+@R2 @R3 @R5 @R7 @R8 @R9
+fn w1() { lock m { g12.post(); cv.wait(); cv.notify_all(); } }
+
+@R2 @R3 @R5 @R7 @R8 @R9
+fn w2() { g12.take(); lock m { gN.post(); cv.wait(); } }
+
+@R2 @R3 @R5 @R7 @R8 @R9
+fn notifier() { gN.take(); lock m { cv.notify_all(); } }

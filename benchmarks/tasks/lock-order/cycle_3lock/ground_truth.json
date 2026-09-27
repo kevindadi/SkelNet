@@ -1,0 +1,16 @@
+{
+  "defect_family": "lock_order",
+  "resources": [
+    "main::a",
+    "main::b",
+    "main::c"
+  ],
+  "statements": [
+    "main::t3.l1",
+    "main::t3.l1b"
+  ],
+  "expected_outcome_buggy": "FAIL",
+  "expected_outcome_fixed": "PASS",
+  "expected_repair": "global lock order",
+  "provenance": "authored"
+}

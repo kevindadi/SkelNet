@@ -1,0 +1,53 @@
+{
+  "task": "channel/rendezvous_both_send",
+  "requirements": [
+    "A main task starts one sending task and one receiving task that run at the same time.",
+    "The two tasks communicate over a channel with no buffering, so a send and a take must meet to exchange the value.",
+    "The sender passes one value and the receiver takes one value, so both tasks finish.",
+    "No task may wait forever for a partner that never arrives.",
+    "Every schedule and interleaving must terminate with both tasks finished and no value left in the channel.",
+    "The channel is empty once both tasks have finished.",
+    "The program must print exactly the line `DONE done=1` and then exit."
+  ],
+  "unverifiable": [
+    7
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R2",
+        "R3",
+        "R4",
+        "R5"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R3",
+        "R5"
+      ],
+      [
+        "R1",
+        "R2",
+        "R3",
+        "R5",
+        "R6"
+      ]
+    ]
+  },
+  "terminal": "DONE done=1",
+  "entities": {
+    "roles": [
+      "s1",
+      "r"
+    ],
+    "resources": [
+      {
+        "name": "ch",
+        "kind": "channel"
+      }
+    ]
+  },
+  "contract": "channel/rendezvous_both_send/contract.json"
+}

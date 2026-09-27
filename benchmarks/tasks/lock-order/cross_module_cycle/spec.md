@@ -1,0 +1,1 @@
+Design two modules that share cross-module resources. Module main owns resource a, module other owns resource b. Two tasks each acquire both resources (declared in requires.resources) and release them. Every interleaving must terminate and both tasks must complete across the module boundary. Both cross-module tasks must hold both resources at once.

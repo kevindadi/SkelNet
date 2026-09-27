@@ -1,0 +1,24 @@
+skeleton atomic_lost_update;
+
+atomic c: Int[0..=2] = 0;
+
+@R4 @R5 @R8 @R2 @R3 @R6 @R1 @R7
+fn main() { scope { spawn w1(); spawn w2(); } }
+
+@R4 @R5 @R8 @R2 @R3 @R6
+fn w1() {
+    loop {
+        let l = c.load();
+        let r = c.cas(l, l + 1);
+        if r == l { break; }
+    }
+}
+
+@R4 @R5 @R8 @R2 @R3 @R6
+fn w2() {
+    loop {
+        let l = c.load();
+        let r = c.cas(l, l + 1);
+        if r == l { break; }
+    }
+}

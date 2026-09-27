@@ -1,0 +1,61 @@
+{
+  "task": "structure/scope_worker_abba",
+  "requirements": [
+    "A main task starts a group of two workers that both contend for the same two mutexes, A and B.",
+    "Each worker takes mutex A and mutex B and, at some point, holds both of them at the same time.",
+    "Each worker releases each mutex it took once its work is finished.",
+    "At most one worker may hold a given mutex at any moment.",
+    "The two workers take the mutexes in the same order so that no wait cycle can form.",
+    "A worker that cannot take a held mutex waits until it becomes free.",
+    "Every schedule and interleaving of the workers must terminate.",
+    "Each worker completes, and the group finishes only after both workers have completed.",
+    "The program must print exactly the line `DONE done=1` and then exit."
+  ],
+  "unverifiable": [
+    1,
+    3,
+    9
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R4",
+        "R5",
+        "R6",
+        "R7"
+      ]
+    ],
+    "preserved": [
+      [
+        "R8"
+      ],
+      [
+        "R8"
+      ],
+      [
+        "R2"
+      ],
+      [
+        "R2"
+      ]
+    ]
+  },
+  "terminal": "DONE done=1",
+  "entities": {
+    "roles": [
+      "w1",
+      "w2"
+    ],
+    "resources": [
+      {
+        "name": "a",
+        "kind": "lock"
+      },
+      {
+        "name": "b",
+        "kind": "lock"
+      }
+    ]
+  },
+  "contract": "structure/scope_worker_abba/contract.json"
+}

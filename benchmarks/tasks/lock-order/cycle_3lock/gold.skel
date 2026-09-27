@@ -1,0 +1,17 @@
+skeleton cycle_3lock;
+
+mutex a;
+mutex b;
+mutex c;
+
+@R5 @R6 @R8 @R9 @R1 @R7 @R2 @R3 @R4
+fn main() { scope { spawn t1(); spawn t2(); spawn t3(); } }
+
+@R5 @R6 @R8 @R9
+fn t1() { lock a { lock b { } } }
+
+@R5 @R6 @R8 @R9
+fn t2() { lock b { lock c { } } }
+
+@R5 @R6 @R8 @R9
+fn t3() { lock a { lock c { } } }

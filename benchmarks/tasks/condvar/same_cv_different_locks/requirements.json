@@ -1,0 +1,61 @@
+{
+  "task": "condvar/same_cv_different_locks",
+  "requirements": [
+    "A main task starts two waiter roles and one notifier role that run at the same time.",
+    "Each waiter guards its own data with its own lock; the two waiters need not share one lock.",
+    "Each waiter must be notified before it proceeds, and the notifier must be able to wake every waiter without depending on a race between them.",
+    "A waiter must hold its own lock while it waits for the notification.",
+    "Each waiter must announce that it is about to wait before it blocks, so the notifier knows how many waits to expect.",
+    "The notifier must wait until both waiters have announced themselves before it wakes them.",
+    "When the notifier wakes the waiters it must hold each lock that a waiter needs in order to wake and finish.",
+    "The waking step must not leave any waiter blocked and must not depend on a race between the waiters.",
+    "Every schedule and interleaving must terminate with all roles finished.",
+    "The program must print exactly the line `DONE done=1` and then exit."
+  ],
+  "unverifiable": [
+    1,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9"
+      ]
+    ],
+    "preserved": []
+  },
+  "terminal": "DONE done=1",
+  "entities": {
+    "roles": [
+      "w1",
+      "w2",
+      "notifier"
+    ],
+    "resources": [
+      {
+        "name": "m1",
+        "kind": "lock"
+      },
+      {
+        "name": "m2",
+        "kind": "lock"
+      },
+      {
+        "name": "cv",
+        "kind": "condition variable"
+      },
+      {
+        "name": "ready",
+        "kind": "semaphore"
+      }
+    ]
+  },
+  "contract": "condvar/same_cv_different_locks/contract.json"
+}

@@ -1,0 +1,23 @@
+{
+  "name": "r2_multi_lock_cv",
+  "properties": [
+    {
+      "kind": "deadlock_free",
+      "id": "deadlock",
+      "req": [
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9"
+      ]
+    }
+  ],
+  "bounds": {
+    "max_depth": 40,
+    "max_states": 10000
+  }
+}

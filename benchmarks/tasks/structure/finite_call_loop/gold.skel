@@ -1,0 +1,7 @@
+skeleton finite_call_loop;
+
+@R2 @R3 @R4
+fn main() { loop { helper(); } }
+
+@R2 @R3 @R4
+fn helper() { }

@@ -1,0 +1,23 @@
+skeleton same_cv_different_locks;
+
+mutex m1;
+mutex m2;
+condvar cv1 for m1;
+condvar cv2 for m2;
+semaphore ready = 0;
+
+@R2 @R3 @R4 @R5 @R6 @R7 @R8 @R9
+fn main() { scope { spawn w1(); spawn w2(); spawn notifier(); } }
+
+@R2 @R3 @R4 @R5 @R6 @R7 @R8 @R9
+fn w1() { lock m1 { ready.post(); cv1.wait(); } }
+
+@R2 @R3 @R4 @R5 @R6 @R7 @R8 @R9
+fn w2() { lock m2 { ready.post(); cv2.wait(); } }
+
+@R2 @R3 @R4 @R5 @R6 @R7 @R8 @R9
+fn notifier() {
+    ready.take();
+    ready.take();
+    lock m1 { lock m2 { cv1.notify_all(); cv2.notify_all(); } }
+}

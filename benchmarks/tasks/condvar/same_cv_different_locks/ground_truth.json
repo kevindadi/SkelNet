@@ -1,0 +1,7 @@
+{
+  "defect_family": "condvar",
+  "resources": [],
+  "statements": [],
+  "provenance": "concir round3 regression seed (precise wait-set: same cv, different locks; correct by construction)",
+  "expected_outcome_correct": "UNSUPPORTED"
+}

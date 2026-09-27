@@ -1,0 +1,1 @@
+Design two workers that each increment a shared atomic counter by exactly one, starting from zero, using a compare-and-swap retry loop so no update is lost. From every reachable state it must still be possible for the counter to reach two, and every interleaving must terminate. Both increments must be observable in the counter's reachable values.

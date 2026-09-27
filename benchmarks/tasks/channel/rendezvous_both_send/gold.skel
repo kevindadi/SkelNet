@@ -1,0 +1,12 @@
+skeleton rendezvous_both_send;
+
+channel ch: Int cap 0;
+
+@R2 @R3 @R4 @R5 @R1 @R6
+fn main() { scope { spawn s1(); spawn r(); } }
+
+@R2 @R3 @R4 @R5
+fn s1() { ch.send(1); }
+
+@R2 @R3 @R4 @R5
+fn r() { ch.recv(); }

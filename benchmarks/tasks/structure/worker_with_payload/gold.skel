@@ -1,0 +1,14 @@
+skeleton worker_payload;
+
+mutex m;
+shared acc: Int = 0 guarded_by m;
+extern fn helper();
+
+@R4 @R5 @R6 @R7
+fn main() { scope { spawn w1(); spawn w2(); } }
+
+@R4 @R5 @R6
+fn w1() { lock m { helper(); acc = acc + 1; } }
+
+@R4 @R5 @R6
+fn w2() { lock m { helper(); acc = acc + 1; } }

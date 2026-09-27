@@ -1,0 +1,7 @@
+{
+  "defect_family": "structure",
+  "resources": [],
+  "statements": [],
+  "expected_outcome_buggy": "PASS",
+  "provenance": "concir round3 regression seed (finite spawn/join loop)"
+}

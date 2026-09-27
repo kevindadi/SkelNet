@@ -1,0 +1,13 @@
+{
+  "defect_family": "atomic_data",
+  "resources": [
+    "main::c"
+  ],
+  "statements": [
+    "main::w1.s2"
+  ],
+  "expected_outcome_buggy": "FAIL",
+  "expected_outcome_fixed": "PASS",
+  "expected_repair": "guard the increment with the invariant bound",
+  "provenance": "authored; bounded Int + safety invariant"
+}

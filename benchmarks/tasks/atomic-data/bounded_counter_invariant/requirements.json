@@ -1,0 +1,56 @@
+{
+  "task": "atomic-data/bounded_counter_invariant",
+  "requirements": [
+    "The program starts a supervising task that launches two worker threads and waits for both of them to finish.",
+    "Both worker threads share a single integer counter that is declared to range from zero to two and starts at zero.",
+    "Each worker adds exactly one to the shared counter while it holds the mutual-exclusion lock.",
+    "A worker must hold the mutual-exclusion lock whenever it reads or writes the shared counter, so the two workers never update it at the same time.",
+    "In every state that can occur, the counter value stays within its declared range from zero to two.",
+    "Every possible schedule and interleaving of the two workers must terminate.",
+    "The program must print exactly the line `DONE done=1` and then exit."
+  ],
+  "unverifiable": [
+    7
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R3",
+        "R4",
+        "R6"
+      ],
+      [
+        "R2",
+        "R5"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R6"
+      ],
+      [
+        "R1",
+        "R6"
+      ]
+    ]
+  },
+  "terminal": "DONE done=1",
+  "entities": {
+    "roles": [
+      "w1",
+      "w2"
+    ],
+    "resources": [
+      {
+        "name": "m",
+        "kind": "lock"
+      },
+      {
+        "name": "c",
+        "kind": "shared variable"
+      }
+    ]
+  },
+  "contract": "atomic-data/bounded_counter_invariant/contract.json"
+}

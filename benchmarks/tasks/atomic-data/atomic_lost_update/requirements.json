@@ -1,0 +1,60 @@
+{
+  "task": "atomic-data/atomic_lost_update",
+  "requirements": [
+    "The program starts a supervising task that launches two worker threads and waits for both of them to finish.",
+    "Both worker threads share a single atomic counter that starts at zero.",
+    "Each worker adds exactly one to the shared counter, so once both have finished the counter equals two.",
+    "Each worker updates the counter with an atomic read-modify-write retry loop, so a competing update can never be silently lost.",
+    "A failed update attempt must be retried rather than abandoned, so every worker's increment eventually takes effect.",
+    "From every state that can occur, it must remain possible for the counter to still reach two.",
+    "Each increment appears to happen in a single indivisible step, so no partial update is ever observable.",
+    "Every possible schedule and interleaving of the two workers must terminate.",
+    "The program must print exactly the line `DONE done=1` and then exit."
+  ],
+  "unverifiable": [
+    9
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R4",
+        "R5",
+        "R8"
+      ],
+      [
+        "R2",
+        "R3",
+        "R6"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R8"
+      ],
+      [
+        "R1",
+        "R8"
+      ],
+      [
+        "R3",
+        "R6",
+        "R7"
+      ]
+    ]
+  },
+  "terminal": "DONE done=1",
+  "entities": {
+    "roles": [
+      "w1",
+      "w2"
+    ],
+    "resources": [
+      {
+        "name": "c",
+        "kind": "atomic counter"
+      }
+    ]
+  },
+  "contract": "atomic-data/atomic_lost_update/contract.json"
+}
