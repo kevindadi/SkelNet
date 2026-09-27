@@ -46,6 +46,74 @@ Command: `git diff --cached | grep -nE '(sk-|key-)[A-Za-z0-9_-]{16,}'`
 
 ---
 
+## P7 — documentation + §10 self-check
+
+### Changes
+
+- Added `docs/dsl.md` (EBNF identical to the plan §4.3 + checks + CLI),
+  `docs/lowering.md` (mapping table, source-map format, early exits, the
+  compute→nop deviation), `docs/feedback.md` (mapping + disclosure policy +
+  `--json` schemas + counterexample example), `docs/architecture.md`,
+  `docs/experiments.md`, `docs/error_codes.md`. Updated `README.md`.
+- Added a total-lowering property test
+  (`crates/skel/tests/verify.rs::lowering_is_total_over_generated_valid_skeletons`).
+
+### §10 self-check (results)
+
+1. **No `.env` in git / no secrets / no push.** `git log --stat --all | grep
+   '\.env$'` → none. `git check-ignore -v .env` →
+   `.gitignore:2:.env	.env`. `git ls-files | grep '(^|/)\.env$'` → none.
+   `git grep -nE '(sk-|key-)[A-Za-z0-9_-]{16,}'` → none. `git remote -v` shows
+   only the original `origin`; no push was performed.
+2. **Source repos untouched.** ConcPlanVerify HEAD `8bf9fa49b…`, ConcIR HEAD
+   `a35dc86…`, both `git status --short` empty; no tags created.
+3. **Offline build/test; no new deps.** `cargo build --workspace --offline` ok;
+   `cargo test --workspace --offline` → 42 suites ok, 0 failures. `Cargo.lock`
+   package set = ConcIR's set + our own `concir_sync` and `skel` (no external
+   additions).
+4. **Hand-written parser; EBNF consistent; S002+hint.** `lexer.rs`/`parser.rs`
+   contain no parser-generator use; `docs/dsl.md` reproduces §4.3; `S002` tests
+   assert the hint (`rwlock`→"use `mutex`").
+5. **Total lowering; no dead statements; early-exit order.** Property test over
+   generated valid skeletons lowers without panic; `early_exit_releases_inside_out_and_maps`
+   asserts inside-out `implicit_release_on_exit` before the jump; implicit
+   return is appended only when reachable.
+6. **24+3 equivalence vs BASELINE.** `gold_skels_match_baseline` checks 23
+   comparable tasks exactly (outcome/complete/per-property); `unbounded_int` is
+   UNKNOWN; rwlock/async are S002 tests. The single deviation
+   (`condvar/same_cv_different_locks`, baseline UNSUPPORTED → subset PASS) is
+   listed in `benchmarks/DEVIATIONS.json` and P4 above.
+7. **Feedback remap: lines, no goal.** `feedback_remap_has_no_unmapped_and_no_goal_leak`
+   asserts `unmapped == 0`, every counterexample step has a DSL line, and the
+   rendered text has no goal; `test_feedback_disclosure.py` repeats this in
+   Python.
+8. **Python arms share one oracle; fake-LLM e2e.** `test_pipeline_skel.py`
+   drives buggy → feedback → fixed → accept → Rust → oracle PASS; `test_pipeline_cir.py`
+   and `test_pipeline_g0.py` use the same `FakeOracle`; `python -m skelnet run
+   --dry-run` prints the budget without model calls.
+9. **`adhere` not in run/eval/report.** `grep -rn adhere python/skelnet` → none;
+   it appears only under its own `skelnet adhere` command.
+10. **MIGRATION.md complete.** Lists source SHAs, every brought-in/deleted
+    file, subcommand and test, per phase.
+
+### Deviations / Open questions (consolidated)
+
+- `compute` → ConcIR `nop` instead of `seq_hole` (ConcIR marks `seq_hole`
+  UNSUPPORTED). `benchmarks/DEVIATIONS.json`.
+- `condvar/same_cv_different_locks` baseline deviation (subset skeleton PASS).
+- `worker_with_payload` helper renamed from `compute` to `helper` (keyword).
+- Python `pipeline`/`oracle`/`evidence`/`audit`/`backend`/`prompts` are compact
+  reimplementations, not verbatim ports; `oracle.py` does build/run/terminal
+  scoring (instrumentation/monitor left as an explicit fallback TODO).
+- `python -m pytest` needs pytest (`python/requirements-dev.txt`); verified with
+  the available pytest binary as `PYTHONPATH=python <pytest> python/tests`
+  (16 passed).
+- `adhere` classification is heuristic and explicitly human-review-only.
+- Repair-only ConcIR test fixtures under `crates/concir/tests/repro_*` were
+  retained as inert data.
+
+---
+
 ## P6 — `skelnet codegen` comments + `skelnet adhere`
 
 ### Changes

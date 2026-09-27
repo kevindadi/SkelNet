@@ -239,6 +239,39 @@ fn main() { }
 }
 
 #[test]
+fn lowering_is_total_over_generated_valid_skeletons() {
+    // A simple property test: many structurally valid skeletons lower without
+    // panicking (the lowerer is total over checked input).
+    for n in 1..6usize {
+        let mut src = String::from("skeleton gen;\nmutex m;\n");
+        for i in 0..n {
+            src.push_str(&format!("semaphore s{i} = {i};\n"));
+        }
+        src.push_str("fn main() { scope {");
+        for i in 0..n {
+            src.push_str(&format!(" spawn w{i}();"));
+        }
+        src.push_str(" } }\n");
+        for i in 0..n {
+            src.push_str(&format!(
+                "fn w{i}() {{ permit s{i} {{ compute \"h\"; }} lock m {{ if {} == 0 {{ }} }} }}\n",
+                i % 2
+            ));
+        }
+        let (ast, perrs) = parse_source("gen.skel", &src);
+        assert!(!perrs.iter().any(|e| e.is_error()), "{perrs:?}");
+        let cerrs = check::check(&ast, None);
+        assert!(
+            !cerrs.iter().any(|e| e.is_error()),
+            "n={n}: {:?}",
+            cerrs.iter().map(|e| (&e.code, &e.message)).collect::<Vec<_>>()
+        );
+        let lowered = lower::lower(&ast, "gen.skel", &src);
+        assert!(lowered.is_ok(), "n={n} lowering failed");
+    }
+}
+
+#[test]
 fn feedback_remap_has_no_unmapped_and_no_goal_leak() {
     let src = r#"
 skeleton abba_bug;
