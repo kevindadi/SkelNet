@@ -65,15 +65,16 @@ class RecordingClient:
         return _FakeOutcome(text)
 
 
-def _args(arm: str, out: Path, rounds: int = 2):
+def _args(arm: str, out: Path, rounds: int = 2, reps: int = 1):
     parser = cli.build_parser()
     return parser.parse_args([
         "run", "--arm", arm, "--model", "DeepSeek Flash",
-        "--tasks", "lock-order/abba_2lock", "--reps", "1",
+        "--tasks", "lock-order/abba_2lock", "--reps", str(reps),
         "--rounds", str(rounds), "--out", str(out)])
 
 
-def _run_arm(arm: str, responses: list[str], tmp_path: Path):
+def _run_arm(arm: str, responses: list[str], tmp_path: Path, *,
+             rounds: int = 2, reps: int = 1):
     created: list[RecordingClient] = []
 
     def factory(spec, out):
@@ -82,7 +83,7 @@ def _run_arm(arm: str, responses: list[str], tmp_path: Path):
         return client
 
     out = tmp_path / f"run_{arm}"
-    args = _args(arm, out)
+    args = _args(arm, out, rounds=rounds, reps=reps)
     rc = cli.cmd_run(args, client_factory=factory, oracle=FakeOracle(True))
     assert rc == 0
     return out, created[0]
@@ -151,6 +152,29 @@ def test_manifest_and_audit_cell_ids(tmp_path):
         assert event["replicate"] == 0
         assert event["cell_id"] == "lock-order/abba_2lock/0"
     assert [e["stage"] for e in events] == ["generate", "feedback", "rust"]
+
+
+def test_audit_rounds_and_cells(tmp_path):
+    # Two reps, SKEL: bad -> bad -> good -> Rust (rounds=3).
+    responses = [BUGGY, BUGGY, FIXED, RUST] * 2
+    out, _ = _run_arm("SKEL", responses, tmp_path, rounds=3, reps=2)
+    events = [json.loads(line) for line in
+              (out / "audit.jsonl").read_text().splitlines() if line.strip()]
+    by_cell: dict[str, list[dict]] = {}
+    for event in events:
+        by_cell.setdefault(event["cell_id"], []).append(event)
+    assert len(by_cell) == 2, by_cell.keys()  # two distinct reps
+    for cell_events in by_cell.values():
+        seq = [(e["stage"], e["candidate_round"]) for e in cell_events]
+        assert seq == [("generate", 1), ("feedback", 2), ("feedback", 3),
+                       ("rust", 4)]
+        attempt_ids = [e["attempt_id"] for e in cell_events]
+        assert len(attempt_ids) == len(set(attempt_ids))
+        # F1 metadata is recorded on every call.
+        for event in cell_events:
+            assert event["system_prompt_assets"]
+            assert event["system_sha256"]
+        assert len(cell_events[1]["system_prompt_assets"]) == 2
 
 
 def test_report_columns(tmp_path):

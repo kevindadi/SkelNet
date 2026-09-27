@@ -204,8 +204,13 @@ class _ChatProvider:
 
     def propose(self, request):
         stage = _stage_for(self.arm, request)
+        assets = prompts.route(self.arm, stage)
         if hasattr(self.client, "set_stage"):
             self.client.set_stage(stage)
+        if hasattr(self.client, "set_attempt"):
+            self.client.set_attempt(getattr(request, "attempt", 1))
+        if hasattr(self.client, "set_prompt_meta"):
+            self.client.set_prompt_meta(assets, _system_sha(assets))
         system = prompts.system_prompt_for(self.arm, stage)
         user = _user_prompt_for(self.arm, stage, request)
         try:
