@@ -74,7 +74,7 @@ experiments/<run_id>/
 
 `--rust-mode codegen` skips the Rust LLM call after a PASS and uses
 `skelnet codegen` (SKEL) or `concir-backend codegen` (CIR) instead. The
-generated skeleton prints nothing, so codegen mode is scored on whether the
+generated program prints nothing, so codegen mode is scored on whether the
 verified design **builds and exits cleanly** (`terminal_check:
 "not_applicable"`, `run_ok`), **not** on the functional output; it is therefore
 not comparable to the LLM modes' `functional_ok`.
@@ -89,6 +89,9 @@ python -m skelnet run --arm SKEL --tasks all --reps 3 --rounds 4 --dry-run
 ```
 
 `--dry-run` prints the request budget and prompt shas and calls no model.
+`--out` must be absent or empty (pass `--force` to overwrite); a run directory
+is single-run, so `eval` rebuilds `SUMMARY.json`/`REPORT.md` from the manifest's
+selected tasks and reps only.
 
 ## Report columns
 

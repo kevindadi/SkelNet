@@ -36,7 +36,7 @@ def test_cir_feedback_non_json_process_error(tmp_path):
     result = Backend().verify_cir(path, _contract())
     feedback = build_cir_feedback(result)
     assert feedback["process_error"]
-    assert "JSON parse error" in feedback["process_error"]
+    assert feedback["process_error"].startswith("JSON parse error: ")
     assert str(path) not in feedback["process_error"]
     assert str(tmp_path) not in feedback["process_error"]
     _assert_no_leak(feedback)

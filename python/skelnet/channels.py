@@ -67,7 +67,6 @@ class AuditedClient:
         self.task_id = task_id
         self.replicate = replicate
         self.stage = stage
-        self.round = 0
         # Attempt number of the current request (set by the pipeline). Not
         # reset by `set_stage`: the round belongs to the cell, not the stage.
         self.attempt = 0
@@ -82,7 +81,6 @@ class AuditedClient:
         self.cell_id = cell_id
         self.task_id = task_id
         self.replicate = replicate
-        self.round = 0
         self.attempt = 0
 
     def set_attempt(self, attempt: int) -> None:
@@ -95,7 +93,6 @@ class AuditedClient:
         self.system_sha256 = system_sha256
 
     def complete(self, system: str, user: str):
-        self.round += 1
         prompt = system.strip() + "\n\n" + user.strip()
         started = time.time()
         attempt_id = f"{self.stage}-{self.attempt}"

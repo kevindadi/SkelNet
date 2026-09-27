@@ -163,7 +163,7 @@ _GOAL_MARKERS = ("holds_all(", "completed(", "function_completed", "goal")
 
 # A process error such as "JSON parse error in '/abs/path.json': ..." must not
 # leak the file path.
-_PROCESS_PATH_RE = re.compile(r"\bin '[^']*':\s*")
+_PROCESS_PATH_RE = re.compile(r"\s+in '[^']*':\s*")
 
 
 def sanitize_detail(pid: Any, detail: Any) -> Any:

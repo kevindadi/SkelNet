@@ -278,9 +278,11 @@ class _ChatProvider:
             self.client.set_stage(stage)
         if hasattr(self.client, "set_attempt"):
             self.client.set_attempt(getattr(request, "attempt", 1))
-        if hasattr(self.client, "set_prompt_meta"):
-            self.client.set_prompt_meta(assets, _system_sha(assets))
+        # Hash the system prompt actually sent, not a re-derived join.
         system = prompts.system_prompt_for(self.arm, stage)
+        if hasattr(self.client, "set_prompt_meta"):
+            self.client.set_prompt_meta(
+                assets, hashlib.sha256(system.encode("utf-8")).hexdigest())
         user = _user_prompt_for(self.arm, stage, request)
         try:
             outcome = self.client.complete(system, user)
