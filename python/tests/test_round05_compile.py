@@ -1,7 +1,9 @@
 """T1/M1/M2: the shared Rust compile check, path hygiene and unavailability."""
 
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 
 from skelnet.backend import repo_root
@@ -124,6 +126,24 @@ def test_nonzero_without_errors_is_unavailable(tmp_path):
     assert result.ok is False
     assert result.errors == []
     assert result.unavailable and "failed to select a version" in result.unavailable
+
+
+# ── N1: replacement order is hash-seed independent ───────────────────
+def test_relativize_order_is_hash_seed_independent():
+    wd = repo_root() / "experiments/run/cells/lock-order/abba_2lock/0/compile/c3"
+    code = (
+        "from pathlib import Path\n"
+        "from skelnet.rusttools.compile import _relativize\n"
+        f"wd = Path({str(wd)!r})\n"
+        "print(_relativize(f'note: see {wd}/src/main.rs', wd))\n"
+    )
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+    for seed in range(32):
+        env["PYTHONHASHSEED"] = str(seed)
+        out = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                             text=True, env=env)
+        assert out.stdout.strip() == "note: see src/main.rs", (seed, out.stdout, out.stderr)
 
 
 @cargo_only

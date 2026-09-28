@@ -363,3 +363,50 @@ def test_cmd_run_cir_real_path(tmp_path):
         "generate", "feedback", "rust", "rust_fix"]
     assert '"reqs"' in client.users[1] and '"R2"' in client.users[1]  # D5-4 reqs
     assert "<concir>" in client.users[3]  # the rust_fix prompt carries the design
+
+
+# ── N3: cmd_run + OSError on the compile call ────────────────────────
+class _OsiErrorRunner:
+    def __init__(self, tools):
+        self.tools = tools
+        self.compile_calls = 0
+
+    def __call__(self, cmd, cwd, timeout, env):
+        if "--message-format=json" in cmd:
+            self.compile_calls += 1
+            raise OSError("cargo not found")
+        return self.tools(cmd, cwd, timeout, env)
+
+
+def _assert_compile_unavailable(out):
+    result = json.loads(
+        (out / "cells" / "lock-order" / "abba_2lock" / "0" / "result.json").read_text())
+    assert result["rust_calls"] == 1
+    assert result["error"] == "compile_unavailable"
+    assert result["rust_compiled"] is None
+    assert result["rust_attempts"][0]["compile"] == "unavailable"
+    assert result["calls"][-1]["stage"] == "rust"
+
+
+def test_cmd_run_skel_compile_unavailable(tmp_path):
+    out = tmp_path / "run"
+    args = run_args("SKEL", out, rounds=1, call_budget=5,
+                    budget_file=str(tmp_path / "budget.json"))
+    runner = _OsiErrorRunner(FakeTools())
+    assert cli.cmd_run(args, client_factory=lambda s, o: _ScriptedChat([FIXED, RUST_GOOD]),
+                       oracle_runner=runner) == 0
+    _assert_compile_unavailable(out)
+    assert runner.compile_calls == 1
+
+
+def test_cmd_run_cir_compile_unavailable(tmp_path):
+    gold = (repo_root() / "benchmarks/tasks/lock-order/abba_2lock"
+            / "gold.cir.json").read_text()
+    out = tmp_path / "run"
+    args = run_args("CIR", out, rounds=1, call_budget=5,
+                    budget_file=str(tmp_path / "budget.json"))
+    runner = _OsiErrorRunner(FakeTools())
+    assert cli.cmd_run(args, client_factory=lambda s, o: _ScriptedChat([gold, RUST_GOOD]),
+                       oracle_runner=runner) == 0
+    _assert_compile_unavailable(out)
+    assert runner.compile_calls == 1

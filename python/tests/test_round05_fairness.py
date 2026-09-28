@@ -225,3 +225,18 @@ def test_opaque_cir_fills_reqs(tmp_path):
     entry = fb["failed_properties"][0]
     assert entry["id"] == "P1"
     assert entry["reqs"] == ["R2", "R3"]
+
+
+# ── N2: keep mode is byte-identical to 9dfaefe ───────────────────────
+_EXPECTED_FULL_KEEP = '{\n  "stage": "explore",\n  "outcome": "FAIL",\n  "complete": true,\n  "failed_properties": [\n    {\n      "id": "no-deadlock",\n      "outcome": "FAIL",\n      "detail": "a reachable state has no enabled step and unfinished threads",\n      "reqs": [\n        "R4",\n        "R5",\n        "R7",\n        "R8"\n      ]\n    }\n  ],\n  "preserved_unmet": [],\n  "diagnostics": [\n    {\n      "property": "property:no-deadlock",\n      "outcome": "info",\n      "message": "reachable global deadlock",\n      "skel": {\n        "loc": "main::main::s1",\n        "construct": "scope",\n        "line": 4,\n        "col": 13,\n        "end_line": 4,\n        "end_col": 46,\n        "reqs": []\n      },\n      "unmapped": false\n    }\n  ],\n  "counterexamples": [\n    {\n      "property": "no-deadlock",\n      "reqs": [\n        "R4",\n        "R5",\n        "R7",\n        "R8"\n      ],\n      "steps": [\n        {\n          "step": 1,\n          "thread": 0,\n          "function": "main::main",\n          "line": 4,\n          "statement": "fn main() { scope { spawn t1(); spawn t2(); } }"\n        },\n        {\n          "step": 2,\n          "thread": 1,\n          "function": "main::t1",\n          "line": 5,\n          "statement": "fn t1() { lock a { lock b { } } }"\n        },\n        {\n          "step": 3,\n          "thread": 2,\n          "function": "main::t2",\n          "line": 6,\n          "statement": "fn t2() { lock b { lock a { } } }"\n        },\n        {\n          "step": 4,\n          "thread": 1,\n          "function": "main::t1",\n          "line": 5,\n          "statement": "fn t1() { lock a { lock b { } } }"\n        },\n        {\n          "step": 5,\n          "thread": 2,\n          "function": "main::t2",\n          "line": 6,\n          "statement": "fn t2() { lock b { lock a { } } }"\n        }\n      ],\n      "final_note": "T0 waits scope ; T1 holds [main::a] waits mutex main::b; T2 holds [main::b] waits mutex main::a"\n    }\n  ],\n  "unmapped": 0,\n  "note": "UNKNOWN means the analysis did not complete; it is not a proof of safety. FAIL may already contain a counterexample."\n}\n'
+
+
+@rust_tools
+def test_keep_mode_matches_9dfaefe(tmp_path):
+    from test_feedback_disclosure import BUGGY
+    skel = tmp_path / "buggy.skel"
+    skel.write_text(BUGGY, encoding="utf-8")
+    verify = Backend().verify(skel, CONTRACT_PATH)
+    fb = build_explore_feedback(verify)
+    assert fb["diagnostics"][0]["property"] == "property:no-deadlock"
+    assert render_feedback(fb) == _EXPECTED_FULL_KEEP.rstrip("\n")
