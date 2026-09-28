@@ -54,4 +54,28 @@ A validation failure is a program bug and aborts the run.
 - `oracle`: the shared format used by the independent oracle (round 3). The
   optional `functional_ok_no_o4`, `oracle_complete` and `layers` keys are
   accepted when present; `layers` status is one of
-  `pass|fail|unsupported|unavailable|not_run`.
+  `pass|fail|unsupported|unavailable|not_run`; each layer's `category`/`detail`
+  are `str|null` and `wall_ms` is `int|null`.
+
+### SKEL/CIR method fields (round 5)
+
+Present on SKEL/CIR cells (G0 and the round-4 baselines may omit them):
+
+- `skel_verified` (`bool|null`): the skeleton stage ended on `PASS ∧ complete`.
+- `skel_status` (`str|null`): the last skeleton's outcome (`PASS`/`FAIL`/
+  `UNKNOWN`/`INVALID`/`UNSUPPORTED`/`check_failed`/`no_candidate`).
+- `rust_compiled` (`bool|null`): the final Rust version compiled.
+- `rust_calls` (`int`), `rust_attempts` (`list` of
+  `{call, stage, reply_kind, compiled}`), `rust_skipped` (`str|null`, one of
+  `no_candidate`/`skeleton_invalid`/`codegen_failed`/`unverified`/`no_program`).
+- `feedback_mode`, `rust_when_unverified`, `property_ids` (`str|null`): the
+  method knobs recorded in `run_params`.
+
+`accepted` for SKEL/CIR means **the skeleton verified AND the final Rust
+compiled** (`skel_verified ∧ rust_compiled`), independent of the oracle.
+`rounds_used` counts skeleton-stage calls; total calls are `budget_used.calls`.
+`status` only says whether the orchestration errored: an `ok` cell may still
+carry an `error` (e.g. `cell_budget_exhausted`, `transport_truncated`).
+
+Codegen mode (`--rust-mode codegen`) reports only `run_ok` and the layer
+statuses: both `functional_ok` and `functional_ok_no_o4` are `null`.

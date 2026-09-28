@@ -119,3 +119,21 @@ def test_rust_fix_routing_through_chat_provider():
 def test_rust_fix_route_uses_compile_fix_asset():
     assert prompts.route("CIR", "rust_fix") == (
         prompts.RUST_COMPILE_FIX_ASSET, prompts.RUST_RUNTIME_API_ASSET)
+
+
+# ── T8: neutral rust prompts ─────────────────────────────────────────
+def test_rust_routes_are_neutral():
+    for arm in ("SKEL", "CIR"):
+        text = prompts.system_prompt_for(arm, prompts.STAGE_RUST).lower()
+        assert "verified" not in text, arm
+
+
+def test_rust_user_prompts_are_neutral():
+    assert "verified" not in prompts.rust_from_skel_user_prompt("r", "s").lower()
+    assert "verified" not in prompts.rust_from_cir_user_prompt("r", "c").lower()
+
+
+def test_prompt_asset_record_has_new_assets():
+    record = prompts.prompt_asset_record()
+    assert prompts.RUST_FROM_SKEL_V2_ASSET in record
+    assert prompts.RUST_FROM_CIR_V3_ASSET in record

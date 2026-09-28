@@ -47,6 +47,8 @@ def validate_cell(cell: Any) -> list[str]:
         errors.append("error is required (may be null)")
     if "accepted" not in cell:
         errors.append("accepted is required")
+    elif not isinstance(cell["accepted"], bool):
+        errors.append("accepted must be a bool")
 
     errors.extend(_validate_calls(cell.get("calls")))
     errors.extend(_validate_budget_used(cell.get("budget_used")))
@@ -177,4 +179,10 @@ def _validate_layers(layers: Any) -> list[str]:
                 f"oracle.layers.{name}.status must be one of {sorted(_LAYER_STATUSES)}")
         if "category" not in layer or "detail" not in layer or "wall_ms" not in layer:
             errors.append(f"oracle.layers.{name} needs category/detail/wall_ms")
+        else:
+            for key in ("category", "detail"):
+                if not (layer[key] is None or isinstance(layer[key], str)):
+                    errors.append(f"oracle.layers.{name}.{key} must be a string or null")
+            if not _is_int_or_none(layer["wall_ms"]):
+                errors.append(f"oracle.layers.{name}.wall_ms must be an int or null")
     return errors

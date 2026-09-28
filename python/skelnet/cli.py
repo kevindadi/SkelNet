@@ -26,8 +26,8 @@ from .providers import CandidateResponse
 from .requirements_render import RequirementsMissing, render_requirements
 from .rusttools.runner import ToolRunner
 from .schema import validate_cell
-from .transport import (BudgetExceeded, TransportError, build_registry,
-                        resolve_model)
+from .transport import (BudgetExceeded, ModelIdentityError, TransportError,
+                        build_registry, experimental_models, resolve_model)
 
 
 def _task_dirs(root: Path) -> list[Path]:
@@ -199,6 +199,8 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
             "sample_seed": ({"task": first_task, "rep": 0,
                              "seed": seed_for(first_task, 0)} if first_task else None),
             "model_policy": _model_policy(spec),
+            "model_policies": [_model_policy_entry(s)
+                               for s in experimental_models()],
             "prompt_routes": {
                 stage: {
                     "assets": list(assets),
@@ -297,6 +299,15 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
                 _write_summary(out, summary)
                 print(f"budget exhausted: {exc}")
                 return 1
+            except ModelIdentityError as exc:
+                manifest["status"] = "failed"
+                manifest["failure"] = "model_identity"
+                manifest["failure_error"] = str(exc)
+                manifest["ended_at"] = time.time()
+                _write_manifest(out, manifest)
+                _write_summary(out, summary)
+                print(f"model identity mismatch: {exc}")
+                return 1
             except Exception as exc:  # noqa: BLE001 - isolate cell failures
                 data = _error_cell(args, spec, run_params, task, tier, rep, exc)
             _write_cell(workdir, data)
@@ -316,12 +327,25 @@ def _run_params(args: argparse.Namespace, spec):
         raise SystemExit("--temperature-policy fixed requires --temperature")
     if args.temperature_policy != "fixed" and temperature is not None:
         raise SystemExit("--temperature is only allowed with --temperature-policy fixed")
-    return params_for_model(
-        spec, temperature_policy=args.temperature_policy,
+    # The method knobs only apply to SKEL/CIR (property ids also to DYNAMIC_M).
+    if args.arm not in ("SKEL", "CIR"):
+        if getattr(args, "feedback_mode", "full") != "full":
+            raise SystemExit(f"--feedback-mode is only valid for SKEL/CIR (arm {args.arm})")
+        if getattr(args, "rust_when_unverified", "last") != "last":
+            raise SystemExit(
+                f"--rust-when-unverified is only valid for SKEL/CIR (arm {args.arm})")
+    overrides = dict(
+        temperature_policy=args.temperature_policy,
         temperature=(temperature if args.temperature_policy == "fixed" else None),
         seed_policy=args.seed_policy, call_budget=args.call_budget,
-        token_budget=args.token_budget, max_output_tokens=args.max_output_tokens,
-        hint=args.hint)
+        token_budget=args.token_budget, hint=args.hint,
+        feedback_mode=getattr(args, "feedback_mode", "full"),
+        rust_when_unverified=getattr(args, "rust_when_unverified", "last"),
+        property_ids=getattr(args, "property_ids", "keep"))
+    # None means "use the registry's per-model value".
+    if args.max_output_tokens is not None:
+        overrides["max_output_tokens"] = args.max_output_tokens
+    return params_for_model(spec, **overrides)
 
 
 def _model_policy(spec) -> dict:
@@ -333,6 +357,12 @@ def _model_policy(spec) -> dict:
         "max_output_tokens_cap": spec.max_output_tokens_cap,
         "supports_seed": spec.supports_seed, "stream": spec.stream,
     }
+
+
+def _model_policy_entry(spec) -> dict:
+    params = params_for_model(spec)
+    return {**_model_policy(spec),
+            "temperature_sent": params.temperature_policy == "fixed"}
 
 
 def _task_tier(task_dir: Path) -> str | None:
@@ -592,6 +622,9 @@ class _ChatProvider:
             outcome = self.client.complete(system, user)
         except BudgetExceeded:
             raise
+        except ModelIdentityError:
+            # A model-identity mismatch invalidates the whole batch.
+            raise
         except TransportError as exc:
             # A failed call can still carry usage/truncation accounting (e.g.
             # TransportTruncated): record and bill it like a real call.
@@ -840,6 +873,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--rounds", type=int, default=4)
     run.add_argument("--out", default="experiments/run")
     run.add_argument("--rust-mode", default="llm", choices=["llm", "codegen"])
+    run.add_argument("--feedback-mode", default="full",
+                     choices=["full", "outcome_only", "nocex", "nomap"])
+    run.add_argument("--rust-when-unverified", default="last",
+                     choices=["skip", "last"])
+    run.add_argument("--property-ids", default="keep", choices=["keep", "opaque"])
     run.add_argument("--force", action="store_true",
                      help="overwrite a non-empty output directory")
     run.add_argument("--temperature-policy", default="provider_default",
@@ -849,10 +887,11 @@ def build_parser() -> argparse.ArgumentParser:
                      choices=["per_cell", "none"])
     run.add_argument("--call-budget", type=int, default=5)
     run.add_argument("--token-budget", type=int, default=200000)
-    run.add_argument("--max-output-tokens", type=int, default=32768)
+    run.add_argument("--max-output-tokens", type=int, default=None)
     run.add_argument("--hint", default="h0", choices=["h0", "h1"])
     run.add_argument("--stage", type=int, default=0, choices=[0, 1, 2, 3])
-    run.add_argument("--budget-file", default="experiments/budget.json")
+    run.add_argument("--budget-file",
+                     default=str(repo_root() / "experiments" / "budget.json"))
     run.add_argument("--cache-dir", default=None)
     run.add_argument("--resume", action="store_true")
     run.add_argument("--replay-from", default=None)

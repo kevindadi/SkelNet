@@ -18,9 +18,11 @@ PROMPT_ASSET_DIR = Path(__file__).resolve().parents[2] / "prompts"
 SKEL_GENERATION_ASSET = "skel_generation_v1.md"
 SKEL_FEEDBACK_ASSET = "skel_feedback_v1.md"
 RUST_FROM_SKEL_ASSET = "rust_from_skel_v1.md"
+RUST_FROM_SKEL_V2_ASSET = "rust_from_skel_v2.md"
 CIR_GENERATION_ASSET = "concir_generation_v4.md"
 CIR_FEEDBACK_ASSET = "concir_feedback_v1.md"
 RUST_FROM_CIR_ASSET = "rust_from_cir_v2.md"
+RUST_FROM_CIR_V3_ASSET = "rust_from_cir_v3.md"
 RUST_GENERATION_ASSET = "rust_generation_v1.md"
 RUST_GENERATION_V2_ASSET = "rust_generation_v2.md"
 RUST_RUNTIME_API_ASSET = "rust_runtime_api_v1.md"
@@ -28,7 +30,8 @@ RUST_COMPILE_FIX_ASSET = "rust_compile_fix_v1.md"
 
 ASSETS = (
     SKEL_GENERATION_ASSET, SKEL_FEEDBACK_ASSET, RUST_FROM_SKEL_ASSET,
-    CIR_GENERATION_ASSET, CIR_FEEDBACK_ASSET, RUST_FROM_CIR_ASSET,
+    RUST_FROM_SKEL_V2_ASSET, CIR_GENERATION_ASSET, CIR_FEEDBACK_ASSET,
+    RUST_FROM_CIR_ASSET, RUST_FROM_CIR_V3_ASSET,
     RUST_GENERATION_ASSET, RUST_GENERATION_V2_ASSET, RUST_RUNTIME_API_ASSET,
     RUST_COMPILE_FIX_ASSET,
 )
@@ -48,11 +51,11 @@ PROMPT_SEPARATOR = "\n\n---\n\n"
 PROMPT_ROUTES: dict[tuple[str, str], tuple[str, ...]] = {
     ("SKEL", STAGE_GENERATE): (SKEL_GENERATION_ASSET,),
     ("SKEL", STAGE_FEEDBACK): (SKEL_GENERATION_ASSET, SKEL_FEEDBACK_ASSET),
-    ("SKEL", STAGE_RUST): (RUST_FROM_SKEL_ASSET, RUST_RUNTIME_API_ASSET),
+    ("SKEL", STAGE_RUST): (RUST_FROM_SKEL_V2_ASSET, RUST_RUNTIME_API_ASSET),
     ("SKEL", STAGE_RUST_FIX): (RUST_COMPILE_FIX_ASSET, RUST_RUNTIME_API_ASSET),
     ("CIR", STAGE_GENERATE): (CIR_GENERATION_ASSET,),
     ("CIR", STAGE_FEEDBACK): (CIR_GENERATION_ASSET, CIR_FEEDBACK_ASSET),
-    ("CIR", STAGE_RUST): (RUST_FROM_CIR_ASSET, RUST_RUNTIME_API_ASSET),
+    ("CIR", STAGE_RUST): (RUST_FROM_CIR_V3_ASSET, RUST_RUNTIME_API_ASSET),
     ("CIR", STAGE_RUST_FIX): (RUST_COMPILE_FIX_ASSET, RUST_RUNTIME_API_ASSET),
     ("G0", STAGE_GENERATE): (RUST_GENERATION_V2_ASSET, RUST_RUNTIME_API_ASSET),
 }
@@ -158,8 +161,8 @@ def rust_from_skel_user_prompt(requirements: str, skeleton: str) -> str:
 
 def rust_from_cir_user_prompt(requirements: str, cir: str) -> str:
     return (
-        "Write a single-file std-only Rust program implementing the verified "
-        "ConcIR program below. Use the program's resource and function names as "
+        "Write a single-file std-only Rust program implementing the ConcIR "
+        "program below. Use the program's resource and function names as "
         "Rust identifiers, `mutex_lock`/`mutex_unlock` as a guard scope, "
         "semaphore acquire/release via `concir_sync`, and keep `// @cir <sid>` "
         "comments.\n\n"
@@ -256,7 +259,8 @@ def _failed_properties(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return failed
 
 
-def build_check_feedback(result) -> dict[str, Any]:
+def build_check_feedback(result, *, property_ids: str = "keep",
+                         index: dict[str, str] | None = None) -> dict[str, Any]:
     payload = result.payload or {}
     return {
         "stage": "check",
@@ -269,29 +273,60 @@ def build_check_feedback(result) -> dict[str, Any]:
     }
 
 
-def build_explore_feedback(result, *, preserved_ids: list[str] | None = None) -> dict[str, Any]:
+def _register_and_show(ids, property_ids: str, index: dict[str, str]):
+    for pid in ids:
+        if pid:
+            present_property_id(pid, property_ids, index)
+
+    def show(pid):
+        return present_property_id(pid, property_ids, index) if pid else pid
+
+    def show_text(text):
+        if property_ids == "keep" or not text:
+            return text
+        for original, shown in index.items():
+            text = text.replace(original, shown)
+        return text
+
+    return show, show_text
+
+
+def build_explore_feedback(result, *, preserved_ids: list[str] | None = None,
+                           property_ids: str = "keep",
+                           index: dict[str, str] | None = None) -> dict[str, Any]:
     """Disclosure-safe verification feedback (no contract goal, ever)."""
     payload = result.payload or {}
+    index = index if index is not None else {}
     # `detail` is sanitized (preserved goals are replaced) by the shared helper.
     failed = _failed_properties(payload)
     preserved_unmet = [p for p in failed if str(p.get("id", "")).startswith("preserved:")]
+    raw_counterexamples = payload.get("counterexamples", []) or []
+    raw_diagnostics = payload.get("diagnostics", []) or []
+    ids = ([p.get("id") for p in failed]
+           + [ce.get("property") for ce in raw_counterexamples]
+           + [(d.get("code") or d.get("property")) for d in raw_diagnostics])
+    show, show_text = _register_and_show(ids, property_ids, index)
+    for entry in failed:
+        entry["id"] = show(entry["id"])
     diagnostics = []
-    for d in payload.get("diagnostics", []) or []:
+    for d in raw_diagnostics:
         diagnostics.append({
-            "property": d.get("code") or d.get("property"),
+            "property": show(d.get("code") or d.get("property")),
             "outcome": d.get("severity"),
-            "message": d.get("message"),
+            "message": show_text(d.get("message")),
             "skel": d.get("skel"),
+            "concir_loc": (d.get("skel") or {}).get("loc"),
             "unmapped": d.get("unmapped"),
         })
     counterexamples = []
-    for ce in payload.get("counterexamples", []) or []:
+    for ce in raw_counterexamples:
         counterexamples.append({
-            "property": ce.get("property"),
+            "property": show(ce.get("property")),
             "reqs": ce.get("reqs"),
             "steps": [
                 {"step": s.get("step"), "thread": s.get("thread"),
                  "function": s.get("function"), "line": (s.get("skel") or {}).get("line"),
+                 "concir_loc": (s.get("skel") or {}).get("loc"),
                  "statement": s.get("statement")}
                 for s in ce.get("steps", [])
             ],
@@ -311,7 +346,23 @@ def build_explore_feedback(result, *, preserved_ids: list[str] | None = None) ->
     }
 
 
-def build_cir_feedback(result) -> dict[str, Any]:
+def _contract_reqs(contract: dict | None) -> dict[str, Any]:
+    """Property id -> requirement ids, from the contract's `req` field only."""
+    mapping: dict[str, Any] = {}
+    if not isinstance(contract, dict):
+        return mapping
+    for prop in contract.get("properties") or []:
+        if isinstance(prop, dict) and isinstance(prop.get("id"), str):
+            mapping[prop["id"]] = prop.get("req")
+    for prop in contract.get("preserved") or []:
+        if isinstance(prop, dict) and isinstance(prop.get("description"), str):
+            mapping[f"preserved: {prop['description']}"] = prop.get("req")
+    return mapping
+
+
+def build_cir_feedback(result, *, contract: dict | None = None,
+                       property_ids: str = "keep",
+                       index: dict[str, str] | None = None) -> dict[str, Any]:
     """Disclosure-safe feedback from ``concir-backend explore`` (CIR arm).
 
     The CIR backend output has a different shape from the skeleton feedback:
@@ -319,9 +370,10 @@ def build_cir_feedback(result) -> dict[str, Any]:
     and counterexamples live in ``diagnostics[].counterexample_names`` /
     ``doom_state``. Aligned with ``concir_feedback_v1.md``; never includes
     ``repair_hints``, ``proven_facts``, contract fingerprints, bounds, or any
-    contract field.
+    contract field except the requirement ids.
     """
     payload = result.payload or {}
+    index = index if index is not None else {}
     process_error = None
     if result.kind != "semantic":
         process_error = sanitize_process_error(result.error)
@@ -334,9 +386,19 @@ def build_cir_feedback(result) -> dict[str, Any]:
 
     failed = _failed_properties(payload)
     preserved_unmet = [p for p in failed if str(p.get("id", "")).startswith("preserved:")]
+    raw_counterexamples = payload.get("diagnostics", []) or []
+    ids = ([p.get("id") for p in failed]
+           + [d.get("property") for d in raw_counterexamples])
+    show, show_text = _register_and_show(ids, property_ids, index)
+    for entry in failed:
+        entry["id"] = show(entry["id"])
+    reqs = _contract_reqs(contract)
+    for entry in failed:
+        if entry.get("reqs") is None and entry.get("id") in reqs:
+            entry["reqs"] = reqs[entry["id"]]
 
     counterexamples = []
-    for d in payload.get("diagnostics", []) or []:
+    for d in raw_counterexamples:
         names = d.get("counterexample_names") or []
         if not names:
             continue
@@ -346,8 +408,8 @@ def build_cir_feedback(result) -> dict[str, Any]:
             for t in (d.get("doom_state") or {}).get("threads", []) or []
         ]
         counterexamples.append({
-            "property": d.get("property"),
-            "message": d.get("message"),
+            "property": show(d.get("property")),
+            "message": show_text(d.get("message")),
             "steps": list(names),
             "final_state": final_state,
         })
@@ -362,6 +424,47 @@ def build_cir_feedback(result) -> dict[str, Any]:
         "preserved_unmet": preserved_unmet,
         "counterexamples": counterexamples,
     }
+
+
+def apply_feedback_mode(feedback: dict[str, Any], mode: str) -> dict[str, Any]:
+    """Trim a verification-stage feedback dict according to ``feedback_mode``.
+
+    - ``full``: unchanged.
+    - ``outcome_only``: keep only ``stage``/``outcome``/``complete`` and the
+      failed property ids (the check stage is never trimmed).
+    - ``nocex``: drop ``counterexamples``; everything else unchanged.
+    - ``nomap``: drop the mapped DSL positions (``line``/``col``/``skel``/
+      ``statement``) and keep only the raw ConcIR location.
+    """
+    if mode == "full":
+        return feedback
+    out = dict(feedback)
+    if mode == "outcome_only":
+        keep = {key: out[key] for key in ("stage", "outcome", "complete")
+                if key in out}
+        keep["failed_properties"] = [{"id": p.get("id")}
+                                     for p in out.get("failed_properties") or []]
+        keep["preserved_unmet"] = [{"id": p.get("id")}
+                                   for p in out.get("preserved_unmet") or []]
+        return keep
+    if mode == "nocex":
+        out.pop("counterexamples", None)
+        return out
+    if mode == "nomap":
+        out["diagnostics"] = [
+            {k: v for k, v in d.items() if k not in ("skel", "line", "col")}
+            for d in out.get("diagnostics") or []
+        ]
+        out["counterexamples"] = [
+            {**ce, "steps": [
+                {k: v for k, v in s.items()
+                 if k not in ("line", "col", "statement")}
+                for s in ce.get("steps") or []
+            ]}
+            for ce in out.get("counterexamples") or []
+        ]
+        return out
+    return feedback
 
 
 def render_feedback(feedback: dict[str, Any]) -> str:

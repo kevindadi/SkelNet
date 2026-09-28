@@ -82,14 +82,16 @@ def test_cir_arm_extracts_fenced_reply(tmp_path):
     assert result.parse_ok
 
 
-def test_cir_check_ok_is_any_non_invalid_round(tmp_path):
+def test_cir_check_ok_excludes_invalid_and_unsupported(tmp_path):
+    # check_ok counts a semantic result that is neither INVALID nor UNSUPPORTED
+    # (D5-1); a FAIL round still counts.
     provider = ScriptedProvider([{"text": json.dumps(_invalid())},
                                  {"text": json.dumps(_buggy())}])
     result = run_cir_cell(
         task=TASK, requirements="two workers, two locks", contract_path=_contract(),
         provider=provider, backend=Backend(), oracle=FakeOracle(True),
         workdir=tmp_path, rounds=2)
-    assert result.check_ok is True  # round 2 is FAIL, not INVALID
+    assert result.check_ok is True  # round 2 is FAIL, not INVALID/UNSUPPORTED
     assert not result.accepted
 
 

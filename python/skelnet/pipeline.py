@@ -225,6 +225,7 @@ def run_skel_cell(*, task: str, requirements: str, contract_path: Path,
     candidate: str | None = None
     last_path: Path | None = None
     last_check_ok = False
+    property_index: dict[str, str] = {}
     attempts = max(1, min(rounds, call_budget - 1))
     for attempt in range(1, attempts + 1):
         result.rounds_used = attempt
@@ -248,7 +249,8 @@ def run_skel_cell(*, task: str, requirements: str, contract_path: Path,
         if check.ok:
             result.check_ok = True
         if verify is None:
-            feedback = prompts.render_feedback(prompts.build_check_feedback(check))
+            feedback = prompts.render_feedback(prompts.build_check_feedback(
+                check, property_ids=property_ids, index=property_index))
             result.history.append({"attempt": attempt, "stage": "check",
                                    "status": check.status,
                                    "diagnostics": (check.payload or {}).get("diagnostics")})
@@ -262,7 +264,10 @@ def run_skel_cell(*, task: str, requirements: str, contract_path: Path,
             result.ledger = evidence.property_ledger(verify.payload)
             result.evidence_sufficient = evidence.evidence_sufficient(verify.payload)
             break
-        feedback = prompts.render_feedback(prompts.build_explore_feedback(verify))
+        feedback = prompts.render_feedback(prompts.apply_feedback_mode(
+            prompts.build_explore_feedback(verify, property_ids=property_ids,
+                                           index=property_index),
+            feedback_mode))
     return _finish_cell(result, arm="SKEL", requirements=requirements,
                         design=candidate, design_path=last_path,
                         last_check_ok=last_check_ok, provider=provider,
@@ -285,6 +290,8 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
     candidate: str | None = None
     last_path: Path | None = None
     last_check_ok = False
+    property_index: dict[str, str] = {}
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
     attempts = max(1, min(rounds, call_budget - 1))
     for attempt in range(1, attempts + 1):
         result.rounds_used = attempt
@@ -316,7 +323,11 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
             result.ledger = evidence.property_ledger(verify.payload)
             result.evidence_sufficient = evidence.evidence_sufficient(verify.payload)
             break
-        feedback = prompts.render_feedback(prompts.build_cir_feedback(verify))
+        feedback = prompts.render_feedback(prompts.apply_feedback_mode(
+            prompts.build_cir_feedback(verify, contract=contract,
+                                       property_ids=property_ids,
+                                       index=property_index),
+            feedback_mode))
     return _finish_cell(result, arm="CIR", requirements=requirements,
                         design=candidate, design_path=last_path,
                         last_check_ok=last_check_ok, provider=provider,
