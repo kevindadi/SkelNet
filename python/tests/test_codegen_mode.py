@@ -3,11 +3,12 @@
 import json
 import shutil
 from pathlib import Path
-from types import SimpleNamespace
 
 from skelnet import cli
 from skelnet.backend import repo_root
 from skelnet.oracle import RustOracle
+
+from round03_helpers import FakeTools
 
 TASK = "lock-order/abba_2lock"
 
@@ -52,15 +53,12 @@ class _Client:
         return _Outcome(text)
 
 
-def _runner(recorder: list[bool] | None = None, run_rc: int = 0):
-    def run(cmd, cwd, timeout, env):
-        cwd = Path(cwd)
-        if recorder is not None:
+def _runner(recorder: list[bool] | None = None):
+    on_build = None
+    if recorder is not None:
+        def on_build(cwd: Path):
             recorder.append((cwd / "src" / "cir_trace.rs").exists())
-        if "build" in cmd:
-            return SimpleNamespace(returncode=0, stdout="", stderr="")
-        return SimpleNamespace(returncode=run_rc, stdout="", stderr="")
-    return run
+    return FakeTools(o2_stdout="DONE\n", on_build=on_build)
 
 
 def _run_codegen(arm: str, texts: list[str], tmp_path: Path, name: str) -> Path:
@@ -70,7 +68,8 @@ def _run_codegen(arm: str, texts: list[str], tmp_path: Path, name: str) -> Path:
         "--rust-mode", "codegen", "--out", str(out)])
     rc = cli.cmd_run(
         args, client_factory=lambda spec, o: _Client(texts),
-        oracle_factory=lambda task_dir, terminal: RustOracle(runner=_runner()))
+        oracle_factory=lambda task_dir, terminal: RustOracle(
+            runner=_runner(), task_dir=task_dir))
     assert rc == 0
     return out
 

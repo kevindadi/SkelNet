@@ -19,7 +19,7 @@ from .backend import Backend, repo_root, sha256_file
 from .budget import BudgetLedger, CellBudget
 from .cache import CachedClient, ResponseCache
 from .models import normalize_token_usage
-from .oracle import RustOracle, repo_toolchain_channel
+from .oracle import RustOracle, oracle_result_dict, repo_toolchain_channel
 from .params import params_for_model, seed_for
 from .pipeline import (dumps, run_cir_cell, run_g0_cell, run_skel_cell)
 from .providers import CandidateResponse
@@ -102,7 +102,8 @@ def default_oracle_factory(*, timeout: float, runner=None):
     is testable: the terminal line must reach the oracle.
     """
     def factory(task_dir, terminal):
-        return RustOracle(terminal=terminal, timeout=timeout, runner=runner)
+        return RustOracle(terminal=terminal, timeout=timeout, runner=runner,
+                          task_dir=task_dir)
     return factory
 
 
@@ -665,20 +666,19 @@ def cmd_eval(args: argparse.Namespace, *, runner=None) -> int:
         if not rust.exists():
             continue
         task = workdir.parent.relative_to(run_dir / "cells").as_posix()
-        terminal = read_terminal(repo_root() / "benchmarks" / "tasks" / task, hint)
+        task_dir = repo_root() / "benchmarks" / "tasks" / task
+        terminal = read_terminal(task_dir, hint)
         extra: dict[str, str] = {}
         trace = workdir / "cir_trace.rs"
         if trace.exists():
             extra["src/cir_trace.rs"] = trace.read_text(encoding="utf-8")
         rust_mode = data.get("rust_mode", "llm")
-        oracle = RustOracle(terminal=terminal, timeout=args.timeout, runner=runner)
+        oracle = RustOracle(terminal=terminal, timeout=args.timeout, runner=runner,
+                            task_dir=task_dir)
         outcome = oracle.evaluate(rust.read_text(encoding="utf-8"), workdir,
                                   extra_files=extra or None,
                                   check_terminal=rust_mode != "codegen")
-        data["oracle"] = {"built": outcome.built, "ran": outcome.ran,
-                          "run_ok": outcome.run_ok,
-                          "functional_ok": outcome.functional_ok,
-                          "terminal_check": outcome.terminal_check}
+        data["oracle"] = oracle_result_dict(outcome)
         result_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         updated += 1
     # Keep the run's summary/report in sync with the re-evaluated cells.
@@ -843,6 +843,9 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("run_dir")
     ev.add_argument("--timeout", type=float, default=300.0)
     ev.set_defaults(func=cmd_eval)
+
+    from .oracle_cli import register as _register_oracle
+    _register_oracle(sub)
 
     rep = sub.add_parser("report", help="one table over runs")
     rep.add_argument("run_dirs", nargs="+")
