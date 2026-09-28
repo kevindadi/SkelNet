@@ -94,7 +94,13 @@ def cmd_tiers(args) -> int:
     if unmatched or not tasks:
         _report_unmatched(unmatched, args.tasks)
         return 2
-    report = tier_repo(root, args.tasks, write=bool(args.write), tasks=tasks)
+    base = root / "benchmarks" / "tasks"
+    main_tasks = [task for task in tasks
+                  if not _is_boundary(str(task.relative_to(base)))]
+    if not main_tasks:
+        print("no main tasks to tier (boundary tasks are not tiered)", file=sys.stderr)
+        return 2
+    report = tier_repo(root, args.tasks, write=bool(args.write), tasks=main_tasks)
     _emit(report, json_out=bool(args.json), kind="tiers")
     return 0
 
@@ -894,11 +900,13 @@ def classify_tier(threads: int, sync_resources: int, mechanism_count: int,
     nearest = "L1"
     nearest_bad: list[str] = []
     best = None
-    for index, (name, conds) in enumerate(ladders):
+    for _index, (name, conds) in enumerate(ladders):
         bad = [label for label, ok in conds if not ok]
         if not bad and computed is None:
             computed = name
-        rank = (len(bad), index)
+        # Count only. A tie does not replace the earlier tier, so the lower
+        # tier wins. ``<=`` would keep the later tier instead.
+        rank = len(bad)
         if best is None or rank < best:
             best = rank
             nearest = name

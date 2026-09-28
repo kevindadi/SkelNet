@@ -164,4 +164,6 @@ python -m skelnet bench tiers --write   # benchmarks/TIERS.md and requirements.j
 ```
 
 `--write` keeps existing `requirements.json` key order (indent 2, trailing
-newline). Boundary tasks are omitted.
+newline). Boundary tasks are omitted. If the selection contains no main task,
+`bench tiers` prints `no main tasks to tier (boundary tasks are not tiered)`
+on stderr, exits 2, and `--write` writes nothing.

@@ -329,6 +329,79 @@ def test_nearest_declaration_is_tier_source(tmp_path):
     assert len(row["violations"]) >= 2
 
 
+def test_classify_tier_tie_takes_the_lower_tier():
+    """L1 and L2 each miss one condition; the tie stays on the lower tier."""
+    computed, nearest, violations = classify_tier(3, 4, 2, 74, False)
+    assert computed is None and nearest == "L1"
+    assert violations == ["sync_resources<=2 and mechanisms<=1"]
+
+
+def test_nearest_tie_declaration_uses_the_lower_tier(tmp_path):
+    root = tmp_path / "repo"
+    cir = _cir(["a", "b", "c"], [
+        _res("m", "Mutex"), _res("cv", "Condvar"),
+        _res("s1", "Semaphore"), _res("s2", "Semaphore"),
+    ])
+    cir["modules"][0]["functions"][0]["body"] = [
+        {"sid": "lk", "kind": "mutex_lock", "resource": "main::m"},
+        {"sid": "w", "kind": "condvar_wait", "condvar": "main::cv", "lock": "main::m"},
+        {"sid": "p", "kind": "semaphore_acquire", "resource": "main::s1"},
+        {"sid": "q", "kind": "semaphore_acquire", "resource": "main::s2"},
+    ] + cir["modules"][0]["functions"][0]["body"]
+    _task(root, "fam/tie", cir, states=74)
+    (root / "benchmarks" / "BASELINE.json").write_text(
+        json.dumps({"tasks": []}), encoding="utf-8")
+    row = tier_repo(root, "fam/tie", tools=_Explored(74))["tasks"][0]
+    assert row["metrics"]["threads"] == 3
+    assert row["metrics"]["sync_resources"] == 4
+    assert row["metrics"]["mechanism_count"] == 2
+    assert row["tier_source"] == "nearest" and row["declared_tier"] == "L1"
+
+
+def test_boundary_tasks_are_omitted_from_tiers(tmp_path):
+    root = tmp_path / "repo"
+    cir = _cir(["main::w"], [_res("m", "Mutex")])
+    cir["modules"][0]["functions"][0]["body"].insert(0, _lock("m"))
+    _task(root, "fam/main", cir, states=10)
+    edge = root / "benchmarks" / "tasks" / "boundary" / "edge"
+    _write(edge / "gold.skel", "skeleton edge;\n")
+    _write(edge / "gold.cir.json", json.dumps(cir) + "\n")
+    _write(edge / "contract.json", "{}\n")
+    req_text = '{"terminal": "DONE edge=1", "note": "leave-me"}\n'
+    _write(edge / "requirements.json", req_text)
+    before = (edge / "requirements.json").read_bytes()
+    report = tier_repo(root, "all", write=True, tools=FallbackTools())
+    assert [row["task"] for row in report["tasks"]] == ["fam/main"]
+    assert sum(report["counts"].values()) == 1
+    assert sum(report["computed_counts"].values()) == 1
+    md = (root / "benchmarks" / "TIERS.md").read_text(encoding="utf-8")
+    assert "fam/main" in md and "boundary/edge" not in md
+    assert (edge / "requirements.json").read_bytes() == before
+
+
+def test_tiers_cli_rejects_a_boundary_only_selection(tmp_path, capsys):
+    from skelnet import cli
+    root = tmp_path / "repo"
+    cir = _cir(["main::w"], [_res("m", "Mutex")])
+    cir["modules"][0]["functions"][0]["body"].insert(0, _lock("m"))
+    _task(root, "fam/task", cir, states=10)
+    edge = root / "benchmarks" / "tasks" / "boundary" / "edge"
+    _write(edge / "spec.md", "edge\n")
+    _write(edge / "contract.json", "{}\n")
+    _write(edge / "ground_truth.json", "{}\n")
+    rc = cli.main(["bench", "tiers", "--root", str(root), "--tasks", "boundary/*"])
+    captured = capsys.readouterr()
+    assert rc == 2 and "no main tasks" in captured.err and captured.out.strip() == ""
+    rc = cli.main(["bench", "tiers", "--root", str(root), "--tasks", "boundary/*", "--write"])
+    captured = capsys.readouterr()
+    assert rc == 2 and "no main tasks" in captured.err
+    assert not (root / "benchmarks" / "TIERS.md").exists()
+    rc = cli.main(["bench", "tiers", "--root", str(root), "--tasks", "boundary/*,fam/*"])
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "fam/task" in captured.out and "boundary/edge" not in captured.out
+
+
 def test_nearest_accepts_one_structural_miss_but_not_a_state_miss():
     # 4 threads, 1 mutex, 10 states: L1 misses only threads. That is a nearest L1.
     computed, nearest, violations = classify_tier(4, 1, 1, 10, False)
