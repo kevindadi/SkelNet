@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from . import evidence, prompts
+from .oracle import oracle_result_dict
 from .providers import CandidateProvider, CandidateRequest
 
 
@@ -231,12 +232,7 @@ def result_to_dict(result: CellResult) -> dict[str, Any]:
         "rounds_used": result.rounds_used,
         "history": result.history, "ledger": result.ledger,
         "evidence_sufficient": result.evidence_sufficient,
-        "oracle": None if result.oracle is None else {
-            "built": result.oracle.built, "ran": result.oracle.ran,
-            "run_ok": getattr(result.oracle, "run_ok", None),
-            "functional_ok": result.oracle.functional_ok,
-            "terminal_check": getattr(result.oracle, "terminal_check", None),
-        },
+        "oracle": None if result.oracle is None else oracle_result_dict(result.oracle),
     }
 
 

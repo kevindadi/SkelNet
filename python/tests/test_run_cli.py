@@ -11,6 +11,8 @@ from skelnet import cli, prompts
 from skelnet.backend import repo_root
 from skelnet.oracle import FakeOracle, RustOracle, repo_toolchain_channel
 
+from round03_helpers import FakeTools
+
 
 def _expected_toolchain_channel() -> str:
     """Independent expectation: read rust-toolchain.toml with tomllib."""
@@ -228,11 +230,6 @@ def test_terminal_wired_through_cmd_run(tmp_path):
 
 
 def test_real_oracle_terminal_pass_through_cmd_run(tmp_path):
-    def runner(cmd, cwd, timeout, env):
-        if "build" in cmd:
-            return SimpleNamespace(returncode=0, stdout="", stderr="")
-        return SimpleNamespace(returncode=0, stdout="DONE t1=1 t2=1\n", stderr="")
-
     out = tmp_path / "run_pass"
     args = cli.build_parser().parse_args([
         "run", "--arm", "G0", "--tasks", "lock-order/abba_2lock", "--reps", "1",
@@ -240,7 +237,7 @@ def test_real_oracle_terminal_pass_through_cmd_run(tmp_path):
     rc = cli.cmd_run(
         args, client_factory=lambda spec, o: RecordingClient([RUST]),
         oracle_factory=lambda task_dir, terminal: RustOracle(
-            terminal=terminal, runner=runner))
+            terminal=terminal, runner=FakeTools(), task_dir=task_dir))
     assert rc == 0
     result = json.loads(
         (out / "cells" / "lock-order" / "abba_2lock" / "0" / "result.json").read_text())
@@ -248,10 +245,7 @@ def test_real_oracle_terminal_pass_through_cmd_run(tmp_path):
     assert result["oracle"]["functional_ok"] is True
 
 
-def _terminal_pass_runner(cmd, cwd, timeout, env):
-    if "build" in cmd:
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
-    return SimpleNamespace(returncode=0, stdout="DONE t1=1 t2=1\n", stderr="")
+_terminal_pass_runner = FakeTools()
 
 
 def test_g0_with_codegen_is_rejected(tmp_path):
