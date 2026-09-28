@@ -25,8 +25,15 @@ def test_extract_json_strips_fences_and_think():
 
 
 def test_normalize_token_usage():
-    assert normalize_token_usage({"prompt_tokens": 3, "completion_tokens": 4}) == (3, 4)
-    assert normalize_token_usage(None) == (0, 0)
+    assert normalize_token_usage({"prompt_tokens": 3, "completion_tokens": 4}) == {
+        "input": 3, "output": 4, "reasoning": None, "cached": None}
+    assert normalize_token_usage(None) == {
+        "input": None, "output": None, "reasoning": None, "cached": None}
+    assert normalize_token_usage({
+        "prompt_tokens": 3, "completion_tokens": 4,
+        "completion_tokens_details": {"reasoning_tokens": 2},
+        "prompt_tokens_details": {"cached_tokens": 1},
+    }) == {"input": 3, "output": 4, "reasoning": 2, "cached": 1}
 
 
 def test_verify_identity():

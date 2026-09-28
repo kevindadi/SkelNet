@@ -16,10 +16,17 @@ from pathlib import Path
 from . import prompts
 from .audit import AuditLog
 from .backend import Backend, repo_root, sha256_file
+from .budget import BudgetLedger, CellBudget
+from .cache import CachedClient, ResponseCache
+from .models import normalize_token_usage
 from .oracle import RustOracle, repo_toolchain_channel
+from .params import params_for_model, seed_for
 from .pipeline import (dumps, run_cir_cell, run_g0_cell, run_skel_cell)
 from .providers import CandidateResponse
-from .transport import build_registry, resolve_model
+from .requirements_render import RequirementsMissing, render_requirements
+from .schema import validate_cell
+from .transport import (BudgetExceeded, TransportError, build_registry,
+                        resolve_model)
 
 
 def _task_dirs(root: Path) -> list[Path]:
@@ -39,12 +46,13 @@ def _select_tasks(root: Path, pattern: str) -> list[Path]:
     return out
 
 
-def read_terminal(task_dir: Path) -> str | None:
+def read_terminal(task_dir: Path, hint: str = "h1") -> str | None:
     """The required terminating stdout line for a task.
 
-    Canonical source: ``requirements.json["terminal"]``. Tasks without a
-    ``requirements.json`` (the boundary tasks) have no terminal line, which is
-    recorded as ``terminal_check: "absent"`` and never counted as a pass.
+    Canonical source: ``requirements.json``. With ``hint == "h0"`` the
+    ``terminal`` field is returned; otherwise ``terminal_v2`` is preferred when
+    present. Tasks without a ``requirements.json`` (the boundary tasks) have no
+    terminal line, recorded as ``terminal_check: "absent"`` and never a pass.
     """
     reqs = Path(task_dir) / "requirements.json"
     if not reqs.exists():
@@ -53,20 +61,24 @@ def read_terminal(task_dir: Path) -> str | None:
         data = json.loads(reqs.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return None
-    terminal = data.get("terminal")
+    key = "terminal" if hint == "h0" else "terminal_v2"
+    terminal = data.get(key)
+    if not (isinstance(terminal, str) and terminal):
+        terminal = data.get("terminal")
     return terminal if isinstance(terminal, str) and terminal else None
 
 
 def _budget(arm: str, tasks: int, reps: int, rounds: int,
-            rust_mode: str = "llm") -> dict:
+            rust_mode: str = "llm", call_budget: int | None = None) -> dict:
     if arm == "G0":
-        per_task = reps
+        per_rep = 1
     else:
-        # Exact pipeline upper bound: up to `rounds` skeleton/CIR attempts, plus
-        # one Rust call only when the Rust stage calls the LLM (not codegen).
-        per_task = reps * (rounds + (1 if rust_mode == "llm" else 0))
+        per_rep = rounds + (1 if rust_mode == "llm" else 0)
+    if call_budget is not None:
+        per_rep = min(per_rep, call_budget)
+    per_task = reps * per_rep
     return {"arm": arm, "tasks": tasks, "reps": reps, "rounds": rounds,
-            "rust_mode": rust_mode,
+            "rust_mode": rust_mode, "call_budget": call_budget,
             "requests": tasks * per_task, "requests_per_task": per_task}
 
 
@@ -162,12 +174,21 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
             "use --rust-mode llm")
     root = repo_root()
     tasks = _select_tasks(root, args.tasks)
-    budget = _budget(args.arm, len(tasks), args.reps, args.rounds, args.rust_mode)
+    spec = resolve_model(build_registry(), args.model)
+    run_params = _run_params(args, spec)
+    budget = _budget(args.arm, len(tasks), args.reps, args.rounds,
+                     args.rust_mode, run_params.call_budget)
     if args.dry_run:
         routes = prompts.routes_for_arm(args.arm)
+        first_task = (str(tasks[0].relative_to(root / "benchmarks" / "tasks"))
+                      if tasks else None)
         print(json.dumps({
             **budget,
             "dry_run": True,
+            "run_params": run_params.to_dict(),
+            "sample_seed": ({"task": first_task, "rep": 0,
+                             "seed": seed_for(first_task, 0)} if first_task else None),
+            "model_policy": _model_policy(spec),
             "prompt_routes": {
                 stage: {
                     "assets": list(assets),
@@ -181,63 +202,214 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         return 0
 
     out = Path(args.out)
-    _prepare_out(out, force=args.force)
+    if args.resume:
+        _check_resume(out, args, run_params)
+    else:
+        _prepare_out(out, force=args.force)
     started_at = time.time()
     audit = AuditLog(out / "audit.jsonl", raw_dir=out / "raw")
     backend = Backend(timeout=args.timeout)
-    manifest = _build_manifest(out, args, backend, tasks, started_at, None, budget)
+    ledger = BudgetLedger(args.budget_file, stage=args.stage)
+    manifest = _build_manifest(out, args, backend, tasks, started_at, None,
+                               budget, spec, run_params)
+    manifest["status"] = "running"
     _write_manifest(out, manifest)
     if oracle_factory is None:
         oracle_factory = default_oracle_factory(timeout=args.timeout,
                                                 runner=oracle_runner)
-    provider = _build_provider(args, audit, out, client_factory=client_factory)
+    provider = _build_provider(args, audit, out, spec, run_params, ledger,
+                               client_factory=client_factory)
     summary: dict = {"run_id": out.name, "arm": args.arm, "model": args.model,
                      "budget": budget, "cells": []}
     for task_dir in tasks:
         task = str(task_dir.relative_to(root / "benchmarks" / "tasks"))
-        reqs = (task_dir / "requirements.json")
-        requirements = reqs.read_text(encoding="utf-8") if reqs.exists() else task
+        tier = _task_tier(task_dir)
         contract = task_dir / "contract.json"
-        terminal = read_terminal(task_dir)
-        # The factory receives the task and its terminal line, so the terminal
-        # wiring is exercised (and testable) on every real run.
+        try:
+            requirements = render_requirements(task_dir, args.hint)
+        except RequirementsMissing:
+            for rep in range(args.reps):
+                workdir = out / "cells" / task / str(rep)
+                if args.resume and (workdir / "result.json").exists():
+                    continue
+                workdir.mkdir(parents=True, exist_ok=True)
+                cell = _skipped_cell(args, spec, run_params, task, tier, rep)
+                _write_cell(workdir, cell)
+                summary["cells"].append(cell)
+            continue
+        terminal = read_terminal(task_dir, args.hint)
         task_oracle = oracle_factory(task_dir, terminal)
         for rep in range(args.reps):
             workdir = out / "cells" / task / str(rep)
+            if args.resume and (workdir / "result.json").exists():
+                continue
             workdir.mkdir(parents=True, exist_ok=True)
             if hasattr(provider, "set_cell"):
                 provider.set_cell(f"{task}/{rep}", task, rep)
-            if args.arm == "G0":
-                cell = run_g0_cell(task=task, requirements=requirements,
-                                   provider=provider, oracle=task_oracle,
-                                   workdir=workdir, replicate=rep)
-            elif args.arm == "SKEL":
-                cell = run_skel_cell(task=task, requirements=requirements,
-                                     contract_path=contract, provider=provider,
-                                     backend=backend, oracle=task_oracle,
-                                     workdir=workdir, rounds=args.rounds,
-                                     replicate=rep, rust_mode=args.rust_mode)
-            elif args.arm == "CIR":
-                cell = run_cir_cell(task=task, requirements=requirements,
-                                    contract_path=contract, provider=provider,
-                                    backend=backend, oracle=task_oracle,
-                                    workdir=workdir, rounds=args.rounds,
-                                    replicate=rep, rust_mode=args.rust_mode)
-            else:
-                raise SystemExit(f"unknown arm {args.arm!r}")
-            (workdir / "result.json").write_text(dumps(cell), encoding="utf-8")
-            if cell.rust:
-                (workdir / "candidate.rs").write_text(cell.rust, encoding="utf-8")
-            if cell.cir_trace:
-                (workdir / "cir_trace.rs").write_text(cell.cir_trace, encoding="utf-8")
-            summary["cells"].append(json.loads(dumps(cell)))
+            base = _base_cell(args, spec, run_params, task, tier, rep)
+            try:
+                if args.arm == "G0":
+                    cell = run_g0_cell(task=task, requirements=requirements,
+                                       provider=provider, oracle=task_oracle,
+                                       workdir=workdir, replicate=rep)
+                elif args.arm == "SKEL":
+                    cell = run_skel_cell(task=task, requirements=requirements,
+                                         contract_path=contract, provider=provider,
+                                         backend=backend, oracle=task_oracle,
+                                         workdir=workdir, rounds=args.rounds,
+                                         replicate=rep, rust_mode=args.rust_mode)
+                elif args.arm == "CIR":
+                    cell = run_cir_cell(task=task, requirements=requirements,
+                                        contract_path=contract, provider=provider,
+                                        backend=backend, oracle=task_oracle,
+                                        workdir=workdir, rounds=args.rounds,
+                                        replicate=rep, rust_mode=args.rust_mode)
+                else:
+                    raise SystemExit(f"unknown arm {args.arm!r}")
+                _write_artifacts(workdir, cell)
+                data = _merge_cell(base, cell, provider, run_params)
+            except BudgetExceeded as exc:
+                manifest["status"] = "budget_exhausted"
+                manifest["ended_at"] = time.time()
+                manifest["budget_error"] = str(exc)
+                _write_manifest(out, manifest)
+                _write_summary(out, summary)
+                print(f"budget exhausted: {exc}")
+                return 1
+            except Exception as exc:  # noqa: BLE001 - isolate cell failures
+                data = _error_cell(args, spec, run_params, task, tier, rep, exc)
+            _write_cell(workdir, data)
+            summary["cells"].append(data)
     ended_at = time.time()
     manifest["ended_at"] = ended_at
+    manifest["status"] = "complete"
     _write_manifest(out, manifest)
-    (out / "SUMMARY.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    (out / "REPORT.md").write_text(_report_markdown([summary]), encoding="utf-8")
+    _write_summary(out, summary)
     print(f"wrote {out}")
     return 0
+
+
+def _run_params(args: argparse.Namespace, spec):
+    temperature = args.temperature
+    if args.temperature_policy == "fixed" and temperature is None:
+        raise SystemExit("--temperature-policy fixed requires --temperature")
+    if args.temperature_policy != "fixed" and temperature is not None:
+        raise SystemExit("--temperature is only allowed with --temperature-policy fixed")
+    return params_for_model(
+        spec, temperature_policy=args.temperature_policy,
+        temperature=(temperature if args.temperature_policy == "fixed" else None),
+        seed_policy=args.seed_policy, call_budget=args.call_budget,
+        token_budget=args.token_budget, max_output_tokens=args.max_output_tokens,
+        hint=args.hint)
+
+
+def _model_policy(spec) -> dict:
+    return {
+        "display_name": spec.display_name, "model_id": spec.model_id,
+        "channel": spec.channel, "surface": spec.surface,
+        "thinking": spec.thinking, "reasoning_effort": spec.reasoning_effort,
+        "max_output_tokens": spec.max_output_tokens,
+        "max_output_tokens_cap": spec.max_output_tokens_cap,
+        "supports_seed": spec.supports_seed, "stream": spec.stream,
+    }
+
+
+def _task_tier(task_dir: Path) -> str | None:
+    reqs = task_dir / "requirements.json"
+    if not reqs.exists():
+        return None
+    try:
+        data = json.loads(reqs.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    tier = data.get("tier")
+    return tier if isinstance(tier, str) else None
+
+
+def _check_resume(out: Path, args, run_params) -> None:
+    manifest_path = out / "MANIFEST.json"
+    if not manifest_path.exists():
+        raise SystemExit(f"--resume requires an existing run at {out}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("arm") != args.arm or manifest.get("model") != args.model:
+        raise SystemExit("--resume: arm/model do not match the existing run")
+    if manifest.get("rounds") != args.rounds or manifest.get("reps") != args.reps:
+        raise SystemExit("--resume: rounds/reps do not match the existing run")
+    if manifest.get("run_params") != run_params.to_dict():
+        raise SystemExit("--resume: RunParams do not match the existing run")
+    selected = (manifest.get("tasks") or {}).get("selected")
+    want = [str(t.relative_to(repo_root() / "benchmarks" / "tasks"))
+            for t in _select_tasks(repo_root(), args.tasks)]
+    if selected != want:
+        raise SystemExit("--resume: tasks do not match the existing run")
+
+
+def _write_summary(out: Path, summary: dict) -> None:
+    (out / "SUMMARY.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    (out / "REPORT.md").write_text(_report_markdown([summary]), encoding="utf-8")
+
+
+def _base_cell(args, spec, run_params, task, tier, rep) -> dict:
+    return {
+        "schema_version": "skelnet-cell-v1",
+        "arm": args.arm, "model": args.model, "model_id": spec.model_id,
+        "task": task, "tier": tier, "hint": run_params.hint, "rep": rep,
+        "seed": seed_for(task, rep), "status": "ok", "skip_reason": None,
+        "error": None, "accepted": False, "parse_ok": False, "check_ok": False,
+        "rounds_used": 0, "history": [], "ledger": {},
+        "evidence_sufficient": False, "rust_mode": args.rust_mode,
+        "calls": [], "budget_used": {"calls": 0, "tokens": 0},
+        "oracle": {"built": False, "ran": False, "run_ok": False,
+                   "functional_ok": None, "terminal_check": "not_run"},
+    }
+
+
+def _skipped_cell(args, spec, run_params, task, tier, rep) -> dict:
+    cell = _base_cell(args, spec, run_params, task, tier, rep)
+    cell["status"] = "skipped"
+    cell["skip_reason"] = "no_requirements_text"
+    return cell
+
+
+def _error_cell(args, spec, run_params, task, tier, rep, exc) -> dict:
+    cell = _base_cell(args, spec, run_params, task, tier, rep)
+    cell["status"] = "error"
+    cell["error"] = f"{type(exc).__name__}: {exc}"
+    return cell
+
+
+def _merge_cell(base: dict, cell, provider, run_params) -> dict:
+    """Merge a pipeline CellResult onto the D1 base cell."""
+    data = dict(base)
+    pipeline = json.loads(dumps(cell))
+    for key in ("accepted", "parse_ok", "check_ok", "rounds_used", "history",
+                "ledger", "evidence_sufficient", "rust_mode", "error"):
+        if key in pipeline:
+            data[key] = pipeline[key]
+    data["rep"] = pipeline.get("replicate", base["rep"])
+    if pipeline.get("oracle") is not None:
+        data["oracle"] = pipeline["oracle"]
+    if provider is not None:
+        data["calls"] = list(getattr(provider, "calls", []))
+        if getattr(provider, "cell_budget", None) is not None:
+            data["budget_used"] = provider.cell_budget.snapshot()
+    return data
+
+
+def _write_cell(workdir: Path, data: dict) -> None:
+    errors = validate_cell(data)
+    if errors:
+        raise RuntimeError(f"invalid cell schema at {workdir}: {errors}")
+    (workdir / "result.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _write_artifacts(workdir: Path, cell) -> None:
+    rust = getattr(cell, "rust", None)
+    if rust:
+        (workdir / "candidate.rs").write_text(rust, encoding="utf-8")
+    trace = getattr(cell, "cir_trace", None)
+    if trace:
+        (workdir / "cir_trace.rs").write_text(trace, encoding="utf-8")
 
 
 def _git(args: list[str]) -> str:
@@ -264,8 +436,8 @@ def _tool_version(command: str) -> str | None:
 
 def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
                     tasks: list[Path], started_at: float,
-                    ended_at: float | None, budget: dict | None = None) -> dict:
-    spec = resolve_model(build_registry(), args.model)
+                    ended_at: float | None, budget: dict | None = None,
+                    spec=None, run_params=None) -> dict:
     tasks_root = repo_root() / "benchmarks" / "tasks"
     return {
         "run_id": out.name,
@@ -278,19 +450,23 @@ def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
         },
         "prompts": prompts.prompt_asset_record(),
         "model": args.model,
-        "model_id": spec.model_id,
-        "channel": spec.channel,
+        "model_id": getattr(spec, "model_id", None),
+        "channel": getattr(spec, "channel", None),
+        "model_policy": _model_policy(spec) if spec is not None else None,
         "arm": args.arm,
         "rust_mode": args.rust_mode,
+        "hint": getattr(run_params, "hint", None),
+        "stage": args.stage,
+        "run_params": run_params.to_dict() if run_params is not None else None,
+        "budget_file": args.budget_file,
+        "cache_dir": args.cache_dir,
+        "replay_from": args.replay_from,
         "tasks": {
             "pattern": args.tasks,
             "selected": [str(t.relative_to(tasks_root)) for t in tasks],
         },
         "rounds": args.rounds,
         "reps": args.reps,
-        # `--seed` is not applied yet: recorded as null until it takes effect.
-        "seed": None,
-        "seed_applied": False,
         "temperature": args.temperature,
         "timeout": args.timeout,
         "versions": {
@@ -301,6 +477,7 @@ def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
         },
         "started_at": started_at,
         "ended_at": ended_at,
+        "status": "running",
     }
 
 
@@ -313,37 +490,96 @@ class _ChatProvider:
     """Adapt an audited ``complete(system, user)`` client to the provider API.
 
     The system prompt is selected per request from the explicit arm x stage
-    routing table; a missing route raises (never a silent fallback).
+    routing table; a missing route raises (never a silent fallback). A per-cell
+    call budget is enforced here; transport/truncation retries and cache hits
+    are recorded in ``calls``.
     """
 
     name = "llm"
 
-    def __init__(self, client, *, arm: str) -> None:
+    def __init__(self, client, *, arm: str, params) -> None:
         self.client = client
         self.arm = arm
+        self.params = params
+        self.cell_budget: CellBudget | None = None
+        self.calls: list[dict] = []
+        self._attempt = 0
 
     def set_cell(self, cell_id: str, task_id: str, replicate: int) -> None:
         if hasattr(self.client, "set_cell"):
             self.client.set_cell(cell_id, task_id, replicate)
+        self.cell_budget = CellBudget(call_budget=self.params.call_budget,
+                                      token_budget=self.params.token_budget)
+        self.calls = []
+
+    @staticmethod
+    def _usage_of(outcome) -> dict:
+        """Sum the normalized usage of every real attempt in this call."""
+        attempts = list(getattr(outcome, "usage_attempts", []) or [])
+        if attempts:
+            normalized = [normalize_token_usage(u) for u in attempts]
+            summed = {}
+            for key in ("input", "output", "reasoning", "cached"):
+                values = [n.get(key) for n in normalized if isinstance(n.get(key), int)]
+                summed[key] = sum(values) if values else None
+            return summed
+        return normalize_token_usage(getattr(outcome, "usage", None))
+
+    def _record(self, stage: str, system: str, user: str, outcome, error=None) -> None:
+        usage = (self._usage_of(outcome) if outcome is not None
+                 else {"input": None, "output": None, "reasoning": None, "cached": None})
+        self.calls.append({
+            "attempt": self._attempt,
+            "stage": stage,
+            "system_sha256": hashlib.sha256(system.encode("utf-8")).hexdigest(),
+            "request_sha256": hashlib.sha256(
+                (system.strip() + "\n\n" + user.strip()).encode("utf-8")).hexdigest(),
+            "cache_hit": bool(getattr(outcome, "cache_hit", False)),
+            "transport_attempt": getattr(outcome, "transport_attempt", 1),
+            "truncation_retry": bool(getattr(outcome, "truncation_retry", False)),
+            "finish_reason": getattr(outcome, "finish_reason", None),
+            "finish_reasons": list(getattr(outcome, "finish_reasons", []) or []),
+            "usage": usage,
+            "wall_ms": getattr(outcome, "wall_ms", 0),
+            "error": (str(error) if error is not None else None),
+        })
 
     def propose(self, request):
+        if self.cell_budget is not None:
+            exhausted = self.cell_budget.check()
+            if exhausted:
+                return CandidateResponse(text="", source="llm", provider=self.name,
+                                         error=exhausted)
         stage = _stage_for(self.arm, request)
         assets = prompts.route(self.arm, stage)
         if hasattr(self.client, "set_stage"):
             self.client.set_stage(stage)
+        self._attempt = getattr(request, "attempt", 1)
         if hasattr(self.client, "set_attempt"):
-            self.client.set_attempt(getattr(request, "attempt", 1))
+            self.client.set_attempt(self._attempt)
         # Hash the system prompt actually sent, not a re-derived join.
         system = prompts.system_prompt_for(self.arm, stage)
         if hasattr(self.client, "set_prompt_meta"):
             self.client.set_prompt_meta(
                 assets, hashlib.sha256(system.encode("utf-8")).hexdigest())
         user = _user_prompt_for(self.arm, stage, request)
+        if self.cell_budget is not None:
+            self.cell_budget.count_call()
         try:
             outcome = self.client.complete(system, user)
-        except Exception as exc:  # noqa: BLE001
+        except BudgetExceeded:
+            raise
+        except TransportError as exc:
+            # A failed call can still carry usage/truncation accounting (e.g.
+            # TransportTruncated): record and bill it like a real call.
+            self._record(stage, system, user, exc, error=exc)
+            if self.cell_budget is not None:
+                self.cell_budget.add_tokens(self._usage_of(exc))
             return CandidateResponse(text="", source="llm", provider=self.name,
                                      error=str(exc))
+        self._record(stage, system, user, outcome)
+        if self.cell_budget is not None:
+            self.cell_budget.add_tokens(self._usage_of(outcome))
         return CandidateResponse.from_usage(
             outcome.text, "llm", self.name,
             model_id=getattr(outcome, "requested_model", None),
@@ -374,19 +610,33 @@ def _user_prompt_for(arm: str, stage: str, request) -> str:
 
 
 def _build_provider(args: argparse.Namespace, audit: AuditLog, out: Path,
-                    *, client_factory=None):
-    spec = resolve_model(build_registry(), args.model)
+                    spec, run_params, ledger, *, client_factory=None):
     if client_factory is None:
+        # Only the real path loads .env; dry-run and injected factories do not.
+        env_file = Path(args.env_file) if args.env_file else repo_root() / ".env"
+        from .env import load_dotenv
+        load_dotenv(env_file, override=True)
         from .channels import build_client, key_for
         from .transport import CHANNELS
         channel = CHANNELS[spec.channel]
         key = key_for(spec, dict(os.environ), channel.api_key_env)
-        inner = build_client(spec, budget=_Budget(), evidence_dir=out / "evidence",
-                             api_key=key, temperature=args.temperature)
+        inner = build_client(spec, run_params, budget=ledger,
+                             evidence_dir=out / "evidence", api_key=key,
+                             timeout=args.timeout)
     else:
         inner = client_factory(spec, out)
-    audited = _make_audited(inner, audit=audit, out=out, spec=spec, arm=args.arm)
-    return _ChatProvider(audited, arm=args.arm)
+    cache = ResponseCache(args.cache_dir if args.cache_dir else out / "cache")
+    replay = None
+    if args.replay_from:
+        replay_dir = Path(args.replay_from)
+        # A run directory is accepted: use its cache/ subdirectory.
+        if (replay_dir / "MANIFEST.json").exists() and (replay_dir / "cache").is_dir():
+            replay_dir = replay_dir / "cache"
+        replay = ResponseCache(replay_dir)
+    cached = CachedClient(inner, cache=cache, replay=replay,
+                          model_id=spec.model_id or "", params=run_params)
+    audited = _make_audited(cached, audit=audit, out=out, spec=spec, arm=args.arm)
+    return _ChatProvider(audited, arm=args.arm, params=run_params)
 
 
 def _make_audited(inner, *, audit, out, spec, arm):
@@ -402,6 +652,11 @@ class _Budget:
 
 def cmd_eval(args: argparse.Namespace, *, runner=None) -> int:
     run_dir = Path(args.run_dir)
+    manifest: dict = {}
+    manifest_path = run_dir / "MANIFEST.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    hint = manifest.get("hint") or "h0"
     updated = 0
     for result_path in sorted(run_dir.glob("cells/**/result.json")):
         data = json.loads(result_path.read_text(encoding="utf-8"))
@@ -410,7 +665,7 @@ def cmd_eval(args: argparse.Namespace, *, runner=None) -> int:
         if not rust.exists():
             continue
         task = workdir.parent.relative_to(run_dir / "cells").as_posix()
-        terminal = read_terminal(repo_root() / "benchmarks" / "tasks" / task)
+        terminal = read_terminal(repo_root() / "benchmarks" / "tasks" / task, hint)
         extra: dict[str, str] = {}
         trace = workdir / "cir_trace.rs"
         if trace.exists():
@@ -523,6 +778,26 @@ def _report_markdown(summaries: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def cmd_models(args: argparse.Namespace) -> int:
+    from .env import load_dotenv
+    from .models_probe import probe_dry_run, probe_run
+    env_file = Path(args.env_file) if args.env_file else repo_root() / ".env"
+    load_dotenv(env_file, override=True)
+    specs = None
+    if args.models:
+        from .transport import resolve_model
+        registry = build_registry()
+        specs = [resolve_model(registry, name) for name in args.models]
+    if args.dry_run:
+        print(json.dumps(probe_dry_run(specs), indent=2))
+        return 0
+    out = Path(args.out) if args.out else Path("experiments") / f"probe-{int(time.time())}"
+    document = probe_run(out, models=specs)
+    print(json.dumps({"probe": str(out / 'PROBE.json'),
+                      "models": len(document.get("models", []))}, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="skelnet")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -537,11 +812,32 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--rust-mode", default="llm", choices=["llm", "codegen"])
     run.add_argument("--force", action="store_true",
                      help="overwrite a non-empty output directory")
-    run.add_argument("--seed", type=int, default=0)
-    run.add_argument("--temperature", type=float, default=0.0)
+    run.add_argument("--temperature-policy", default="provider_default",
+                     choices=["provider_default", "fixed"])
+    run.add_argument("--temperature", type=float, default=None)
+    run.add_argument("--seed-policy", default="per_cell",
+                     choices=["per_cell", "none"])
+    run.add_argument("--call-budget", type=int, default=5)
+    run.add_argument("--token-budget", type=int, default=200000)
+    run.add_argument("--max-output-tokens", type=int, default=32768)
+    run.add_argument("--hint", default="h0", choices=["h0", "h1"])
+    run.add_argument("--stage", type=int, default=0, choices=[0, 1, 2, 3])
+    run.add_argument("--budget-file", default="experiments/budget.json")
+    run.add_argument("--cache-dir", default=None)
+    run.add_argument("--resume", action="store_true")
+    run.add_argument("--replay-from", default=None)
+    run.add_argument("--env-file", default=None)
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--timeout", type=float, default=300.0)
     run.set_defaults(func=cmd_run)
+
+    models = sub.add_parser("models", help="model parameter probe")
+    models.add_argument("action", choices=["probe"])
+    models.add_argument("--dry-run", action="store_true")
+    models.add_argument("--models", nargs="*", default=None)
+    models.add_argument("--out", default=None)
+    models.add_argument("--env-file", default=None)
+    models.set_defaults(func=cmd_models)
 
     ev = sub.add_parser("eval", help="re-run the oracle offline")
     ev.add_argument("run_dir")

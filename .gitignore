@@ -27,6 +27,10 @@ experiments/**/exit.txt
 experiments/**/wall_ms.txt
 experiments/**/proj/
 experiments/**/env.json
+# Global budget ledger and model-probe output
+experiments/budget.json
+experiments/probe-*/
+experiments/**/cache/
 
 # Generic transient logs
 *.log

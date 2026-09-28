@@ -65,9 +65,25 @@ def sha256_file(path: Path | str) -> str | None:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+class BackendTimeout(RuntimeError):
+    """The backend subprocess exceeded its timeout."""
+
+    def __init__(self, timeout: float) -> None:
+        super().__init__(f"backend timeout after {timeout}s")
+        self.timeout = timeout
+
+
 def _run(cmd: list[str], *, cwd: Path | None = None, timeout: float = 300.0) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=str(cwd) if cwd else None, capture_output=True,
-                          text=True, timeout=timeout)
+    try:
+        return subprocess.run(cmd, cwd=str(cwd) if cwd else None,
+                              capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise BackendTimeout(timeout) from exc
+
+
+def _timeout_result(timeout: float) -> "BackendResult":
+    return BackendResult("process", "timeout",
+                         error=f"backend timeout after {timeout}s")
 
 
 class Backend:
@@ -82,7 +98,10 @@ class Backend:
         args = [str(self.skelnet), "check", str(skel), "--json"]
         if reqs:
             args += ["--reqs", str(reqs)]
-        proc = _run(args, timeout=self.timeout)
+        try:
+            proc = _run(args, timeout=self.timeout)
+        except (BackendTimeout, subprocess.TimeoutExpired):
+            return _timeout_result(self.timeout)
         try:
             payload = json.loads(proc.stdout)
         except json.JSONDecodeError:
@@ -101,7 +120,10 @@ class Backend:
                engine: str = "petri") -> BackendResult:
         args = [str(self.skelnet), "verify", str(skel), str(contract),
                 "--engine", engine, "--json"]
-        proc = _run(args, timeout=self.timeout)
+        try:
+            proc = _run(args, timeout=self.timeout)
+        except (BackendTimeout, subprocess.TimeoutExpired):
+            return _timeout_result(self.timeout)
         try:
             payload = json.loads(proc.stdout)
         except json.JSONDecodeError:
@@ -119,7 +141,10 @@ class Backend:
         args = [str(self.skelnet), "lower", str(skel), "-o", str(out)]
         if map_path:
             args += ["--map", str(map_path)]
-        proc = _run(args, timeout=self.timeout)
+        try:
+            proc = _run(args, timeout=self.timeout)
+        except (BackendTimeout, subprocess.TimeoutExpired):
+            return _timeout_result(self.timeout)
         status = "ok" if proc.returncode == 0 else "invalid"
         return BackendResult("semantic", status, exit_code=proc.returncode,
                              stdout=proc.stdout, stderr=proc.stderr,
@@ -136,7 +161,11 @@ class Backend:
 
     def _codegen(self, args: list[str], out_dir: Path | str) -> "CodegenResult":
         out_dir = Path(out_dir)
-        proc = _run(args, timeout=self.timeout)
+        try:
+            proc = _run(args, timeout=self.timeout)
+        except (BackendTimeout, subprocess.TimeoutExpired):
+            return CodegenResult(ok=False,
+                                 error=f"backend timeout after {self.timeout}s")
         if proc.returncode != 0:
             return CodegenResult(ok=False, error=proc.stderr.strip() or proc.stdout.strip())
         main_rs = out_dir / "src" / "main.rs"
@@ -153,7 +182,10 @@ class Backend:
     def verify_cir(self, cir: Path | str, contract: Path | str, *,
                    engine: str = "petri") -> BackendResult:
         args = [str(self.concir), "explore", str(cir), str(contract), engine]
-        proc = _run(args, timeout=self.timeout)
+        try:
+            proc = _run(args, timeout=self.timeout)
+        except (BackendTimeout, subprocess.TimeoutExpired):
+            return _timeout_result(self.timeout)
         try:
             payload = json.loads(proc.stdout)
         except json.JSONDecodeError:

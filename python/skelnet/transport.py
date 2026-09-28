@@ -18,7 +18,9 @@ name. A display name is never assumed to be a valid API ID.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
+from typing import Any, Callable
 
 
 class TransportError(RuntimeError):
@@ -28,6 +30,60 @@ class TransportError(RuntimeError):
 class ModelIdentityError(TransportError):
     """The response model is not the requested model; the result must not be
     attributed to the requested model."""
+
+
+class TemperatureRejected(TransportError):
+    """The provider rejected the temperature parameter."""
+
+
+class TransportTruncated(TransportError):
+    """The reply was truncated (or empty) even after the larger retry.
+
+    Carries the per-attempt accounting of the failed call so the provider and
+    audit can still record the spend and the truncation metadata.
+    """
+
+    def __init__(self, message: str = "transport_truncated", *,
+                 truncation_retry: bool = False,
+                 finish_reasons: list | None = None,
+                 usage_attempts: list | None = None) -> None:
+        super().__init__(message)
+        self.truncation_retry = truncation_retry
+        self.finish_reasons = list(finish_reasons or [])
+        self.usage_attempts = list(usage_attempts or [])
+
+
+class ReplayMiss(TransportError):
+    """A `--replay-from` call had no cached response and network is disabled."""
+
+
+class BudgetExceeded(TransportError):
+    """A global budget limit was reached; the whole run must stop."""
+
+
+# Exceptions worth retrying, matched by class name (no openai import needed).
+RETRYABLE_EXCEPTION_NAMES = ("APIConnectionError", "APITimeoutError",
+                             "InternalServerError", "RateLimitError")
+
+
+def create_with_retries(create: Callable[[], Any], *, max_attempts: int = 3,
+                        sleep: Callable[[float], None] = time.sleep):
+    """Call `create()` with bounded exponential backoff.
+
+    Returns ``(result, transport_attempt)``. Transport retries do not count
+    against a cell's call budget.
+    """
+    last: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return create(), attempt
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            if type(exc).__name__ in RETRYABLE_EXCEPTION_NAMES and attempt < max_attempts:
+                sleep(min(2 ** (attempt - 1), 8))
+                continue
+            raise
+    raise last if last else RuntimeError("no response")
 
 
 @dataclass(frozen=True)
@@ -54,6 +110,16 @@ class ModelSpec:
     status: str = "available"        # available | blocked | unknown
     blocked_reason: str | None = None
     discovered: bool = False         # model_id observed in a live model list
+    # Parameter policy (R2). `thinking` is the requested switch; GPT/Kimi use
+    # reasoning_effort="medium"; `supports_seed` gates per-cell seeds (Responses
+    # never send a seed).
+    thinking: bool = False
+    reasoning_effort: str | None = None
+    max_output_tokens: int = 32768
+    max_output_tokens_cap: int = 65536
+    supports_seed: bool = False
+    stream: bool = False
+    confirmed_response_aliases: tuple[str, ...] = ()
 
 
 # Channels are keyed by name; the API key env var is a *name* only. The value
@@ -67,7 +133,7 @@ CHANNELS: dict[str, Channel] = {
         name="dashscope-direct", transport="direct-api", provider="qwen",
         api_key_env="DASHSCOPE_API_KEY",
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        surface="responses"),
+        surface="chat"),
     "cursor": Channel(
         name="cursor", transport="cursor", provider="cursor",
         api_key_env="CURSOR_API_KEY", surface="cursor-sdk",
@@ -76,6 +142,17 @@ CHANNELS: dict[str, Channel] = {
         name="opencode-go", transport="opencode", provider="opencode",
         api_key_env="OPENCODE_API_KEY",
         base_url="https://opencode.ai/zen/go/v1", surface="chat"),
+    # Reserved direct endpoints (not used in R2 experiments).
+    "openai-direct": Channel(
+        name="openai-direct", transport="direct-api", provider="openai",
+        api_key_env="OPENAI_API_KEY", base_url="https://api.openai.com/v1",
+        surface="responses",
+        notes="Reserved; blocked in R2 (no key/transport decision yet)."),
+    "moonshot-direct": Channel(
+        name="moonshot-direct", transport="direct-api", provider="moonshot",
+        api_key_env="MOONSHOT_API_KEY", base_url="https://api.moonshot.cn/v1",
+        surface="chat",
+        notes="Reserved; blocked in R2 (no key/transport decision yet)."),
 }
 
 
@@ -113,13 +190,26 @@ def build_registry() -> list[ModelSpec]:
     """
 
     specs = [
+        # ── The four experimental models (frozen parameter policy) ──────
         ModelSpec("DeepSeek Flash", "deepseek", "deepseek-direct",
                   "deepseek-flash", role="main",
-                  discovered="deepseek-flash" in DISCOVERED_MODELS["deepseek-direct"]),
+                  discovered="deepseek-flash" in DISCOVERED_MODELS["deepseek-direct"],
+                  thinking=True, reasoning_effort=None, supports_seed=True),
         ModelSpec("Qwen", "qwen", "dashscope-direct", "qwen3.8-flash",
                   role="compare",
                   candidates=("qwen3.8-flash", "qwen3.8-max", "qwen3.7-flash"),
-                  discovered="qwen3.8-flash" in DISCOVERED_MODELS["dashscope-direct"]),
+                  discovered="qwen3.8-flash" in DISCOVERED_MODELS["dashscope-direct"],
+                  thinking=True, reasoning_effort=None, supports_seed=False,
+                  stream=False),
+        ModelSpec("Kimi", "moonshot", "opencode-go", "kimi-k3", role="compare",
+                  aliases=("kimi-k2.7-code",),
+                  discovered="kimi-k3" in DISCOVERED_MODELS["opencode-go"],
+                  thinking=True, reasoning_effort="medium", supports_seed=True),
+        ModelSpec("GPT 6 Luna", "openai", "opencode-go", "gpt-6-luna",
+                  role="compare", surface="responses",
+                  discovered="gpt-6-luna" in DISCOVERED_MODELS["opencode-go"],
+                  thinking=True, reasoning_effort="medium", supports_seed=False),
+        # ── Reserved / comparison entries ───────────────────────────────
         ModelSpec("Composer 2.5", "cursor", "cursor", "composer-2.5",
                   role="diagnostic", status="blocked",
                   blocked_reason="Cursor agent accumulates large, partly "
@@ -127,22 +217,33 @@ def build_registry() -> list[ModelSpec]:
                                  "tokens/call) and cannot be reduced to a "
                                  "stateless chat call; not comparable to direct APIs",
                   discovered="composer-2.5" in DISCOVERED_MODELS["cursor"]),
-        ModelSpec("Kimi", "moonshot", "opencode-go", "kimi-k3", role="compare",
-                  aliases=("kimi-k2.7-code",),
-                  discovered="kimi-k3" in DISCOVERED_MODELS["opencode-go"]),
         ModelSpec("GLM", "zhipu", "opencode-go", "glm-5.3-flash", role="compare",
                   aliases=("glm-5.3",),
                   discovered="glm-5.3-flash" in DISCOVERED_MODELS["opencode-go"]),
-        ModelSpec("GPT 6 Luna", "openai", "opencode-go", "gpt-6-luna",
-                  role="compare", surface="responses",
-                  discovered="gpt-6-luna" in DISCOVERED_MODELS["opencode-go"]),
         ModelSpec("Grok 4.7", "xai", "opencode-go", "grok-4.7", role="compare",
                   surface="responses",
                   discovered="grok-4.7" in DISCOVERED_MODELS["opencode-go"]),
         ModelSpec("Mimo", "xiaomi", "opencode-go", "mimo-v2.5", role="compare",
                   discovered="mimo-v2.5" in DISCOVERED_MODELS["opencode-go"]),
+        ModelSpec("OpenAI direct", "openai", "openai-direct", None,
+                  role="diagnostic", status="blocked",
+                  blocked_reason="Reserved channel; no transport decision in R2."),
+        ModelSpec("Moonshot direct", "moonshot", "moonshot-direct", None,
+                  role="diagnostic", status="blocked",
+                  blocked_reason="Reserved channel; no transport decision in R2."),
     ]
     return specs
+
+
+# The four models this experiment round runs.
+EXPERIMENTAL_MODEL_IDS = ("gpt-6-luna", "kimi-k3", "deepseek-flash",
+                          "qwen3.8-flash")
+
+
+def experimental_models(specs: list[ModelSpec] | None = None) -> list[ModelSpec]:
+    specs = specs or build_registry()
+    by_id = {s.model_id: s for s in specs}
+    return [by_id[mid] for mid in EXPERIMENTAL_MODEL_IDS if mid in by_id]
 
 
 def available_models(specs: list[ModelSpec] | None = None) -> list[ModelSpec]:
@@ -162,18 +263,20 @@ def resolve_model(specs: list[ModelSpec], display_or_id: str) -> ModelSpec:
     raise KeyError(f"unknown model {display_or_id!r}; not in the registry")
 
 
-def verify_identity(requested: str, returned: str | None) -> bool:
+def verify_identity(requested: str, returned: str | None, *,
+                    aliases: tuple[str, ...] = ()) -> bool:
     """Return whether the response is the requested model.
 
     ``None`` (provider did not report a model) is treated as *unconfirmed*, not
-    as a match. A mismatch raises :class:`ModelIdentityError` so the result is
+    as a match. Only names explicitly listed in ``aliases`` are additionally
+    accepted. A mismatch raises :class:`ModelIdentityError` so the result is
     never attributed to the requested model.
     """
 
     if returned is None:
         return False
-    if returned != requested:
-        raise ModelIdentityError(
-            f"response model {returned!r} is not the requested {requested!r}; "
-            "results must not be attributed to the requested model")
-    return True
+    if returned == requested or returned in aliases:
+        return True
+    raise ModelIdentityError(
+        f"response model {returned!r} is not the requested {requested!r}; "
+        "results must not be attributed to the requested model")

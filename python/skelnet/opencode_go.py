@@ -1,8 +1,9 @@
-"""OpenCode Go (OpenAI-compatible) client for the second/third-model probe.
+"""OpenCode Go clients (Chat Completions and Responses).
 
-Only `/chat/completions` is used. The client mirrors `DeepSeekFlashClient`'s
-`complete(system, user)` surface so the existing providers/workflows can drive
-it unchanged.
+Both mirror ``DirectChatClient``'s ``complete(system, user)`` surface. The
+session header is refreshed per cell (``new_session``), retries are bounded, and
+truncated/empty replies are retried once with a larger cap. Every real request
+(including the truncation retry) reserves global budget and records its usage.
 """
 
 from __future__ import annotations
@@ -10,15 +11,31 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+
+from .models import normalize_token_usage
+from .params import seed_for
+from .transport import TemperatureRejected, TransportTruncated, create_with_retries
 
 OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
 
 
 def _sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump()
+        return dumped if isinstance(dumped, dict) else {}
+    return {}
 
 
 @dataclass
@@ -34,165 +51,281 @@ class OpenCodeOutcome:
     transport_attempt: int
     prompt_sha256: str
     cost: float | None = None
+    session: str | None = None
+    seed: int | None = None
+    truncation_retry: bool = False
+    finish_reasons: list[str | None] = field(default_factory=list)
+    usage_attempts: list[dict[str, Any]] = field(default_factory=list)
+    temperature_sent: float | None = None
 
 
-class OpenCodeGoClient:
-    def __init__(self, *, api_key: str, budget, evidence_dir: Path | str,
-                 model: str, timeout: float = 90.0, max_tokens: int = 4096,
-                 temperature: float = 0.0) -> None:
-        from openai import OpenAI
-
+class _OpenCodeBase:
+    def __init__(self, *, api_key: str, base_url: str, model: str, budget: Any,
+                 evidence_dir: Path | str, params: Any, timeout: float = 90.0,
+                 sdk_client: Any | None = None,
+                 sleep: Callable[[float], None] = time.sleep) -> None:
         self.model = model
+        self.base_url = base_url or OPENCODE_GO_BASE_URL
         self.budget = budget
+        self.params = params
         self.evidence_dir = Path(evidence_dir)
         self.evidence_dir.mkdir(parents=True, exist_ok=True)
         self.log_path = self.evidence_dir / "requests.jsonl"
-        self.timeout = timeout
-        self.max_tokens = max_tokens
-        self.temperature = temperature
-        import uuid
+        self.timeout = float(timeout)
+        self.sleep = sleep
+        self.task_id: str | None = None
+        self.replicate = 0
+        self.session = str(uuid.uuid4())
+        if sdk_client is not None:
+            self._client = sdk_client
+        else:
+            from openai import OpenAI
+            self._client = OpenAI(api_key=api_key, base_url=self.base_url,
+                                  timeout=timeout, max_retries=0)
 
-        self._client = OpenAI(
-            api_key=api_key, base_url=OPENCODE_GO_BASE_URL, timeout=timeout,
-            default_headers={"x-opencode-session": str(uuid.uuid4())})
+    def new_session(self) -> None:
+        self.session = str(uuid.uuid4())
+
+    def set_cell(self, task_id: str, replicate: int) -> None:
+        self.task_id = task_id
+        self.replicate = replicate
+
+    def _seed(self) -> int | None:
+        if (self.params.seed_policy == "per_cell" and self.params.supports_seed
+                and self.task_id is not None):
+            return seed_for(self.task_id, self.replicate)
+        return None
+
+    def _temperature_sent(self) -> float | None:
+        if self.params.temperature_policy == "fixed":
+            return self.params.temperature
+        return None
+
+    def _add_tokens(self, usage: Any) -> None:
+        add = getattr(self.budget, "add_tokens", None)
+        if add is not None:
+            add(normalize_token_usage(usage))
+
+    def _reserve_and_create(self, kwargs: dict) -> Any:
+        self.budget.reserve()
+        return self._create(kwargs)
 
     def _record(self, record: dict[str, Any]) -> None:
         with self.log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-    def _create_with_retry(self, kwargs: dict, messages: list, prompt_sha: str,
-                           started: float):
-        retryable = ("APIConnectionError", "APITimeoutError", "InternalServerError",
-                     "RateLimitError")
-        last_exc = None
-        for attempt in range(3):
-            try:
-                return self._client.chat.completions.create(**kwargs)
-            except Exception as exc:  # noqa: BLE001
-                last_exc = exc
-                # Some models only accept temperature=1; retry with 1 and record it.
-                if "temperature" in str(exc).lower() and kwargs["temperature"] != 1:
-                    kwargs["temperature"] = 1.0
-                    self.temperature = 1.0
-                    continue
-                if type(exc).__name__ in retryable and attempt < 2:
-                    time.sleep(3 * (attempt + 1))
-                    continue
-                self._record({"status": "error", "model": self.model,
-                              "messages": messages, "prompt_sha256": prompt_sha,
-                              "error": str(exc), "error_type": type(exc).__name__,
-                              "wall_ms": int((time.monotonic() - started) * 1000)})
-                raise
-        raise last_exc if last_exc else RuntimeError("no response")
+    def _truncated(self, text: str, finish_reason: str | None) -> bool:
+        return finish_reason == "length" or not text.strip()
+
+    def _next_cap(self, current: int) -> int:
+        return min(2 * current, getattr(self.params, "max_output_tokens_cap", 65536))
+
+
+class OpenCodeGoClient(_OpenCodeBase):
+    """OpenCode Go via ``/chat/completions`` (e.g. Kimi)."""
+
+    def _kwargs(self, messages: list, max_tokens: int) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {"model": self.model, "messages": messages,
+                                  "max_tokens": max_tokens,
+                                  "extra_headers": {"x-opencode-session": self.session}}
+        if self.params.temperature_policy == "fixed":
+            kwargs["temperature"] = self.params.temperature
+        if self.params.reasoning_effort:
+            kwargs["reasoning_effort"] = self.params.reasoning_effort
+        seed = self._seed()
+        if seed is not None:
+            kwargs["seed"] = seed
+        return kwargs
+
+    def _create(self, kwargs: dict) -> Any:
+        return self._client.chat.completions.create(**kwargs)
 
     def complete(self, system_prompt: str, user_prompt: str) -> OpenCodeOutcome:
         messages = [{"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}]
         prompt_sha = _sha(json.dumps(messages, ensure_ascii=False, sort_keys=True))
-        self.budget.reserve()
         started = time.monotonic()
-        kwargs: dict[str, Any] = {
-            "model": self.model, "messages": messages,
-            "temperature": self.temperature, "max_tokens": self.max_tokens,
-        }
-        response = self._create_with_retry(kwargs, messages, prompt_sha, started)
+        max_tokens = self.params.max_output_tokens
+        truncation_retry = False
+        transport_attempt = 1
+        finish_reasons: list[str | None] = []
+        usage_attempts: list[dict[str, Any]] = []
+        content = ""
+        finish_reason = None
+        usage: dict[str, Any] = {}
+        response = None
+        for attempt_index in range(2):
+            kwargs = self._kwargs(messages, max_tokens)
+            try:
+                response, transport_attempt = create_with_retries(
+                    lambda: self._reserve_and_create(kwargs), sleep=self.sleep)
+            except Exception as exc:  # noqa: BLE001
+                if "temperature" in str(exc).lower():
+                    self._record_error(messages, prompt_sha, exc, started, kwargs)
+                    raise TemperatureRejected(str(exc)) from exc
+                self._record_error(messages, prompt_sha, exc, started, kwargs)
+                raise
+            choice = (getattr(response, "choices", None) or [None])[0]
+            message = getattr(choice, "message", None)
+            content = getattr(message, "content", None) or ""
+            finish_reason = getattr(choice, "finish_reason", None)
+            usage = _as_dict(getattr(response, "usage", None))
+            finish_reasons.append(finish_reason)
+            usage_attempts.append(usage)
+            self._add_tokens(usage)
+            truncated = self._truncated(content, finish_reason)
+            self._record({"status": "truncated" if truncated else "ok",
+                          "model": self.model, "session": self.session,
+                          "response_model": getattr(response, "model", None),
+                          "request_id": getattr(response, "id", None),
+                          "messages": messages, "prompt_sha256": prompt_sha,
+                          "usage": usage, "cost": getattr(response, "cost", None),
+                          "max_tokens": max_tokens, "finish_reason": finish_reason,
+                          "seed": self._seed(), "truncation_retry": truncation_retry,
+                          "content_sha256": _sha(content), "content": content,
+                          "wall_ms": int((time.monotonic() - started) * 1000)})
+            if not truncated:
+                break
+            if attempt_index == 0:
+                truncation_retry = True
+                max_tokens = self._next_cap(max_tokens)
+                continue
+            raise TransportTruncated(
+                truncation_retry=truncation_retry,
+                finish_reasons=finish_reasons,
+                usage_attempts=usage_attempts)
         wall_ms = int((time.monotonic() - started) * 1000)
-        choice = (response.choices or [None])[0]
-        message = getattr(choice, "message", None)
-        content = getattr(message, "content", None) or ""
-        usage = None
-        if getattr(response, "usage", None) is not None:
-            usage = response.usage.model_dump() if hasattr(response.usage, "model_dump") \
-                else dict(response.usage)
-        cost = getattr(response, "cost", None)
-        response_model = getattr(response, "model", None)
-        record = {"status": "ok", "model": self.model, "temperature": kwargs["temperature"],
-                  "response_model": response_model,
-                  "request_id": getattr(response, "id", None), "messages": messages,
-                  "prompt_sha256": prompt_sha, "usage": usage, "cost": cost,
-                  "finish_reason": getattr(choice, "finish_reason", None),
-                  "content_sha256": _sha(content), "content": content, "wall_ms": wall_ms}
-        self._record(record)
         return OpenCodeOutcome(
             text=content, messages=messages, requested_model=self.model,
-            response_model=response_model, request_id=getattr(response, "id", None),
-            finish_reason=getattr(choice, "finish_reason", None), usage=usage,
-            wall_ms=wall_ms, transport_attempt=1, prompt_sha256=prompt_sha, cost=cost)
+            response_model=getattr(response, "model", None),
+            request_id=getattr(response, "id", None), finish_reason=finish_reason,
+            usage=usage or None, wall_ms=wall_ms, transport_attempt=transport_attempt,
+            prompt_sha256=prompt_sha, cost=getattr(response, "cost", None),
+            session=self.session, seed=self._seed(), truncation_retry=truncation_retry,
+            finish_reasons=finish_reasons, usage_attempts=usage_attempts,
+            temperature_sent=self._temperature_sent())
+
+    def _record_error(self, messages, prompt_sha, exc, started, kwargs) -> None:
+        self._record({"status": "error", "model": self.model, "session": self.session,
+                      "messages": messages, "prompt_sha256": prompt_sha,
+                      "max_tokens": kwargs.get("max_tokens"), "finish_reason": None,
+                      "error": str(exc), "error_type": type(exc).__name__,
+                      "wall_ms": int((time.monotonic() - started) * 1000)})
 
 
-class OpenCodeGoResponsesClient:
-    """OpenCode Go via the Responses API, for models that reject chat/completions.
+class OpenCodeGoResponsesClient(_OpenCodeBase):
+    """OpenCode Go via ``/responses`` (e.g. GPT 6 Luna)."""
 
-    ``gpt-6-luna`` and ``grok-4.7`` return ``ModelProtocolUnsupported`` on
-    ``/chat/completions`` and require ``/responses`` plus the session header.
-    Mirrors :class:`OpenCodeGoClient`'s ``complete(system, user)`` surface.
-    """
-
-    def __init__(self, *, api_key: str, budget, evidence_dir: Path | str,
-                 model: str, timeout: float = 90.0, max_tokens: int = 4096,
-                 temperature: float = 0.0) -> None:
-        from openai import OpenAI
-
-        self.model = model
-        self.budget = budget
-        self.evidence_dir = Path(evidence_dir)
-        self.evidence_dir.mkdir(parents=True, exist_ok=True)
-        self.log_path = self.evidence_dir / "requests.jsonl"
-        self.timeout = timeout
-        self.max_tokens = max_tokens
-        self.temperature = temperature
-        import uuid
-
-        self._client = OpenAI(
-            api_key=api_key, base_url=OPENCODE_GO_BASE_URL, timeout=timeout,
-            default_headers={"x-opencode-session": str(uuid.uuid4())})
-
-    def _record(self, record: dict[str, Any]) -> None:
-        with self.log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-    def complete(self, system_prompt: str, user_prompt: str) -> OpenCodeOutcome:
-        messages = [{"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}]
-        prompt_sha = _sha(json.dumps(messages, ensure_ascii=False, sort_keys=True))
-        self.budget.reserve()
-        started = time.monotonic()
+    def _kwargs(self, system_prompt: str, user_prompt: str,
+                max_tokens: int) -> dict[str, Any]:
         kwargs: dict[str, Any] = {
             "model": self.model, "instructions": system_prompt,
-            "input": user_prompt, "max_output_tokens": self.max_tokens,
+            "input": user_prompt, "max_output_tokens": max_tokens,
+            "extra_headers": {"x-opencode-session": self.session},
         }
-        try:
-            response = self._client.responses.create(**kwargs)
-        except Exception as exc:  # noqa: BLE001
-            self._record({"status": "error", "model": self.model,
-                          "surface": "responses", "messages": messages,
-                          "prompt_sha256": prompt_sha, "error": str(exc),
-                          "error_type": type(exc).__name__,
+        if self.params.temperature_policy == "fixed":
+            kwargs["temperature"] = self.params.temperature
+        if self.params.reasoning_effort:
+            kwargs["reasoning"] = {"effort": self.params.reasoning_effort}
+        return kwargs
+
+    def _create(self, kwargs: dict) -> Any:
+        return self._client.responses.create(**kwargs)
+
+    def _parse(self, response: Any) -> dict[str, Any]:
+        return {"text": getattr(response, "output_text", None) or "",
+                "finish_reason": _responses_finish_reason(response),
+                "usage": _as_dict(getattr(response, "usage", None)),
+                "response_model": getattr(response, "model", None),
+                "request_id": getattr(response, "id", None),
+                "cost": getattr(response, "cost", None)}
+
+    def complete(self, system_prompt: str, user_prompt: str) -> OpenCodeOutcome:
+        messages = [{"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}]
+        prompt_sha = _sha(json.dumps(messages, ensure_ascii=False, sort_keys=True))
+        started = time.monotonic()
+        max_tokens = self.params.max_output_tokens
+        truncation_retry = False
+        transport_attempt = 1
+        finish_reasons: list[str | None] = []
+        usage_attempts: list[dict[str, Any]] = []
+        parsed: dict[str, Any] = {}
+        for attempt_index in range(2):
+            kwargs = self._kwargs(system_prompt, user_prompt, max_tokens)
+            try:
+                response, transport_attempt = create_with_retries(
+                    lambda: self._reserve_and_create(kwargs), sleep=self.sleep)
+            except Exception as exc:  # noqa: BLE001
+                if "temperature" in str(exc).lower():
+                    self._record_error(messages, prompt_sha, exc, started, kwargs)
+                    raise TemperatureRejected(str(exc)) from exc
+                self._record_error(messages, prompt_sha, exc, started, kwargs)
+                raise
+            parsed = self._parse(response)
+            finish_reasons.append(parsed["finish_reason"])
+            usage_attempts.append(parsed["usage"])
+            self._add_tokens(parsed["usage"])
+            truncated = self._truncated(parsed["text"], parsed["finish_reason"])
+            self._record({"status": "truncated" if truncated else "ok",
+                          "model": self.model, "surface": "responses",
+                          "session": self.session,
+                          "response_model": parsed["response_model"],
+                          "request_id": parsed["request_id"], "messages": messages,
+                          "prompt_sha256": prompt_sha, "usage": parsed["usage"],
+                          "cost": parsed["cost"], "max_output_tokens": max_tokens,
+                          "finish_reason": parsed["finish_reason"],
+                          "truncation_retry": truncation_retry,
+                          "content_sha256": _sha(parsed["text"]),
+                          "content": parsed["text"],
                           "wall_ms": int((time.monotonic() - started) * 1000)})
-            raise
+            if not truncated:
+                break
+            if attempt_index == 0:
+                truncation_retry = True
+                max_tokens = self._next_cap(max_tokens)
+                continue
+            raise TransportTruncated(
+                truncation_retry=truncation_retry,
+                finish_reasons=finish_reasons,
+                usage_attempts=usage_attempts)
         wall_ms = int((time.monotonic() - started) * 1000)
-        content = getattr(response, "output_text", None) or ""
-        usage = None
-        if getattr(response, "usage", None) is not None:
-            usage = response.usage.model_dump() if hasattr(response.usage, "model_dump") \
-                else dict(response.usage)
-        response_model = getattr(response, "model", None)
-        self._record({"status": "ok", "model": self.model, "surface": "responses",
-                      "response_model": response_model,
-                      "request_id": getattr(response, "id", None),
-                      "messages": messages, "prompt_sha256": prompt_sha,
-                      "usage": usage, "content_sha256": _sha(content),
-                      "content": content, "wall_ms": wall_ms})
         return OpenCodeOutcome(
-            text=content, messages=messages, requested_model=self.model,
-            response_model=response_model, request_id=getattr(response, "id", None),
-            finish_reason=None, usage=usage, wall_ms=wall_ms,
-            transport_attempt=1, prompt_sha256=prompt_sha, cost=None)
+            text=parsed["text"], messages=messages, requested_model=self.model,
+            response_model=parsed["response_model"], request_id=parsed["request_id"],
+            finish_reason=parsed["finish_reason"], usage=parsed["usage"] or None,
+            wall_ms=wall_ms, transport_attempt=transport_attempt, prompt_sha256=prompt_sha,
+            cost=parsed["cost"], session=self.session, truncation_retry=truncation_retry,
+            finish_reasons=finish_reasons, usage_attempts=usage_attempts,
+            temperature_sent=self._temperature_sent())
+
+    def _record_error(self, messages, prompt_sha, exc, started, kwargs) -> None:
+        self._record({"status": "error", "model": self.model, "surface": "responses",
+                      "session": self.session, "messages": messages,
+                      "prompt_sha256": prompt_sha,
+                      "max_output_tokens": kwargs.get("max_output_tokens"),
+                      "finish_reason": None, "error": str(exc),
+                      "error_type": type(exc).__name__,
+                      "wall_ms": int((time.monotonic() - started) * 1000)})
 
 
-def list_models(api_key: str, timeout: float = 30.0) -> dict[str, Any]:
+def _responses_finish_reason(response: Any) -> str | None:
+    status = getattr(response, "status", None)
+    if status == "completed":
+        return "stop"
+    if status == "incomplete":
+        details = getattr(response, "incomplete_details", None)
+        reason = getattr(details, "reason", None)
+        if reason is None and isinstance(details, dict):
+            reason = details.get("reason")
+        return "length" if reason == "max_output_tokens" else reason
+    return status
+
+
+def list_models(api_key: str, *, base_url: str = OPENCODE_GO_BASE_URL,
+                timeout: float = 30.0) -> dict[str, Any]:
     from openai import OpenAI
 
-    client = OpenAI(api_key=api_key, base_url=OPENCODE_GO_BASE_URL, timeout=timeout)
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
     models = client.models.list()
     return models.model_dump() if hasattr(models, "model_dump") else {"data": []}
