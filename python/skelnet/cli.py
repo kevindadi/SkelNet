@@ -70,12 +70,20 @@ def read_terminal(task_dir: Path, hint: str = "h1") -> str | None:
 
 def _budget(arm: str, tasks: int, reps: int, rounds: int,
             rust_mode: str = "llm", call_budget: int | None = None) -> dict:
-    if arm == "G0":
+    if call_budget is None:
+        if arm == "G0":
+            per_rep = 1
+        else:
+            per_rep = rounds + (1 if rust_mode == "llm" else 0)
+    elif arm == "G0":
         per_rep = 1
+    elif arm in ("SKEL", "CIR") and rust_mode == "codegen":
+        # The skeleton stage gets at most min(rounds, B-1); codegen has no
+        # Rust LLM stage, so the same skeleton rule applies.
+        per_rep = min(rounds, call_budget - 1)
     else:
-        per_rep = rounds + (1 if rust_mode == "llm" else 0)
-    if call_budget is not None:
-        per_rep = min(per_rep, call_budget)
+        # SKEL/CIR (llm) and every round-4 baseline arm: the cell budget.
+        per_rep = call_budget
     per_task = reps * per_rep
     return {"arm": arm, "tasks": tasks, "reps": reps, "rounds": rounds,
             "rust_mode": rust_mode, "call_budget": call_budget,
@@ -380,16 +388,18 @@ def _error_cell(args, spec, run_params, task, tier, rep, exc) -> dict:
 
 
 def _merge_cell(base: dict, cell, provider, run_params) -> dict:
-    """Merge a pipeline CellResult onto the D1 base cell."""
+    """Merge a pipeline CellResult onto the D1 base cell (no field whitelist)."""
     data = dict(base)
     pipeline = json.loads(dumps(cell))
-    for key in ("accepted", "parse_ok", "check_ok", "rounds_used", "history",
-                "ledger", "evidence_sufficient", "rust_mode", "error"):
-        if key in pipeline:
-            data[key] = pipeline[key]
+    for key, value in pipeline.items():
+        if key == "replicate":
+            continue
+        if key == "oracle":
+            if value is not None:
+                data["oracle"] = value
+            continue
+        data[key] = value
     data["rep"] = pipeline.get("replicate", base["rep"])
-    if pipeline.get("oracle") is not None:
-        data["oracle"] = pipeline["oracle"]
     if provider is not None:
         data["calls"] = list(getattr(provider, "calls", []))
         if getattr(provider, "cell_budget", None) is not None:

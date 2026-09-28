@@ -42,6 +42,7 @@ class CellResult:
     check_ok: bool = False
     rounds_used: int = 0
     error: str | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 def _extract_block(text: str, language: str) -> str:
@@ -250,7 +251,7 @@ def run_g0_cell(*, task: str, requirements: str, provider: CandidateProvider,
 
 
 def result_to_dict(result: CellResult) -> dict[str, Any]:
-    return {
+    out = {
         "arm": result.arm, "task": result.task, "replicate": result.replicate,
         "accepted": result.accepted, "error": result.error,
         "rust_mode": result.rust_mode,
@@ -260,6 +261,11 @@ def result_to_dict(result: CellResult) -> dict[str, Any]:
         "evidence_sufficient": result.evidence_sufficient,
         "oracle": None if result.oracle is None else oracle_result_dict(result.oracle),
     }
+    for key, value in result.extra.items():
+        if key in out:
+            raise ValueError(f"CellResult.extra key {key!r} conflicts with a cell field")
+        out[key] = value
+    return out
 
 
 def dumps(result: CellResult) -> str:

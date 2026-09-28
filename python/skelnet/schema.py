@@ -51,6 +51,7 @@ def validate_cell(cell: Any) -> list[str]:
     errors.extend(_validate_calls(cell.get("calls")))
     errors.extend(_validate_budget_used(cell.get("budget_used")))
     errors.extend(_validate_oracle(cell.get("oracle")))
+    errors.extend(_validate_method_fields(cell))
 
     for key in ("parse_ok", "check_ok", "evidence_sufficient"):
         if not isinstance(cell.get(key), bool):
@@ -64,6 +65,34 @@ def validate_cell(cell: Any) -> list[str]:
         errors.append("rounds_used must be an int")
     if not isinstance(cell.get("rust_mode"), str):
         errors.append("rust_mode must be a string")
+    return errors
+
+
+def _validate_method_fields(cell: Any) -> list[str]:
+    """Type-check the SKEL/CIR method fields when present (G0/baselines omit)."""
+    errors: list[str] = []
+    for key in ("skel_verified", "rust_compiled"):
+        if key in cell and not (cell[key] is None or isinstance(cell[key], bool)):
+            errors.append(f"{key} must be a bool or null")
+    for key in ("skel_status", "feedback_mode", "rust_when_unverified",
+                "property_ids", "rust_skipped"):
+        if key in cell and not (cell[key] is None or isinstance(cell[key], str)):
+            errors.append(f"{key} must be a string or null")
+    if "rust_calls" in cell and (not isinstance(cell["rust_calls"], int)
+                                 or isinstance(cell["rust_calls"], bool)):
+        errors.append("rust_calls must be an int")
+    if "rust_attempts" in cell:
+        attempts = cell["rust_attempts"]
+        if not isinstance(attempts, list):
+            errors.append("rust_attempts must be a list")
+        else:
+            for i, attempt in enumerate(attempts):
+                if not isinstance(attempt, dict):
+                    errors.append(f"rust_attempts[{i}] is not an object")
+                    continue
+                for key in ("call", "stage", "reply_kind", "compiled"):
+                    if key not in attempt:
+                        errors.append(f"rust_attempts[{i}].{key} is required")
     return errors
 
 
