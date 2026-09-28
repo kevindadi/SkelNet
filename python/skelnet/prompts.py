@@ -54,6 +54,42 @@ PROMPT_ROUTES: dict[tuple[str, str], tuple[str, ...]] = {
     ("G0", STAGE_GENERATE): (RUST_GENERATION_V2_ASSET, RUST_RUNTIME_API_ASSET),
 }
 
+# ── baseline arms (round 4) ──────────────────────────────────────────
+# ``generate`` matches G0 byte for byte. ``rust_fix`` matches the SKEL/CIR
+# compile-fix route. The stage name is the string ``rust_fix`` (round 5's
+# ``STAGE_RUST_FIX``).
+RUST_SELF_REFINE_ASSET = "rust_self_refine_v1.md"
+RUST_STATIC_FEEDBACK_ASSET = "rust_static_feedback_v1.md"
+RUST_DYNAMIC_FEEDBACK_ASSET = "rust_dynamic_feedback_v1.md"
+RUST_DYNAMIC_MONITOR_FEEDBACK_ASSET = "rust_dynamic_monitor_feedback_v1.md"
+
+BASELINE_ASSETS = (
+    RUST_SELF_REFINE_ASSET, RUST_STATIC_FEEDBACK_ASSET,
+    RUST_DYNAMIC_FEEDBACK_ASSET, RUST_DYNAMIC_MONITOR_FEEDBACK_ASSET,
+)
+ASSETS = ASSETS + BASELINE_ASSETS
+
+BASELINE_ARMS = ("REFINE", "STATIC", "DYNAMIC", "DYNAMIC_M")
+STAGE_REVIEW = "review"
+STAGE_TOOL_FEEDBACK = "tool_feedback"
+_RUST_FIX_STAGE = "rust_fix"
+
+BASELINE_ROUTES: dict[tuple[str, str], tuple[str, ...]] = {}
+for _arm in BASELINE_ARMS:
+    BASELINE_ROUTES[(_arm, STAGE_GENERATE)] = (
+        RUST_GENERATION_V2_ASSET, RUST_RUNTIME_API_ASSET)
+    BASELINE_ROUTES[(_arm, _RUST_FIX_STAGE)] = (
+        RUST_COMPILE_FIX_ASSET, RUST_RUNTIME_API_ASSET)
+BASELINE_ROUTES[("REFINE", STAGE_REVIEW)] = (
+    RUST_SELF_REFINE_ASSET, RUST_RUNTIME_API_ASSET)
+BASELINE_ROUTES[("STATIC", STAGE_TOOL_FEEDBACK)] = (
+    RUST_STATIC_FEEDBACK_ASSET, RUST_RUNTIME_API_ASSET)
+BASELINE_ROUTES[("DYNAMIC", STAGE_TOOL_FEEDBACK)] = (
+    RUST_DYNAMIC_FEEDBACK_ASSET, RUST_RUNTIME_API_ASSET)
+BASELINE_ROUTES[("DYNAMIC_M", STAGE_TOOL_FEEDBACK)] = (
+    RUST_DYNAMIC_MONITOR_FEEDBACK_ASSET, RUST_RUNTIME_API_ASSET)
+PROMPT_ROUTES.update(BASELINE_ROUTES)
+
 
 def route(arm: str, stage: str) -> tuple[str, ...]:
     """Return the ordered system-prompt assets for an arm x stage, or raise."""
@@ -315,3 +351,52 @@ def build_cir_feedback(result) -> dict[str, Any]:
 
 def render_feedback(feedback: dict[str, Any]) -> str:
     return json.dumps(feedback, ensure_ascii=False, indent=2)
+
+
+def baseline_review_user_prompt(requirements: str, program: str, *,
+                                feedback: str | None = None) -> str:
+    """REFINE review turn: the current program, plus an optional format note."""
+    parts = [
+        "Review the program for concurrency defects. If you find one, output a "
+        "corrected program. If you are sure there is none, reply with exactly "
+        "NO_ISSUES.",
+        "",
+        "<domain_requirements>",
+        requirements.strip(),
+        "</domain_requirements>",
+        "",
+        "<current_program>",
+        program.strip(),
+        "</current_program>",
+    ]
+    if feedback:
+        parts += ["", feedback.strip()]
+    parts += ["", "Output one ```rust code block, or exactly NO_ISSUES."]
+    return "\n".join(parts)
+
+
+def baseline_tool_feedback_user_prompt(requirements: str, program: str,
+                                       feedback: str, *, source: str) -> str:
+    """STATIC / DYNAMIC / DYNAMIC_M tool-feedback turn.
+
+    ``source`` is ``static``, ``dynamic``, or ``dynamic_monitor``.
+    """
+    parts = [
+        "The program compiled. The tool feedback below is the reason it was "
+        "not accepted. Correct the program.",
+        "",
+        "<domain_requirements>",
+        requirements.strip(),
+        "</domain_requirements>",
+        "",
+        "<current_program>",
+        program.strip(),
+        "</current_program>",
+        "",
+        f'<tool_feedback source="{source}">',
+        feedback.strip(),
+        "</tool_feedback>",
+        "",
+        "Output one ```rust code block.",
+    ]
+    return "\n".join(parts)

@@ -64,6 +64,7 @@ def validate_cell(cell: Any) -> list[str]:
         errors.append("rounds_used must be an int")
     if not isinstance(cell.get("rust_mode"), str):
         errors.append("rust_mode must be a string")
+    errors.extend(_validate_baseline_fields(cell))
     return errors
 
 
@@ -129,6 +130,53 @@ def _validate_oracle(oracle: Any) -> list[str]:
     layers = oracle.get("layers")
     if layers is not None:
         errors.extend(_validate_layers(layers))
+    return errors
+
+
+def _validate_baseline_fields(cell: dict) -> list[str]:
+    """Type-check ``baseline`` when a round-4 arm recorded one."""
+    if "baseline" not in cell:
+        return []
+    baseline = cell["baseline"]
+    if not isinstance(baseline, dict):
+        return ["baseline must be an object"]
+    errors: list[str] = []
+    rounds = baseline.get("rounds")
+    if not isinstance(rounds, list):
+        errors.append("baseline.rounds must be a list")
+    else:
+        for i, round_ in enumerate(rounds):
+            if not isinstance(round_, dict):
+                errors.append(f"baseline.rounds[{i}] must be an object")
+                continue
+            for key in ("call", "stage", "reply_kind", "version", "compiled",
+                        "feedback_sha256", "feedback_bytes", "truncated"):
+                if key not in round_:
+                    errors.append(f"baseline.rounds[{i}].{key} is required")
+            if "compiled" in round_ and not isinstance(round_["compiled"], bool):
+                errors.append(f"baseline.rounds[{i}].compiled must be a bool")
+            if "truncated" in round_ and not isinstance(round_["truncated"], bool):
+                errors.append(f"baseline.rounds[{i}].truncated must be a bool")
+            if "feedback_bytes" in round_ and (
+                    not isinstance(round_["feedback_bytes"], int)
+                    or isinstance(round_["feedback_bytes"], bool)):
+                errors.append(f"baseline.rounds[{i}].feedback_bytes must be an int")
+    if "accepted_at_call" in baseline and not _is_int_or_none(
+            baseline["accepted_at_call"]):
+        errors.append("baseline.accepted_at_call must be an int or null")
+    reason = baseline.get("accept_reason")
+    if "accept_reason" in baseline and not (reason is None or isinstance(reason, str)):
+        errors.append("baseline.accept_reason must be a string or null")
+    if not isinstance(baseline.get("final_version"), int) or isinstance(
+            baseline.get("final_version"), bool):
+        errors.append("baseline.final_version must be an int")
+    hit = baseline.get("first_round_cache_hit")
+    if "first_round_cache_hit" in baseline and not (
+            hit is None or isinstance(hit, bool)):
+        errors.append("baseline.first_round_cache_hit must be a bool or null")
+    missing = baseline.get("tools_missing")
+    if not isinstance(missing, list) or not all(isinstance(x, str) for x in missing):
+        errors.append("baseline.tools_missing must be a list of strings")
     return errors
 
 

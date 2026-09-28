@@ -847,6 +847,9 @@ def build_parser() -> argparse.ArgumentParser:
     from .oracle_cli import register as _register_oracle
     _register_oracle(sub)
 
+    from .tools_cli import register as _register_tools
+    _register_tools(sub)
+
     rep = sub.add_parser("report", help="one table over runs")
     rep.add_argument("run_dirs", nargs="+")
     rep.set_defaults(func=cmd_report)
