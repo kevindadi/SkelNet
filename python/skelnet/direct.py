@@ -3,7 +3,9 @@
 The client is parameterised by :class:`~skelnet.params.RunParams`: thinking is
 sent through ``extra_body`` (per channel), temperature is omitted under
 ``provider_default``, per-cell seeds are sent only when the model supports them,
-and a truncated/empty reply is retried once with a larger output cap.
+and a truncated/empty reply is retried once with a larger output cap. Every
+real request (including the truncation retry) reserves global budget and records
+its usage.
 """
 
 from __future__ import annotations
@@ -11,10 +13,11 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from .models import normalize_token_usage
 from .params import seed_for
 from .transport import TemperatureRejected, TransportTruncated, create_with_retries
 
@@ -38,6 +41,10 @@ class DirectOutcome:
     cost: float | None = None
     reasoning_content: str | None = None
     seed: int | None = None
+    truncation_retry: bool = False
+    finish_reasons: list[str | None] = field(default_factory=list)
+    usage_attempts: list[dict[str, Any]] = field(default_factory=list)
+    temperature_sent: float | None = None
 
 
 class DirectChatClient:
@@ -75,6 +82,20 @@ class DirectChatClient:
                 and self.task_id is not None):
             return seed_for(self.task_id, self.replicate)
         return None
+
+    def _temperature_sent(self) -> float | None:
+        if self.params.temperature_policy == "fixed":
+            return self.params.temperature
+        return None
+
+    def _add_tokens(self, usage: Any) -> None:
+        add = getattr(self.budget, "add_tokens", None)
+        if add is not None:
+            add(normalize_token_usage(usage))
+
+    def _reserve_and_create(self, kwargs: dict) -> Any:
+        self.budget.reserve()
+        return self._create(kwargs)
 
     def _record(self, record: dict[str, Any]) -> None:
         with self.log_path.open("a", encoding="utf-8") as handle:
@@ -149,17 +170,18 @@ class DirectChatClient:
         messages = [{"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}]
         prompt_sha = _sha(json.dumps(messages, ensure_ascii=False, sort_keys=True))
-        self.budget.reserve()
         started = time.monotonic()
         max_tokens = self.params.max_output_tokens
         truncation_retry = False
         transport_attempt = 1
+        finish_reasons: list[str | None] = []
+        usage_attempts: list[dict[str, Any]] = []
         parsed: dict[str, Any] = {}
         for attempt_index in range(2):
             kwargs = self._kwargs(messages, max_tokens)
             try:
                 response, transport_attempt = create_with_retries(
-                    lambda: self._create(kwargs), sleep=self.sleep)
+                    lambda: self._reserve_and_create(kwargs), sleep=self.sleep)
             except Exception as exc:  # noqa: BLE001
                 if "temperature" in str(exc).lower():
                     self._record_error(messages, prompt_sha, exc, started, kwargs)
@@ -167,42 +189,46 @@ class DirectChatClient:
                 self._record_error(messages, prompt_sha, exc, started, kwargs)
                 raise
             parsed = self._parse(response)
-            if not self._truncated(parsed["text"], parsed["finish_reason"]):
+            finish_reasons.append(parsed["finish_reason"])
+            usage_attempts.append(parsed["usage"])
+            self._add_tokens(parsed["usage"])
+            truncated = self._truncated(parsed["text"], parsed["finish_reason"])
+            self._record({
+                "status": "truncated" if truncated else "ok",
+                "model": self.model, "base_url": self.base_url,
+                "response_model": parsed["response_model"],
+                "request_id": parsed["request_id"], "messages": messages,
+                "prompt_sha256": prompt_sha, "usage": parsed["usage"],
+                "max_tokens": max_tokens, "finish_reason": parsed["finish_reason"],
+                "stream": self.stream, "seed": self._seed(),
+                "truncation_retry": truncation_retry,
+                "content_sha256": _sha(parsed["text"]), "content": parsed["text"],
+                "wall_ms": int((time.monotonic() - started) * 1000),
+            })
+            if not truncated:
                 break
             if attempt_index == 0:
                 truncation_retry = True
                 max_tokens = min(2 * max_tokens,
                                  getattr(self.params, "max_output_tokens_cap", 65536))
                 continue
-            wall_ms = int((time.monotonic() - started) * 1000)
-            self._record({"status": "error", "model": self.model, "base_url": self.base_url,
-                          "messages": messages, "prompt_sha256": prompt_sha,
-                          "finish_reason": parsed["finish_reason"], "usage": parsed["usage"],
-                          "truncation_retry": truncation_retry,
-                          "error": "transport_truncated", "wall_ms": wall_ms})
             raise TransportTruncated()
         wall_ms = int((time.monotonic() - started) * 1000)
-        self._record({
-            "status": "ok", "model": self.model, "base_url": self.base_url,
-            "response_model": parsed["response_model"], "request_id": parsed["request_id"],
-            "messages": messages, "prompt_sha256": prompt_sha, "usage": parsed["usage"],
-            "finish_reason": parsed["finish_reason"], "stream": self.stream,
-            "seed": self._seed(), "truncation_retry": truncation_retry,
-            "reasoning_content": parsed["reasoning"],
-            "content_sha256": _sha(parsed["text"]), "content": parsed["text"],
-            "wall_ms": wall_ms,
-        })
         return DirectOutcome(
             text=parsed["text"], messages=messages, requested_model=self.model,
             response_model=parsed["response_model"], request_id=parsed["request_id"],
             finish_reason=parsed["finish_reason"], usage=parsed["usage"] or None,
             wall_ms=wall_ms, transport_attempt=transport_attempt, prompt_sha256=prompt_sha,
             cost=parsed["cost"], reasoning_content=parsed["reasoning"],
-            seed=self._seed())
+            seed=self._seed(), truncation_retry=truncation_retry,
+            finish_reasons=finish_reasons, usage_attempts=usage_attempts,
+            temperature_sent=self._temperature_sent())
 
     def _record_error(self, messages, prompt_sha, exc, started, kwargs) -> None:
         self._record({"status": "error", "model": self.model, "base_url": self.base_url,
                       "messages": messages, "prompt_sha256": prompt_sha,
+                      "max_tokens": kwargs.get("max_tokens"),
+                      "finish_reason": None,
                       "error": str(exc), "error_type": type(exc).__name__,
                       "wall_ms": int((time.monotonic() - started) * 1000)})
 

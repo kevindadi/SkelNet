@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 
 def chat_response(text: str, *, finish_reason: str = "stop", usage=None,
-                  model: str = "m", request_id: str = "r1", cost=None,
+                  model: str | None = None, request_id: str = "r1", cost=None,
                   reasoning: str | None = None):
     message = SimpleNamespace(content=text, reasoning_content=reasoning)
     choice = SimpleNamespace(message=message, finish_reason=finish_reason)
@@ -16,13 +16,21 @@ def chat_response(text: str, *, finish_reason: str = "stop", usage=None,
 
 def responses_response(text: str, *, status: str = "completed",
                        incomplete_reason: str | None = None, usage=None,
-                       model: str = "m", request_id: str = "r1", cost=None):
+                       model: str | None = None, request_id: str = "r1", cost=None):
     details = None
     if incomplete_reason is not None:
         details = SimpleNamespace(reason=incomplete_reason)
     return SimpleNamespace(output_text=text, status=status,
                            incomplete_details=details, usage=usage, model=model,
                            id=request_id, cost=cost)
+
+
+def _attribute_model(response, requested):
+    if response is None or requested is None:
+        return response
+    if hasattr(response, "model") and getattr(response, "model") is None:
+        response.model = requested
+    return response
 
 
 class _ChatCompletions:
@@ -32,7 +40,7 @@ class _ChatCompletions:
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        return self.handler(kwargs)
+        return _attribute_model(self.handler(kwargs), kwargs.get("model"))
 
 
 class _Responses:
@@ -42,7 +50,7 @@ class _Responses:
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        return self.handler(kwargs)
+        return _attribute_model(self.handler(kwargs), kwargs.get("model"))
 
 
 class FakeSDK:
@@ -116,6 +124,60 @@ def run_args(arm, out, *, tasks="lock-order/abba_2lock", reps=1, rounds=1,
         if value is not True:
             argv.append(str(value))
     return cli.build_parser().parse_args(argv)
+
+
+def sequence_chat_handler(responses):
+    """A chat handler returning the given texts in order."""
+    iterator = iter(responses)
+
+    def handler(_kwargs):
+        return chat_response(next(iterator))
+    return handler
+
+
+def sequence_responses_handler(responses):
+    iterator = iter(responses)
+
+    def handler(_kwargs):
+        return responses_response(next(iterator))
+    return handler
+
+
+def sequence_handler(responses):
+    """Return already-built response objects in order (no re-wrapping)."""
+    iterator = iter(responses)
+    return lambda _kwargs: next(iterator)
+
+
+_ORIGINAL_BUILD_CLIENT = None
+
+
+def patch_build_client(monkeypatch, sdk):
+    """Keep the real channels.build_client, only injecting a fake SDK + sleep.
+
+    Repeated calls in one test must still reach the *original* function, not a
+    previously patched wrapper.
+    """
+    global _ORIGINAL_BUILD_CLIENT
+    from skelnet import channels
+    if _ORIGINAL_BUILD_CLIENT is None:
+        _ORIGINAL_BUILD_CLIENT = channels.build_client
+    original = _ORIGINAL_BUILD_CLIENT
+
+    def patched(spec, params, **kwargs):
+        kwargs["sdk_client"] = sdk
+        kwargs["sleep"] = lambda _seconds: None
+        return original(spec, params, **kwargs)
+
+    monkeypatch.setattr(channels, "build_client", patched)
+    return patched
+
+
+def write_env(tmp_path, **values):
+    path = tmp_path / ".env"
+    path.write_text("\n".join(f"{k}={v}" for k, v in values.items()) + "\n",
+                    encoding="utf-8")
+    return path
 
 
 def terminal_pass_runner(stdout: str = "DONE t1=1 t2=1\n"):

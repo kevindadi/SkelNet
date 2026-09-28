@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from .models import billable_tokens
 from .transport import BudgetExceeded
 
 
@@ -21,8 +22,13 @@ class BudgetLedger:
                  limits: dict[str, dict[str, int]] | None = None) -> None:
         self.path = Path(path)
         self.stage = str(stage)
-        self.limits = limits or {}
         self.data = self._load()
+        if limits is None:
+            # Limits are configured in the ledger file itself.
+            self.limits = dict(self.data.get("limits") or {})
+        else:
+            self.limits = limits
+            self.data["limits"] = limits
 
     def _load(self) -> dict[str, Any]:
         if self.path.exists():
@@ -56,7 +62,8 @@ class BudgetLedger:
         limits = self.limits.get(self.stage, {})
         max_requests = limits.get("max_requests")
         max_tokens = limits.get("max_tokens")
-        tokens = data["input"] + data["output"] + data["reasoning"]
+        tokens = billable_tokens({"input": data["input"], "output": data["output"],
+                                  "reasoning": data["reasoning"]})
         if max_requests is not None and data["requests"] >= max_requests:
             raise BudgetExceeded(
                 f"stage {self.stage}: request budget exhausted "
@@ -105,12 +112,7 @@ class CellBudget:
         self.calls += 1
 
     def add_tokens(self, tokens: dict[str, int | None] | None) -> None:
-        if not tokens:
-            return
-        for key in ("input", "output", "reasoning"):
-            value = tokens.get(key)
-            if isinstance(value, int):
-                self.tokens += value
+        self.tokens += billable_tokens(tokens)
 
     def snapshot(self) -> dict[str, int]:
         return {"calls": self.calls, "tokens": self.tokens}

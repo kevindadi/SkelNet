@@ -77,13 +77,15 @@ def _validate_calls(calls: Any) -> list[str]:
             continue
         for key in ("attempt", "stage", "system_sha256", "request_sha256",
                     "cache_hit", "transport_attempt", "truncation_retry",
-                    "finish_reason", "wall_ms"):
+                    "finish_reason", "finish_reasons", "wall_ms"):
             if key not in call:
                 errors.append(f"calls[{i}].{key} is required")
         if not isinstance(call.get("cache_hit"), bool):
             errors.append(f"calls[{i}].cache_hit must be a bool")
         if not isinstance(call.get("truncation_retry"), bool):
             errors.append(f"calls[{i}].truncation_retry must be a bool")
+        if not isinstance(call.get("finish_reasons"), list):
+            errors.append(f"calls[{i}].finish_reasons must be a list")
         errors.extend(_validate_usage(call.get("usage"), f"calls[{i}].usage"))
     return errors
 

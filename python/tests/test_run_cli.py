@@ -184,12 +184,9 @@ def test_manifest_and_audit_cell_ids(tmp_path):
 
 
 def test_audit_rounds_and_cells(tmp_path):
-    # Two reps, SKEL: bad -> bad -> good -> Rust (rounds=3). The two bad
-    # skeletons differ because the per-run response cache returns the previous
-    # reply for an identical request.
-    buggy2 = BUGGY.replace("fn t2() { lock b { lock a { } } }",
-                           "fn t2() { lock b { } }")
-    responses = [BUGGY, buggy2, FIXED, RUST] * 2
+    # Two reps, SKEL: bad -> bad -> good -> Rust (rounds=3). Identical bad
+    # skeletons are fine: the cache key includes the per-cell call index.
+    responses = [BUGGY, BUGGY, FIXED, RUST] * 2
     out, _ = _run_arm("SKEL", responses, tmp_path, rounds=3, reps=2)
     events = [json.loads(line) for line in
               (out / "audit.jsonl").read_text().splitlines() if line.strip()]

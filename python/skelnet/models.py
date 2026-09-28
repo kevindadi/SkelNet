@@ -48,6 +48,26 @@ def normalize_token_usage(usage: dict[str, Any] | None) -> dict[str, int | None]
     }
 
 
+def billable_tokens(tokens: dict[str, Any] | None) -> int:
+    """Tokens counted against a budget.
+
+    Chat ``completion_tokens`` and Responses ``output_tokens`` already include
+    reasoning tokens, so the total is ``input + output``; ``reasoning`` is only
+    used when ``output`` is missing. ``reasoning`` is still recorded separately.
+    """
+    if not tokens:
+        return 0
+    inp = tokens.get("input")
+    out = tokens.get("output")
+    reasoning = tokens.get("reasoning")
+    base = inp if isinstance(inp, int) else 0
+    if isinstance(out, int):
+        return base + out
+    if isinstance(reasoning, int):
+        return base + reasoning
+    return base
+
+
 def _nested(value: Any, *keys: str) -> Any:
     current = value
     for key in keys:

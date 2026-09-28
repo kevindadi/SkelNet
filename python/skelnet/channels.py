@@ -105,12 +105,17 @@ class AuditedClient:
         self.system_prompt_assets = list(assets)
         self.system_sha256 = system_sha256
 
+    def _temperature_policy(self):
+        params = getattr(self.inner, "params", None)
+        return getattr(params, "temperature_policy", None)
+
     def complete(self, system: str, user: str):
         prompt = system.strip() + "\n\n" + user.strip()
         started = time.time()
         attempt_id = f"{self.stage}-{self.attempt}"
         meta = {"system_prompt_assets": list(self.system_prompt_assets),
-                "system_sha256": self.system_sha256}
+                "system_sha256": self.system_sha256,
+                "temperature_policy": self._temperature_policy()}
         try:
             outcome = self.inner.complete(system, user)
         except Exception as exc:  # noqa: BLE001 - recorded then re-raised
@@ -122,7 +127,9 @@ class AuditedClient:
                 returned_model=None, usage_raw=None, started_at=started,
                 ended_at=time.time(), prompt=prompt, response="",
                 candidate_round=self.attempt, attempt_id=attempt_id, status="error",
-                error_type=type(exc).__name__, error=str(exc), **meta)
+                cache_hit=False, temperature_sent=None, truncation_retry=False,
+                finish_reasons=[], error_type=type(exc).__name__, error=str(exc),
+                **meta)
             raise
         ended = time.time()
         returned = getattr(outcome, "response_model", None)
@@ -144,6 +151,10 @@ class AuditedClient:
             finish_reason=getattr(outcome, "finish_reason", None),
             session=getattr(outcome, "session", None),
             seed=seed, seed_sent=seed is not None,
+            cache_hit=bool(getattr(outcome, "cache_hit", False)),
+            temperature_sent=getattr(outcome, "temperature_sent", None),
+            truncation_retry=bool(getattr(outcome, "truncation_retry", False)),
+            finish_reasons=list(getattr(outcome, "finish_reasons", []) or []),
             notes=None if confirmed else "identity unconfirmed (model not reported)",
             **meta)
         return outcome

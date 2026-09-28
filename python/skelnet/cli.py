@@ -209,7 +209,7 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
     started_at = time.time()
     audit = AuditLog(out / "audit.jsonl", raw_dir=out / "raw")
     backend = Backend(timeout=args.timeout)
-    ledger = BudgetLedger(args.budget_file, stage=args.stage, limits={})
+    ledger = BudgetLedger(args.budget_file, stage=args.stage)
     manifest = _build_manifest(out, args, backend, tasks, started_at, None,
                                budget, spec, run_params)
     manifest["status"] = "running"
@@ -512,9 +512,21 @@ class _ChatProvider:
                                       token_budget=self.params.token_budget)
         self.calls = []
 
+    @staticmethod
+    def _usage_of(outcome) -> dict:
+        """Sum the normalized usage of every real attempt in this call."""
+        attempts = list(getattr(outcome, "usage_attempts", []) or [])
+        if attempts:
+            normalized = [normalize_token_usage(u) for u in attempts]
+            summed = {}
+            for key in ("input", "output", "reasoning", "cached"):
+                values = [n.get(key) for n in normalized if isinstance(n.get(key), int)]
+                summed[key] = sum(values) if values else None
+            return summed
+        return normalize_token_usage(getattr(outcome, "usage", None))
+
     def _record(self, stage: str, system: str, user: str, outcome, error=None) -> None:
-        usage = (normalize_token_usage(getattr(outcome, "usage", None))
-                 if outcome is not None
+        usage = (self._usage_of(outcome) if outcome is not None
                  else {"input": None, "output": None, "reasoning": None, "cached": None})
         self.calls.append({
             "attempt": self._attempt,
@@ -526,6 +538,7 @@ class _ChatProvider:
             "transport_attempt": getattr(outcome, "transport_attempt", 1),
             "truncation_retry": bool(getattr(outcome, "truncation_retry", False)),
             "finish_reason": getattr(outcome, "finish_reason", None),
+            "finish_reasons": list(getattr(outcome, "finish_reasons", []) or []),
             "usage": usage,
             "wall_ms": getattr(outcome, "wall_ms", 0),
             "error": (str(error) if error is not None else None),
@@ -562,8 +575,7 @@ class _ChatProvider:
                                      error=str(exc))
         self._record(stage, system, user, outcome)
         if self.cell_budget is not None:
-            self.cell_budget.add_tokens(normalize_token_usage(
-                getattr(outcome, "usage", None)))
+            self.cell_budget.add_tokens(self._usage_of(outcome))
         return CandidateResponse.from_usage(
             outcome.text, "llm", self.name,
             model_id=getattr(outcome, "requested_model", None),
@@ -610,7 +622,13 @@ def _build_provider(args: argparse.Namespace, audit: AuditLog, out: Path,
     else:
         inner = client_factory(spec, out)
     cache = ResponseCache(args.cache_dir if args.cache_dir else out / "cache")
-    replay = ResponseCache(args.replay_from) if args.replay_from else None
+    replay = None
+    if args.replay_from:
+        replay_dir = Path(args.replay_from)
+        # A run directory is accepted: use its cache/ subdirectory.
+        if (replay_dir / "MANIFEST.json").exists() and (replay_dir / "cache").is_dir():
+            replay_dir = replay_dir / "cache"
+        replay = ResponseCache(replay_dir)
     cached = CachedClient(inner, cache=cache, replay=replay,
                           model_id=spec.model_id or "", params=run_params)
     audited = _make_audited(cached, audit=audit, out=out, spec=spec, arm=args.arm)
@@ -757,7 +775,10 @@ def _report_markdown(summaries: list[dict]) -> str:
 
 
 def cmd_models(args: argparse.Namespace) -> int:
+    from .env import load_dotenv
     from .models_probe import probe_dry_run, probe_run
+    env_file = Path(args.env_file) if args.env_file else repo_root() / ".env"
+    load_dotenv(env_file, override=True)
     specs = None
     if args.models:
         from .transport import resolve_model
@@ -811,6 +832,7 @@ def build_parser() -> argparse.ArgumentParser:
     models.add_argument("--dry-run", action="store_true")
     models.add_argument("--models", nargs="*", default=None)
     models.add_argument("--out", default=None)
+    models.add_argument("--env-file", default=None)
     models.set_defaults(func=cmd_models)
 
     ev = sub.add_parser("eval", help="re-run the oracle offline")

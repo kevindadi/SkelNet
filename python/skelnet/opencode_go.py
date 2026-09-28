@@ -2,7 +2,8 @@
 
 Both mirror ``DirectChatClient``'s ``complete(system, user)`` surface. The
 session header is refreshed per cell (``new_session``), retries are bounded, and
-truncated/empty replies are retried once with a larger cap.
+truncated/empty replies are retried once with a larger cap. Every real request
+(including the truncation retry) reserves global budget and records its usage.
 """
 
 from __future__ import annotations
@@ -11,10 +12,11 @@ import hashlib
 import json
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from .models import normalize_token_usage
 from .params import seed_for
 from .transport import TemperatureRejected, TransportTruncated, create_with_retries
 
@@ -51,6 +53,10 @@ class OpenCodeOutcome:
     cost: float | None = None
     session: str | None = None
     seed: int | None = None
+    truncation_retry: bool = False
+    finish_reasons: list[str | None] = field(default_factory=list)
+    usage_attempts: list[dict[str, Any]] = field(default_factory=list)
+    temperature_sent: float | None = None
 
 
 class _OpenCodeBase:
@@ -90,6 +96,20 @@ class _OpenCodeBase:
             return seed_for(self.task_id, self.replicate)
         return None
 
+    def _temperature_sent(self) -> float | None:
+        if self.params.temperature_policy == "fixed":
+            return self.params.temperature
+        return None
+
+    def _add_tokens(self, usage: Any) -> None:
+        add = getattr(self.budget, "add_tokens", None)
+        if add is not None:
+            add(normalize_token_usage(usage))
+
+    def _reserve_and_create(self, kwargs: dict) -> Any:
+        self.budget.reserve()
+        return self._create(kwargs)
+
     def _record(self, record: dict[str, Any]) -> None:
         with self.log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -124,61 +144,68 @@ class OpenCodeGoClient(_OpenCodeBase):
         messages = [{"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}]
         prompt_sha = _sha(json.dumps(messages, ensure_ascii=False, sort_keys=True))
-        self.budget.reserve()
         started = time.monotonic()
         max_tokens = self.params.max_output_tokens
         truncation_retry = False
         transport_attempt = 1
+        finish_reasons: list[str | None] = []
+        usage_attempts: list[dict[str, Any]] = []
+        content = ""
+        finish_reason = None
+        usage: dict[str, Any] = {}
+        response = None
         for attempt_index in range(2):
             kwargs = self._kwargs(messages, max_tokens)
             try:
                 response, transport_attempt = create_with_retries(
-                    lambda: self._create(kwargs), sleep=self.sleep)
+                    lambda: self._reserve_and_create(kwargs), sleep=self.sleep)
             except Exception as exc:  # noqa: BLE001
                 if "temperature" in str(exc).lower():
-                    self._record_error(messages, prompt_sha, exc, started)
+                    self._record_error(messages, prompt_sha, exc, started, kwargs)
                     raise TemperatureRejected(str(exc)) from exc
-                self._record_error(messages, prompt_sha, exc, started)
+                self._record_error(messages, prompt_sha, exc, started, kwargs)
                 raise
             choice = (getattr(response, "choices", None) or [None])[0]
             message = getattr(choice, "message", None)
             content = getattr(message, "content", None) or ""
             finish_reason = getattr(choice, "finish_reason", None)
-            if not self._truncated(content, finish_reason):
+            usage = _as_dict(getattr(response, "usage", None))
+            finish_reasons.append(finish_reason)
+            usage_attempts.append(usage)
+            self._add_tokens(usage)
+            truncated = self._truncated(content, finish_reason)
+            self._record({"status": "truncated" if truncated else "ok",
+                          "model": self.model, "session": self.session,
+                          "response_model": getattr(response, "model", None),
+                          "request_id": getattr(response, "id", None),
+                          "messages": messages, "prompt_sha256": prompt_sha,
+                          "usage": usage, "cost": getattr(response, "cost", None),
+                          "max_tokens": max_tokens, "finish_reason": finish_reason,
+                          "seed": self._seed(), "truncation_retry": truncation_retry,
+                          "content_sha256": _sha(content), "content": content,
+                          "wall_ms": int((time.monotonic() - started) * 1000)})
+            if not truncated:
                 break
             if attempt_index == 0:
                 truncation_retry = True
                 max_tokens = self._next_cap(max_tokens)
                 continue
-            self._record({"status": "error", "model": self.model,
-                          "messages": messages, "prompt_sha256": prompt_sha,
-                          "finish_reason": finish_reason,
-                          "truncation_retry": truncation_retry,
-                          "error": "transport_truncated",
-                          "wall_ms": int((time.monotonic() - started) * 1000)})
             raise TransportTruncated()
         wall_ms = int((time.monotonic() - started) * 1000)
-        usage = _as_dict(getattr(response, "usage", None))
-        response_model = getattr(response, "model", None)
-        cost = getattr(response, "cost", None)
-        self._record({"status": "ok", "model": self.model, "session": self.session,
-                      "response_model": response_model,
-                      "request_id": getattr(response, "id", None), "messages": messages,
-                      "prompt_sha256": prompt_sha, "usage": usage, "cost": cost,
-                      "finish_reason": finish_reason, "seed": self._seed(),
-                      "truncation_retry": truncation_retry,
-                      "content_sha256": _sha(content), "content": content,
-                      "wall_ms": wall_ms})
         return OpenCodeOutcome(
             text=content, messages=messages, requested_model=self.model,
-            response_model=response_model, request_id=getattr(response, "id", None),
-            finish_reason=finish_reason, usage=usage or None, wall_ms=wall_ms,
-            transport_attempt=transport_attempt, prompt_sha256=prompt_sha,
-            cost=cost, session=self.session, seed=self._seed())
+            response_model=getattr(response, "model", None),
+            request_id=getattr(response, "id", None), finish_reason=finish_reason,
+            usage=usage or None, wall_ms=wall_ms, transport_attempt=transport_attempt,
+            prompt_sha256=prompt_sha, cost=getattr(response, "cost", None),
+            session=self.session, seed=self._seed(), truncation_retry=truncation_retry,
+            finish_reasons=finish_reasons, usage_attempts=usage_attempts,
+            temperature_sent=self._temperature_sent())
 
-    def _record_error(self, messages, prompt_sha, exc, started) -> None:
+    def _record_error(self, messages, prompt_sha, exc, started, kwargs) -> None:
         self._record({"status": "error", "model": self.model, "session": self.session,
                       "messages": messages, "prompt_sha256": prompt_sha,
+                      "max_tokens": kwargs.get("max_tokens"), "finish_reason": None,
                       "error": str(exc), "error_type": type(exc).__name__,
                       "wall_ms": int((time.monotonic() - started) * 1000)})
 
@@ -214,57 +241,64 @@ class OpenCodeGoResponsesClient(_OpenCodeBase):
         messages = [{"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}]
         prompt_sha = _sha(json.dumps(messages, ensure_ascii=False, sort_keys=True))
-        self.budget.reserve()
         started = time.monotonic()
         max_tokens = self.params.max_output_tokens
         truncation_retry = False
         transport_attempt = 1
+        finish_reasons: list[str | None] = []
+        usage_attempts: list[dict[str, Any]] = []
         parsed: dict[str, Any] = {}
         for attempt_index in range(2):
             kwargs = self._kwargs(system_prompt, user_prompt, max_tokens)
             try:
                 response, transport_attempt = create_with_retries(
-                    lambda: self._create(kwargs), sleep=self.sleep)
+                    lambda: self._reserve_and_create(kwargs), sleep=self.sleep)
             except Exception as exc:  # noqa: BLE001
                 if "temperature" in str(exc).lower():
-                    self._record_error(messages, prompt_sha, exc, started)
+                    self._record_error(messages, prompt_sha, exc, started, kwargs)
                     raise TemperatureRejected(str(exc)) from exc
-                self._record_error(messages, prompt_sha, exc, started)
+                self._record_error(messages, prompt_sha, exc, started, kwargs)
                 raise
             parsed = self._parse(response)
-            if not self._truncated(parsed["text"], parsed["finish_reason"]):
+            finish_reasons.append(parsed["finish_reason"])
+            usage_attempts.append(parsed["usage"])
+            self._add_tokens(parsed["usage"])
+            truncated = self._truncated(parsed["text"], parsed["finish_reason"])
+            self._record({"status": "truncated" if truncated else "ok",
+                          "model": self.model, "surface": "responses",
+                          "session": self.session,
+                          "response_model": parsed["response_model"],
+                          "request_id": parsed["request_id"], "messages": messages,
+                          "prompt_sha256": prompt_sha, "usage": parsed["usage"],
+                          "cost": parsed["cost"], "max_output_tokens": max_tokens,
+                          "finish_reason": parsed["finish_reason"],
+                          "truncation_retry": truncation_retry,
+                          "content_sha256": _sha(parsed["text"]),
+                          "content": parsed["text"],
+                          "wall_ms": int((time.monotonic() - started) * 1000)})
+            if not truncated:
                 break
             if attempt_index == 0:
                 truncation_retry = True
                 max_tokens = self._next_cap(max_tokens)
                 continue
-            self._record({"status": "error", "model": self.model, "surface": "responses",
-                          "messages": messages, "prompt_sha256": prompt_sha,
-                          "finish_reason": parsed["finish_reason"],
-                          "truncation_retry": truncation_retry,
-                          "error": "transport_truncated",
-                          "wall_ms": int((time.monotonic() - started) * 1000)})
             raise TransportTruncated()
         wall_ms = int((time.monotonic() - started) * 1000)
-        self._record({"status": "ok", "model": self.model, "surface": "responses",
-                      "session": self.session, "response_model": parsed["response_model"],
-                      "request_id": parsed["request_id"], "messages": messages,
-                      "prompt_sha256": prompt_sha, "usage": parsed["usage"],
-                      "cost": parsed["cost"], "finish_reason": parsed["finish_reason"],
-                      "truncation_retry": truncation_retry,
-                      "content_sha256": _sha(parsed["text"]), "content": parsed["text"],
-                      "wall_ms": wall_ms})
         return OpenCodeOutcome(
             text=parsed["text"], messages=messages, requested_model=self.model,
             response_model=parsed["response_model"], request_id=parsed["request_id"],
             finish_reason=parsed["finish_reason"], usage=parsed["usage"] or None,
             wall_ms=wall_ms, transport_attempt=transport_attempt, prompt_sha256=prompt_sha,
-            cost=parsed["cost"], session=self.session)
+            cost=parsed["cost"], session=self.session, truncation_retry=truncation_retry,
+            finish_reasons=finish_reasons, usage_attempts=usage_attempts,
+            temperature_sent=self._temperature_sent())
 
-    def _record_error(self, messages, prompt_sha, exc, started) -> None:
+    def _record_error(self, messages, prompt_sha, exc, started, kwargs) -> None:
         self._record({"status": "error", "model": self.model, "surface": "responses",
                       "session": self.session, "messages": messages,
-                      "prompt_sha256": prompt_sha, "error": str(exc),
+                      "prompt_sha256": prompt_sha,
+                      "max_output_tokens": kwargs.get("max_output_tokens"),
+                      "finish_reason": None, "error": str(exc),
                       "error_type": type(exc).__name__,
                       "wall_ms": int((time.monotonic() - started) * 1000)})
 

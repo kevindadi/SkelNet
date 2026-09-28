@@ -17,15 +17,28 @@ from typing import Any
 from .transport import ReplayMiss
 
 
-def cache_key(*, model_id: str, system: str, user: str, seed: int | None,
+def cache_key(*, model_id: str, system: str, user: str, task: str | None,
+              rep: int, seed: int | None, call_index: int,
               temperature_policy: str, temperature: float | None,
               max_output_tokens: int, thinking: bool,
               reasoning_effort: str | None) -> str:
+    """Cache key = sha256 of the canonical request identity.
+
+    Includes the cell identity (`task`, `rep`, the always-computed
+    `seed_for(task, rep)`) and the per-cell logical `call_index`, so distinct
+    reps and repeated identical requests within a cell never share a reply.
+    Deliberately **excludes** arm and stage: a byte-identical first-round
+    request (call_index 1) still hits across arms when a shared ``--cache-dir``
+    is used.
+    """
     payload = {
         "model_id": model_id,
         "system": system,
         "user": user,
+        "task": task,
+        "rep": rep,
         "seed": seed,
+        "call_index": call_index,
         "temperature_policy": temperature_policy,
         "temperature": temperature,
         "max_output_tokens": max_output_tokens,
@@ -53,6 +66,10 @@ class CachedOutcome:
     messages: list = field(default_factory=list)
     requested_model: str = ""
     cache_hit: bool = True
+    truncation_retry: bool = False
+    finish_reasons: list = field(default_factory=list)
+    usage_attempts: list = field(default_factory=list)
+    temperature_sent: float | None = None
 
 
 class ResponseCache:
@@ -92,17 +109,27 @@ class CachedClient:
         self.model_id = model_id
         self.params = params
         self.cache_hit = False
+        self.task_id: str | None = None
+        self.replicate = 0
+        self.call_index = 0
 
-    def __getattr__(self, name: str) -> Any:  # forward set_cell/new_session/...
+    def __getattr__(self, name: str) -> Any:  # forward new_session/set_stage/...
         return getattr(self.inner, name)
 
+    def set_cell(self, task_id: str, replicate: int) -> None:
+        """Bind the cache to a cell: reset the call counter, forward to inner."""
+        self.task_id = task_id
+        self.replicate = replicate
+        self.call_index = 0
+        if hasattr(self.inner, "set_cell"):
+            self.inner.set_cell(task_id, replicate)
+
     def _key(self, system: str, user: str) -> str:
-        seed = None
-        if (self.params.seed_policy == "per_cell" and self.params.supports_seed
-                and getattr(self.inner, "task_id", None) is not None):
-            from .params import seed_for
-            seed = seed_for(self.inner.task_id, self.inner.replicate)
-        return cache_key(model_id=self.model_id, system=system, user=user, seed=seed,
+        from .params import seed_for
+        seed = seed_for(self.task_id, self.replicate) if self.task_id is not None else None
+        return cache_key(model_id=self.model_id, system=system, user=user,
+                         task=self.task_id, rep=self.replicate, seed=seed,
+                         call_index=self.call_index,
                          temperature_policy=self.params.temperature_policy,
                          temperature=self.params.temperature,
                          max_output_tokens=self.params.max_output_tokens,
@@ -110,6 +137,7 @@ class CachedClient:
                          reasoning_effort=self.params.reasoning_effort)
 
     def complete(self, system: str, user: str):
+        self.call_index += 1
         key = self._key(system, user)
         if self.replay is not None:
             cached = self.replay.get(key)
@@ -138,6 +166,10 @@ class CachedClient:
             "prompt_sha256": getattr(outcome, "prompt_sha256", ""),
             "messages": getattr(outcome, "messages", []),
             "requested_model": getattr(outcome, "requested_model", ""),
+            "truncation_retry": bool(getattr(outcome, "truncation_retry", False)),
+            "finish_reasons": list(getattr(outcome, "finish_reasons", []) or []),
+            "usage_attempts": list(getattr(outcome, "usage_attempts", []) or []),
+            "temperature_sent": getattr(outcome, "temperature_sent", None),
         }
         self.cache.put(key, payload)
         return outcome

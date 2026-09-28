@@ -45,7 +45,8 @@ is capped at 32768 tokens (retry cap 65536).
 seed policy, per-cell call/token budgets, max output tokens and hint.
 `--temperature` is only accepted with `--temperature-policy fixed`. The
 `models probe --dry-run` command lists each model's policy and whether its key
-is present (never the value).
+is present (never the value); `--env-file` selects the dotenv file to load
+(defaults to the repository `.env`).
 
 ## Terminal line
 
@@ -108,6 +109,7 @@ not comparable to the LLM modes' `functional_ok`.
 python -m skelnet run  --arm SKEL --model <name> --tasks all|<glob> --reps 3 --rounds 4 --out experiments/<run_id>
 python -m skelnet eval experiments/<run_id>          # external oracle, offline re-run
 python -m skelnet report experiments/<run_id> [...]  # one table
+python -m skelnet models probe --dry-run             # key presence + policy, no calls
 python -m skelnet run --arm SKEL --tasks all --reps 3 --rounds 4 --dry-run
 ```
 
@@ -153,10 +155,19 @@ run directories can be compared in one call.
 - Prompts are content-addressed (`prompts.prompt_asset_record()`).
 - The global request/token ledger (`--budget-file`, default
   `experiments/budget.json`) accumulates across restarts; `--stage` separates
-  budgets. Per-cell call/token budgets are enforced before each call.
-- `--cache-dir` shares responses across runs; `--replay-from` replays a run or
-  cache directory without any network call. Cache hits count as a logical call
-  but not against the global spend.
+  budgets. Limits live in the ledger file under `limits.<stage>`
+  (`max_requests`, `max_tokens`) and are read on load; every real request
+  (including transport and truncation retries) reserves before it is sent.
+  Per-cell call/token budgets are enforced before each logical call.
+- The cache key is the sha256 of the request identity: model, system/user
+  prompts, `task`, `rep`, the always-computed `seed_for(task, rep)`, the
+  per-cell logical `call_index`, temperature policy/value, max output tokens,
+  thinking and reasoning effort. It deliberately excludes arm/stage so a
+  byte-identical first-round request (call_index 1) still hits across arms with
+  a shared `--cache-dir`.
+- `--cache-dir` shares responses across runs; `--replay-from` replays a run
+  directory or a cache directory without any network call. Cache hits count as a
+  logical call but not against the global spend.
 - `--resume` reuses a run directory, skipping cells that already have a
   `result.json`, and requires matching arm/model/tasks/reps/rounds/RunParams.
 - `eval` re-runs the oracle on stored Rust without any model calls.

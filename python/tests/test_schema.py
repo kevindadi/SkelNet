@@ -20,7 +20,7 @@ def _valid_cell():
         "calls": [{"attempt": 1, "stage": "generate", "system_sha256": "a",
                    "request_sha256": "b", "cache_hit": False,
                    "transport_attempt": 1, "truncation_retry": False,
-                   "finish_reason": "stop",
+                   "finish_reason": "stop", "finish_reasons": ["stop"],
                    "usage": {"input": 1, "output": 2, "reasoning": None,
                              "cached": None}, "wall_ms": 5}],
         "budget_used": {"calls": 1, "tokens": 3},

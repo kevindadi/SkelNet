@@ -17,10 +17,11 @@ A validation failure is a program bug and aborts the run.
     {"attempt": 1, "stage": "generate", "system_sha256": "...",
      "request_sha256": "...", "cache_hit": false, "transport_attempt": 1,
      "truncation_retry": false, "finish_reason": "stop",
+     "finish_reasons": ["length", "stop"],
      "usage": {"input": 1200, "output": 800, "reasoning": 300, "cached": null},
      "wall_ms": 4210, "error": null}
   ],
-  "budget_used": {"calls": 2, "tokens": 2300},
+  "budget_used": {"calls": 2, "tokens": 2000},
   "oracle": {
     "built": true, "ran": true, "run_ok": true,
     "functional_ok": true, "functional_ok_no_o4": true,
@@ -40,8 +41,13 @@ A validation failure is a program bug and aborts the run.
   `no_requirements_text` for boundary tasks.
 - `calls`: one entry per **logical** call. `transport_attempt` counts bounded
   retries (A4); `truncation_retry` marks the larger-cap retry (A6). Transport and
-  truncation retries do not consume the cell call budget.
-- `budget_used`: logical calls and total tokens (input + output + reasoning).
+  truncation retries do not consume the cell call budget. `finish_reasons` is the
+  ordered per-attempt finish reason (required; length 1 without a truncation
+  retry), while `finish_reason` is the final one.
+- `budget_used`: logical calls and billable tokens (`input + output`). Chat
+  `completion_tokens` and Responses `output_tokens` already include reasoning, so
+  `reasoning` is counted only when `output` is absent; it is still recorded
+  separately in `usage`.
 - `oracle`: the shared format used by the independent oracle (round 3). The
   optional `functional_ok_no_o4`, `oracle_complete` and `layers` keys are
   accepted when present; `layers` status is one of

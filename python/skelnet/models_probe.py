@@ -3,7 +3,8 @@
 ``--dry-run`` lists the four experimental models and their parameter policy and
 reports only whether each API key is present (never its value). A real probe
 (only run by the repository owner with keys) sends a few minimal requests and
-writes ``PROBE.json``.
+writes ``PROBE.json``. The caller loads ``.env`` (via ``--env-file``) before
+either mode.
 """
 
 from __future__ import annotations
@@ -14,8 +15,12 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
+from .models import normalize_token_usage
 from .params import params_for_model
 from .transport import CHANNELS, experimental_models
+
+PROBE_SYSTEM = "You are a probe."
+PROBE_USER = "Reply with the single word OK."
 
 
 def _api_key_present(spec) -> bool:
@@ -64,14 +69,13 @@ def probe_run(out_dir: Path | str, *, client_factory: Callable | None = None,
             records.append({**_policy(spec), "probed": False,
                             "reason": spec.blocked_reason or "unavailable"})
             continue
-        params = params_for_model(spec)
-        try:
-            client = (client_factory(spec, params) if client_factory
-                      else _build_probe_client(spec, params, out_dir))
-        except Exception as exc:  # noqa: BLE001
-            records.append({**_policy(spec), "probed": False, "reason": str(exc)})
-            continue
-        records.append(_probe_one(spec, params, client))
+
+        def build(params, spec=spec):
+            if client_factory is not None:
+                return client_factory(spec, params)
+            return _build_probe_client(spec, params, out_dir)
+
+        records.append(_probe_one(spec, build))
     document = {"schema_version": "skelnet-probe-v1",
                 "created_at": time.time(), "models": records}
     (out_dir / "PROBE.json").write_text(json.dumps(document, indent=2),
@@ -81,9 +85,6 @@ def probe_run(out_dir: Path | str, *, client_factory: Callable | None = None,
 
 def _build_probe_client(spec, params, out_dir):
     from .channels import build_client, key_for
-    from .env import load_dotenv
-    # The real probe (repository owner only) reads keys from the local .env.
-    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=True)
     channel = CHANNELS[spec.channel]
     api_key = key_for(spec, dict(os.environ), channel.api_key_env)
     return build_client(spec, params, budget=_NullBudget(), evidence_dir=out_dir,
@@ -94,26 +95,91 @@ class _NullBudget:
     def reserve(self) -> None:
         return None
 
+    def add_tokens(self, _tokens) -> None:
+        return None
 
-def _probe_one(spec, params, client) -> dict[str, Any]:
-    record = {**_policy(spec), "probed": True}
+
+def _reasoning_tokens(usage) -> int | None:
+    return normalize_token_usage(usage).get("reasoning")
+
+
+def _thinking_accepted(outcome) -> bool | None:
+    reasoning = _reasoning_tokens(getattr(outcome, "usage", None))
+    reasoning_text = getattr(outcome, "reasoning_content", None)
+    if (isinstance(reasoning, int) and reasoning > 0) or (
+            isinstance(reasoning_text, str) and reasoning_text.strip()):
+        return True
+    return None
+
+
+def _output_includes_reasoning(usage) -> bool | None:
+    tokens = normalize_token_usage(usage)
+    if isinstance(tokens.get("output"), int) and isinstance(tokens.get("reasoning"), int):
+        return tokens["output"] >= tokens["reasoning"]
+    return None
+
+
+def _fill_basic(record: dict, outcome) -> None:
+    record["returned_model"] = getattr(outcome, "response_model", None)
+    record["usage"] = getattr(outcome, "usage", None)
+    record["finish_reason"] = getattr(outcome, "finish_reason", None)
+    record["seed_sent"] = getattr(outcome, "seed", None) is not None
+
+
+def _probe_one(spec, build) -> dict[str, Any]:
+    record = {**_policy(spec), "probed": True, "error": None,
+              "thinking_accepted": None, "output_includes_reasoning": None,
+              "requires_stream": None, "seed_deterministic": None,
+              "reasoning_tokens_low": None, "reasoning_tokens_medium": None}
+    params = params_for_model(spec)
     try:
+        client = build(params)
         if hasattr(client, "set_cell"):
             client.set_cell("probe", 0)
-        first = client.complete("You are a probe.", "Reply with the single word OK.")
-        record["returned_model"] = getattr(first, "response_model", None)
-        record["usage"] = getattr(first, "usage", None)
-        record["finish_reason"] = getattr(first, "finish_reason", None)
-        record["seed_sent"] = getattr(first, "seed", None) is not None
+        first = client.complete(PROBE_SYSTEM, PROBE_USER)
+        _fill_basic(record, first)
+        record["thinking_accepted"] = _thinking_accepted(first)
+        record["output_includes_reasoning"] = _output_includes_reasoning(
+            getattr(first, "usage", None))
         if getattr(first, "seed", None) is not None:
-            second = client.complete("You are a probe.", "Reply with the single word OK.")
+            second = client.complete(PROBE_SYSTEM, PROBE_USER)
             record["seed_deterministic"] = (
                 getattr(second, "text", None) == getattr(first, "text", None))
-        else:
-            record["seed_deterministic"] = None
-        record["thinking_accepted"] = True
-        record["error"] = None
     except Exception as exc:  # noqa: BLE001
+        record["thinking_accepted"] = False
         record["error"] = type(exc).__name__
         record["error_message"] = str(exc)
+        if spec.channel == "dashscope-direct":
+            _probe_stream_fallback(record, spec, build)
+        return record
+
+    # Reasoning-effort variation for the reasoning models (GPT/Kimi).
+    if spec.surface == "responses" or spec.channel == "opencode-go":
+        for effort, key in (("low", "reasoning_tokens_low"),
+                            ("medium", "reasoning_tokens_medium")):
+            try:
+                variant = build(params_for_model(spec, reasoning_effort=effort))
+                if hasattr(variant, "set_cell"):
+                    variant.set_cell("probe", 0)
+                out = variant.complete(PROBE_SYSTEM, PROBE_USER)
+                record[key] = _reasoning_tokens(getattr(out, "usage", None))
+            except Exception:  # noqa: BLE001
+                record[key] = None
     return record
+
+
+def _probe_stream_fallback(record: dict, spec, build) -> None:
+    try:
+        client = build(params_for_model(spec, stream=True))
+        if hasattr(client, "set_cell"):
+            client.set_cell("probe", 0)
+        outcome = client.complete(PROBE_SYSTEM, PROBE_USER)
+        _fill_basic(record, outcome)
+        record["requires_stream"] = True
+        record["thinking_accepted"] = _thinking_accepted(outcome)
+        record["output_includes_reasoning"] = _output_includes_reasoning(
+            getattr(outcome, "usage", None))
+        record["error"] = None
+    except Exception as exc:  # noqa: BLE001
+        record["requires_stream"] = None
+        record["error"] = type(exc).__name__
