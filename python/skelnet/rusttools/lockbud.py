@@ -8,6 +8,7 @@ that word, often with a zero count).
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -62,17 +63,58 @@ class LockbudResult:
         return bool(self.hits)
 
 
+def _record_slice(text: str, match: re.Match) -> str:
+    """The full JSON object that contains this ``bug_kind`` key.
+
+    ``raw_decode`` keeps nested ``diagnosis`` arrays. A record that is not
+    valid JSON falls back to the nearest ``{`` through the next ``}``.
+    """
+    decoder = json.JSONDecoder()
+    cursor = match.start()
+    while True:
+        start = text.rfind("{", 0, cursor)
+        if start < 0:
+            break
+        try:
+            obj, end = decoder.raw_decode(text, start)
+        except json.JSONDecodeError:
+            cursor = start
+            continue
+        if (isinstance(obj, dict) and "bug_kind" in obj
+                and start <= match.start() < end):
+            return text[start:end]
+        cursor = start
+    start = text.rfind("{", 0, match.start())
+    end = text.find("}", match.end())
+    if start >= 0 and end >= 0:
+        return text[start:end + 1]
+    return match.group(0)
+
+
 def parse_bug_kinds(text: str, workdir: Path | None = None) -> list[LockbudHit]:
     """Classify lockbud output. Summary lines without ``bug_kind`` are ignored."""
     hits: list[LockbudHit] = []
     for match in _BUG_KIND_RE.finditer(text or ""):
-        start = text.rfind("{", 0, match.start())
-        end = text.find("}", match.end())
-        raw = text[start:end + 1] if start >= 0 and end >= 0 else match.group(0)
+        raw = _record_slice(text or "", match)
         if workdir is not None:
             raw = relativize(raw, workdir)
         hits.append(LockbudHit(bug_kind=match.group(1), raw=raw))
     return hits
+
+
+def _failure_line(stderr: str) -> str:
+    """First stderr line that starts with ``error``, else the last non-empty line."""
+    nonempty: list[str] = []
+    for line in (stderr or "").splitlines():
+        stripped = line.strip()
+        if stripped:
+            nonempty.append(stripped)
+    for line in nonempty:
+        if line.startswith("error"):
+            return line
+    if nonempty:
+        return nonempty[-1]
+    return "nonzero exit"
 
 
 def run_lockbud(tools: ToolRunner, workdir: Path | str, source: str, *,
@@ -111,12 +153,22 @@ def run_lockbud(tools: ToolRunner, workdir: Path | str, source: str, *,
         cleanup_target(project)
         return LockbudResult(timed_out=True, wall_ms=wall)
     hits = parse_bug_kinds(combined, project)
+    # A build failure or crash with no bug_kind record is not "no findings".
+    # Records that did parse still block, even when the exit code is non-zero.
+    if call.returncode not in (0, None) and not hits:
+        line = relativize(_failure_line(call.stderr or ""), project)
+        cleanup_target(project)
+        return LockbudResult(unavailable=f"lockbud_failed: {line}", hits=[],
+                             wall_ms=wall)
     cleanup_target(project)
     return LockbudResult(hits=hits, wall_ms=wall)
 
 
 def render_lockbud_section(result: LockbudResult) -> str:
     if result.unavailable:
+        if result.unavailable.startswith("lockbud_failed:"):
+            reason = result.unavailable.split(":", 1)[1].strip()
+            return f"## lockbud\nlockbud could not analyze this program: {reason}"
         return f"## lockbud\n{result.unavailable}"
     if result.timed_out:
         return "## lockbud\nlockbud timed out"

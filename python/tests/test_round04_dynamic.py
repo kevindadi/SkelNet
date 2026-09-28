@@ -1,5 +1,6 @@
 """T4: dynamic feedback categories, driven by markers in the program source."""
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -213,6 +214,89 @@ def test_feedback_seeds_flow_through_dynamic_then_oracle(tmp_path):
                for s in used)
     oracle_seeds = set(range(ORACLE_MIRI_SEED_START, ORACLE_MIRI_SEED_START + 16))
     assert oracle_seeds.isdisjoint(used)
+
+
+def test_dynamic_feedback_relativizes_absolute_paths(tmp_path, monkeypatch):
+    """N3: workdir, repo, sysroot, cargo registry, and other absolute paths."""
+    import skelnet.rusttools.compile as compile_mod
+    from skelnet.backend import repo_root
+
+    sysroot = "/opt/fake-sysroot-n3"
+    monkeypatch.setattr(compile_mod, "_sysroot", lambda: sysroot)
+    cargo_home = os.environ.get("CARGO_HOME") or str(Path.home() / ".cargo")
+    root = str(repo_root())
+    work = str(tmp_path)
+    registry = (f"{cargo_home}/registry/src/index.crates.io-xxx/"
+                "shuttle-0.8.1/src/runtime/execution.rs:203:17")
+    unrelated = "/opt/unrelated/data/secret.txt"
+    failure = (
+        f"thread 'main' panicked at {registry}:\n"
+        f"note: built in {work}/src/main.rs\n"
+        f"see {root}/runtime/concir_sync/src/lib.rs:1:1\n"
+        f"and {sysroot}/lib/rustlib/src/rust/library/std/src/panicking.rs:10:1\n"
+        f"leaked {unrelated}\n"
+        "deadlock! blocked tasks: [main, t1]\n"
+    )
+
+    def run(cmd, cwd, timeout, env):
+        cmd = [str(c) for c in cmd]
+        cwd = Path(cwd)
+        if "build" in cmd:
+            _make_binary(cwd)
+            return ns(0, "", "")
+        if _in_shuttle_project(cwd) or Path(cmd[0]).name == "shuttle_probe":
+            return ns(1, "", failure)
+        if "miri" in cmd:
+            return ns(0, _TERMINAL + "\n", "")
+        return ns(0, _TERMINAL + "\n", "")
+
+    result = run_dynamic(
+        ToolRunner(runner=run, toolchain="nightly-test"),
+        tmp_path, f'fn main() {{ println!("{_TERMINAL}"); }}\n',
+        terminal=_TERMINAL, stress_runs=1, stress_timeout=1.0,
+        shuttle_iterations=4, shuttle_depth=1, miri_seed_count=1, timeout=5)
+    text = result.feedback
+    saved = (tmp_path / "shuttle" / "failure.txt").read_text(encoding="utf-8")
+    assert registry in saved
+    for prefix in (work, root, sysroot, f"{cargo_home}/registry/src/",
+                   "/opt/unrelated"):
+        assert prefix not in text, prefix
+    assert "<cargo>/registry/" in text
+    assert "execution.rs:203:17" in text
+    assert "<abs>/secret.txt" in text
+    assert "<rust>/library/std/src/panicking.rs" in text
+
+
+def _assert_feedback_has_no_machine_paths(text: str, workdir: Path) -> None:
+    from skelnet.backend import repo_root
+    cargo_home = os.environ.get("CARGO_HOME") or str(Path.home() / ".cargo")
+    for prefix in (str(Path.home()), cargo_home, str(repo_root()), "/usr/",
+                   str(workdir)):
+        assert prefix not in text, prefix
+
+
+@rust_tools
+def test_real_abba_feedback_paths_are_stable(tmp_path):
+    """N3: real Shuttle feedback has no machine paths and does not depend on workdir."""
+    if not cargo_available():
+        import pytest
+        pytest.skip("cargo is not available")
+    buggy = (_ABBA / "buggy.rs").read_text(encoding="utf-8")
+    tools = ToolRunner()
+    kwargs = dict(terminal="DONE t1=1 t2=1", stress_runs=1, stress_timeout=2.0,
+                  shuttle_iterations=200, shuttle_depth=3, miri_seed_count=1,
+                  timeout=300)
+    first = run_dynamic(tools, tmp_path / "one", buggy, **kwargs)
+    second = run_dynamic(tools, tmp_path / "two", buggy, **kwargs)
+    sections = []
+    for result, directory in ((first, tmp_path / "one"), (second, tmp_path / "two")):
+        _assert_feedback_has_no_machine_paths(result.feedback, directory)
+        shuttle = next(s for s in result.slices if s.name == "shuttle")
+        sections.append(shuttle.text)
+        assert "<cargo>/registry/" in shuttle.text
+        assert "execution.rs:203:17" in shuttle.text
+        assert "<abs>/execution.rs" not in shuttle.text
+    assert sections[0] == sections[1]
 
 
 @rust_tools

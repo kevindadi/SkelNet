@@ -49,11 +49,15 @@ latest Rust. G0 uses the same error strings.
 
 ### REFINE (D4-6)
 
-`NO_ISSUES` is recognized only by `classify_rust_reply(..., allow_no_issues=True)`,
-and only when the latest version compiled and the stage is `review`. The
-classifier drops non-letters and compares with `NOISSUES`, so `NO_ISSUES`
-matches. A `NO_ISSUES` reply during `rust_fix` is `other`: the previous
-version is kept, `FORMAT_RETRY_NOTE` is prepended, and the call counts.
+`NO_ISSUES` is recognized only for REFINE, only at stage `review`, and only
+when the current version compiled (`allow_no_issues=True`). The classifier
+drops every non-letter character and accepts the reply only when what remains
+is exactly `NOISSUES`, so `NO_ISSUES` and `No issues.` match. That check runs
+before code fences. A reply that contains a code block does not reduce to
+`NOISSUES`; if the extracted block contains `fn main` it is a program. A
+`NO_ISSUES` reply during `rust_fix`, or while the current version does not
+compile, is `other`: the previous version is kept, `FORMAT_RETRY_NOTE` is
+prepended, and the call counts.
 
 ### STATIC (D4-2, D4-3)
 
@@ -76,13 +80,36 @@ On toolchain `nightly-2026-09-04` all six exist. None were dropped.
 Lockbud is commit `cc78cb7` on `nightly-2026-02-07`. The wrapper is invoked
 with `LOCKBUD_LOG=warn` because the JSON report is a `log::warn!` and is
 otherwise silent. Only JSON `"bug_kind"` records count. A summary line that
-merely contains the word `conflictlock` is not a finding. False positives
-are fed back as usual and are also reported by `tools fp-check`.
+merely contains the word `conflictlock` is not a finding. Each record's raw
+text is the full JSON object (`JSONDecoder.raw_decode`), so a nested
+`ConflictLock` `diagnosis` keeps every edge. False positives are fed back as
+usual and are also reported by `tools fp-check`.
 
-On this checkout the detector does run (`Detecting deadlock` in the debug
-log) and `concir_sync` builds with that nightly, but it emits no `bug_kind`
-records for `abba_2lock`'s `buggy.rs` or `fixed.rs`, nor for a same-thread
-`Mutex` double lock. Silence is not treated as a finding.
+A non-zero lockbud exit that produced no `bug_kind` record is not a clean
+result. `tools.lockbud` is `{"status": "unavailable", "category":
+"lockbud_failed"}` and the feedback says `lockbud could not analyze this
+program: …` (the first stderr line that starts with `error`, otherwise the
+last non-empty stderr line, after path rewriting). That does not block
+acceptance, same as `shuttle_unsupported` / `miri_unsupported`. A non-zero
+exit that still emitted `bug_kind` records keeps those records and blocks.
+Exit 0 with no records stays `pass` and the feedback says `no bug_kind
+records`.
+
+What the same invocation reports depends on how the locks are written:
+
+| Shape | `bug_kind` |
+| --- | --- |
+| two spawn closures locking a→b and b→a | `ConflictLock` |
+| same function locks one `Mutex` twice | `DoubleLock` |
+| `&Arc<Mutex<_>>` parameters, struct fields, `thread::scope` + `&Mutex`, `static` locks, reverse order inside one function | `ConflictLock` |
+| two named functions that take `Arc<Mutex<_>>` by value | none (known miss) |
+
+The miss is alias analysis: lockbud does not follow an `Arc` moved by value
+into different callees. `-k all`, `LOCKBUD_LOG=info`, and `-b` do not change
+it. `abba_2lock`'s `REQUIREMENTS.md` calls t1/t2 "threads/functions", so a
+model often writes that missed form. The replay fixture's STATIC arm
+therefore accepts the ABBA program on call 1. Silence after a successful
+run is not a finding.
 
 ### DYNAMIC (D4-4, D4-8)
 
@@ -101,6 +128,19 @@ Shuttle's panic header contains the OS thread id. That id is removed before
 the failure text is placed in the feedback, so a repeated run of the same
 program and seed produces the same feedback bytes. The schedule string is
 left intact.
+
+Every feedback section (clippy rendered text, lockbud records and the
+lockbud failure line, stress, Shuttle, miri, monitor property `detail`, and
+the monitor-run detail) goes through `clippy.relativize`, in order:
+
+1. `compile._relativize` rewrites the probe workdir, the repository root, and
+   the rustc sysroot source prefix (`<rust>/`), and rewrites remaining
+   `-->` / `:::` positions to `<abs>/<filename>`.
+2. `CARGO_HOME` (or `~/.cargo` when it is unset) `registry/src/<index>/`
+   becomes `<cargo>/registry/`.
+3. Any other absolute path with at least two components, including
+   `panicked at /…:line:col`, becomes `<abs>/<filename>`. The line and column
+   stay.
 
 ### DYNAMIC_M (D4-5)
 

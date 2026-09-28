@@ -8,11 +8,14 @@ Paths in rendered text are made relative to the probe project.
 from __future__ import annotations
 
 import json
+import os
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..oracle import cargo_toml
+from .compile import _relativize as _compile_relativize
 from .runner import ToolRunner, cleanup_target
 
 # D4-3. Lints that do not exist on the repository toolchain are dropped after
@@ -32,12 +35,60 @@ CONCURRENCY_LINTS: tuple[str, ...] = (
 RUSTC_BLOCKING_LINTS = ("let_underscore_lock", "unused_must_use")
 
 
+# A path with at least two components (`/dir/file`), including
+# `panicked at /…:line:col` lines that are not `-->` / `:::` positions.
+# The lookbehind keeps `<cargo>/…` and `<rust>/…` intact: the slash after `>`
+# is not a start-of-path boundary.
+_ABS_PATH_RE = re.compile(
+    r"(?:(?<=^)|(?<=[\s'\"`(]))"
+    r"(/[^/\s:]+(?:/[^/\s:]+)+)"
+    r"(:\d+:\d+)?",
+    re.MULTILINE,
+)
+
+
+def _cargo_homes() -> list[str]:
+    raw = os.environ.get("CARGO_HOME")
+    home = Path(raw) if raw else Path.home() / ".cargo"
+    forms: list[str] = []
+    for candidate in (str(home), os.path.realpath(home)):
+        if candidate and candidate not in forms:
+            forms.append(candidate)
+    forms.sort(key=len, reverse=True)
+    return forms
+
+
+def _rewrite_cargo_registry(text: str) -> str:
+    """`CARGO_HOME/registry/src/<index>/` becomes `<cargo>/registry/`."""
+    for home in _cargo_homes():
+        text = re.sub(
+            re.escape(home) + r"/registry/src/[^/]+/",
+            "<cargo>/registry/",
+            text,
+        )
+    return text
+
+
+def _rewrite_remaining_absolute(text: str) -> str:
+    def repl(match: re.Match) -> str:
+        name = match.group(1).rsplit("/", 1)[-1]
+        return "<abs>/" + name + (match.group(2) or "")
+
+    return _ABS_PATH_RE.sub(repl, text)
+
+
 def relativize(text: str, workdir: Path) -> str:
+    """Rewrite absolute paths in feedback text.
+
+    Order: the shared compile relativizer (workdir, repository root, rustc
+    sysroot), then the cargo registry index directory, then any leftover
+    absolute path.
+    """
     if not text:
         return text
-    for base in {str(workdir), str(workdir.resolve())}:
-        text = text.replace(base + "/", "").replace(base, ".")
-    return text
+    text = _compile_relativize(text, Path(workdir))
+    text = _rewrite_cargo_registry(text)
+    return _rewrite_remaining_absolute(text)
 
 
 @dataclass

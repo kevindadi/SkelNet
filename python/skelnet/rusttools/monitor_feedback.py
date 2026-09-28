@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..oracle import CONCIR_SYNC_CRATE, _tool_path
+from .clippy import relativize
 from .dynamic_feedback import pack_sections
 from .monitor import evaluate_o4
 from .runner import ToolRunner
@@ -80,12 +81,20 @@ class MonitorFeedback:
                 "unmapped": list(self.unmapped)}
 
 
+def _rel(text, workdir: Path | None):
+    if workdir is None or not isinstance(text, str) or not text:
+        return text
+    return relativize(text, workdir)
+
+
 def render_monitor_feedback(layer, *, property_ids: str = "keep",
-                            id_index: dict[str, str] | None = None
+                            id_index: dict[str, str] | None = None,
+                            workdir: Path | str | None = None
                             ) -> MonitorFeedback:
     """Build disclosure-safe feedback from an ``evaluate_o4`` result."""
     from ..prompts import sanitize_detail
     index = id_index if id_index is not None else {}
+    root = Path(workdir) if workdir is not None else None
     data = layer.data or {}
     report = data.get("report") or {}
     properties = report.get("properties") or []
@@ -97,13 +106,13 @@ def render_monitor_feedback(layer, *, property_ids: str = "keep",
         lines.append(f"## monitor\n{_INSTRUMENT_NOTE}")
     if _crash_or_timeout(layer):
         blocking = True
-        detail = layer.detail or "instrumented run failed"
+        detail = _rel(layer.detail or "instrumented run failed", root)
         lines.append(f"## monitor run\n{detail}")
     for prop in properties:
         if _property_blocking(prop):
             blocking = True
         pid = _present(str(prop.get("id") or ""), property_ids, index)
-        detail = sanitize_detail(prop.get("id"), prop.get("detail"))
+        detail = _rel(sanitize_detail(prop.get("id"), prop.get("detail")), root)
         item = {
             "id": pid,
             "kind": prop.get("kind"),
@@ -125,7 +134,7 @@ def render_monitor_feedback(layer, *, property_ids: str = "keep",
     if unmapped:
         lines.append("## unmapped program resources\n" + "\n".join(unmapped))
     if layer.category == "tool_missing" or layer.status == "unavailable":
-        lines.append(f"## monitor\nmonitor unavailable: {layer.detail}")
+        lines.append(f"## monitor\nmonitor unavailable: {_rel(layer.detail, root)}")
     if not lines:
         lines.append("## monitor\nno blocking monitor result")
     feedback, truncated = pack_sections(lines)
@@ -147,4 +156,4 @@ def run_monitor_feedback(tools: ToolRunner, workdir: Path | str, source: str, *,
         backend_bin=_tool_path("concir-backend", "CONCIR_BACKEND"),
         concir_sync_path=CONCIR_SYNC_CRATE, runs=runs, timeout=timeout)
     return render_monitor_feedback(layer, property_ids=property_ids,
-                                   id_index=id_index)
+                                   id_index=id_index, workdir=Path(workdir))

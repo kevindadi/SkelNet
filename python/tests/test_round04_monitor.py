@@ -1,6 +1,7 @@
 """T5: monitor feedback blocking rules and disclosure filtering."""
 
 import json
+import os
 from pathlib import Path
 
 from skelnet.rusttools.monitor_feedback import (run_monitor_feedback,
@@ -141,6 +142,23 @@ def test_monitor_feedback_drops_reference_design_and_goal(tmp_path):
     # The reference-design failure is real, and it must not decide acceptance.
     assert result.category == "monitor_fail" or result.blocking
     assert result.blocking  # the safety FAIL still blocks
+
+
+def test_monitor_detail_relativizes_absolute_paths(tmp_path):
+    cargo = os.environ.get("CARGO_HOME") or str(Path.home() / ".cargo")
+    registry = (f"{cargo}/registry/src/index.crates.io-xxx/"
+                "shuttle-0.8.1/src/runtime/execution.rs:203:17")
+    unrelated = "/opt/unrelated/data/secret.txt"
+    result = _run(tmp_path, _report([
+        {"id": "safety-main", "kind": "safety", "source": "properties",
+         "req": "R1", "status": "FAIL",
+         "detail": f"panicked at {registry} see {unrelated}"},
+    ]))
+    assert f"{cargo}/registry/src/" not in result.feedback
+    assert "/opt/unrelated" not in result.feedback
+    assert "<cargo>/registry/" in result.feedback
+    assert "execution.rs:203:17" in result.feedback
+    assert "<abs>/secret.txt" in result.feedback
 
 
 def test_opaque_property_ids_hide_the_raw_id(tmp_path):

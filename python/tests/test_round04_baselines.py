@@ -356,6 +356,10 @@ class _CmdRunner:
         return ns(0, json.dumps(payload) + "\n", "")
 
     def _lockbud(self, src: str):
+        if "LOCKBUD_FAIL" in src:
+            return ns(101, "", "error: could not compile lockbud_probe\n")
+        if "LOCKBUD_HIT" in src:
+            return ns(0, "", '{"bug_kind": "ConflictLock"}\n')
         if "CLIPPY_HIT" in src:
             return ns(0, "", '{"bug_kind": "DoubleLock"}\n')
         return ns(0, "", "Possible bugs: conflictlock 0\n")
@@ -460,6 +464,37 @@ def test_cmd_run_static_real_path(tmp_path):
         (row.get("feedback_sha256") or "") for row in cell["baseline"]["rounds"])
     assert "function_completed" not in json.dumps(cell["baseline"])
     assert joined  # feedback was recorded
+
+
+def test_cmd_run_static_lockbud_failed_does_not_block(tmp_path):
+    """N1: a lockbud build failure is unavailable, and the version is accepted."""
+    src = _rust(f'println!("{TERMINAL}");', "LOCKBUD_FAIL")
+    rc, cell, _client, runner, _out = _cmd(
+        tmp_path, "STATIC", [src], name="lock-fail")
+    assert rc == 0
+    assert cell["accepted"] is True
+    assert cell["baseline"]["accept_reason"] == "static_clean"
+    assert cell["baseline"]["accepted_at_call"] == 1
+    lock = cell["baseline"]["rounds"][0]["tools"]["lockbud"]
+    assert lock["status"] == "unavailable"
+    assert lock["category"] == "lockbud_failed"
+    assert any(env.get("RUSTC_WRAPPER") for env in runner.envs)
+
+
+def test_cmd_run_static_lockbud_conflict_blocks_until_clean(tmp_path):
+    """N4: a ConflictLock blocks; the next user prompt carries the record."""
+    hit = _rust(f'println!("{TERMINAL}");', "LOCKBUD_HIT")
+    clean = _rust(f'println!("{TERMINAL}");')
+    rc, cell, client, _runner, _out = _cmd(
+        tmp_path, "STATIC", [hit, clean], name="lock-hit")
+    assert rc == 0
+    assert cell["accepted"] is True
+    assert cell["baseline"]["accept_reason"] == "static_clean"
+    assert cell["baseline"]["accepted_at_call"] == 2
+    assert cell["rounds_used"] == 2
+    assert cell["calls"][1]["stage"] == "tool_feedback"
+    assert "bug_kind" in client.users[1]
+    assert cell["baseline"]["rounds"][0]["tools"]["lockbud"]["status"] == "fail"
 
 
 def test_cmd_run_dynamic_real_path(tmp_path):

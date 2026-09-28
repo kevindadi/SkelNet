@@ -86,11 +86,17 @@ def _static_feedback(tools, directory, source, *, timeout: float) -> _Feedback:
     text, truncated = pack_sections(sections)
     clippy_status = "unavailable" if clippy.unavailable else (
         "fail" if clippy.blocking else "pass")
-    lock_status = "unavailable" if lockbud.unavailable else (
-        "fail" if lockbud.blocking else "pass")
+    # A lockbud crash or a build that produced no bug_kind record does not
+    # block (same idea as D4-4 ``*_unsupported``). Parsed records still do.
+    if lockbud.unavailable and str(lockbud.unavailable).startswith("lockbud_failed"):
+        lock_status = "unavailable"
+        lock_cat = "lockbud_failed"
+    else:
+        lock_status = "unavailable" if lockbud.unavailable else (
+            "fail" if lockbud.blocking else "pass")
+        lock_cat = lockbud.hits[0].bug_kind if lockbud.hits else None
     clippy_cat = clippy.clippy[0].code if clippy.clippy else (
         clippy.rustc_errors[0].code if clippy.rustc_errors else None)
-    lock_cat = lockbud.hits[0].bug_kind if lockbud.hits else None
     return _Feedback(
         passed=not clippy.blocking and not lockbud.blocking,
         reason="static_clean",
