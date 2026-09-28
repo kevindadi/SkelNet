@@ -1,9 +1,10 @@
-"""T1: the shared Rust compile check and its error rendering."""
+"""T1/M1/M2: the shared Rust compile check, path hygiene and unavailability."""
 
 import json
 import subprocess
 from pathlib import Path
 
+from skelnet.backend import repo_root
 from skelnet.rusttools.compile import CompileResult, compile_rust, render_compile_errors
 from skelnet.rusttools.runner import ToolRunner
 
@@ -86,6 +87,65 @@ def test_render_truncates_at_utf8_boundary():
 def test_render_preserves_order():
     result = CompileResult(errors=[{"rendered": "first"}, {"rendered": "second"}])
     assert render_compile_errors(result) == "first\nsecond"
+
+
+# ── M1: absolute-path hygiene ────────────────────────────────────────
+def test_relativize_workdir_repo_sysroot_and_unrelated(tmp_path, monkeypatch):
+    import skelnet.rusttools.compile as compile_mod
+    monkeypatch.setattr(compile_mod, "_sysroot", lambda: "/fake/sysroot")
+    root = str(repo_root())
+    base = str(tmp_path)
+    rendered = (
+        "error[E0001]: boom\n"
+        f" --> {base}/src/main.rs:1:1\n"
+        f"  ::: {root}/runtime/concir_sync/src/lib.rs:10:5\n"
+        "  = note: see /fake/sysroot/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs\n"
+        " --> /opt/other/path/foo.rs:1:1\n"
+    )
+    output = json.dumps(_message("error", "E0001", "boom", rendered))
+    tools = _tools(lambda *a: ns(101, output, ""))
+    result = compile_rust(tools, tmp_path, "fn main() {}\n")
+    text = result.errors[0]["rendered"]
+    assert base not in text
+    assert root not in text
+    assert "/fake/sysroot" not in text
+    assert "/opt/other" not in text
+    assert "runtime/concir_sync/src/lib.rs" in text
+    assert "<rust>/library/alloc/src/vec/mod.rs" in text
+    assert "<abs>/foo.rs" in text
+
+
+# ── M2: unavailable vs. compile failure ──────────────────────────────
+def test_nonzero_without_errors_is_unavailable(tmp_path):
+    output = json.dumps({"reason": "compiler-artifact", "package_id": "probe 0.1.0"})
+    tools = _tools(lambda *a: ns(
+        101, output, "error: failed to select a version for the requirement `x`"))
+    result = compile_rust(tools, tmp_path, "fn main() {}\n")
+    assert result.ok is False
+    assert result.errors == []
+    assert result.unavailable and "failed to select a version" in result.unavailable
+
+
+@cargo_only
+def test_real_cargo_diagnostics_have_no_absolute_paths(tmp_path):
+    programs = {
+        "vec": 'fn main() { let _ = Vec::with_capacity("x"); }\n',
+        "sem": 'fn main() { let _ = concir_sync::Semaphore::new("x"); }\n',
+    }
+    rendered = {}
+    for name, source in programs.items():
+        result = compile_rust(ToolRunner(toolchain=None), tmp_path / name, source)
+        assert result.ok is False
+        text = render_compile_errors(result)
+        rendered[name] = text
+        assert str(repo_root()) not in text, name
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("-->") or stripped.startswith(":::"):
+                path = stripped.split(None, 1)[1]
+                assert not path.startswith("/"), (name, line)
+    # The repo path is rewritten to a relative one (not just basename-masked).
+    assert "runtime/concir_sync/src/lib.rs" in rendered["sem"]
 
 
 @cargo_only
