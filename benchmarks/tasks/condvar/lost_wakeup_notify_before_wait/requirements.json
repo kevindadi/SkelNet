@@ -68,5 +68,9 @@
       }
     ]
   },
-  "contract": "condvar/lost_wakeup_notify_before_wait/contract.json"
+  "contract": "condvar/lost_wakeup_notify_before_wait/contract.json",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

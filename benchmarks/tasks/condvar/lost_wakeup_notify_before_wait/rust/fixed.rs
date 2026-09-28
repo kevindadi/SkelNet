@@ -1,11 +1,8 @@
-//! Reference program for condvar/bare_wait_no_predicate.
+//! Reference program for condvar/lost_wakeup_notify_before_wait.
 //!
-//! Matches gold.skel: waiter and notifier share mutex `m` and condvar `cv`.
-//! The flag `ready` lives in `m`. The waiter re-checks it after every wake,
-//! so a signal that arrives first is not lost.
-//!
-//! Rewritten from the previous Arc<(Mutex, Condvar)> `pair` program, which
-//! did not print the terminal line and did not use the entity names.
+//! Matches gold.skel: under `m`, the notifier stores true into `ready` and
+//! then signals `cv`. The waiter waits only while `ready` is false and
+//! checks it again after every wake.
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;

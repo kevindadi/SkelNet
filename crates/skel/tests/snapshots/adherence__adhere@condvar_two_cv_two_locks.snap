@@ -1,0 +1,50 @@
+---
+source: crates/skel/tests/adherence.rs
+expression: md
+---
+# Skeleton adherence report (human review only)
+
+skeleton: `benchmarks/tasks/condvar/two_cv_two_locks/gold.skel`
+
+## main::main
+
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 10 | spawn w1 | matched | 55 |
+| 10 | spawn w2 | matched | 57 |
+| 10 | spawn notifier | matched | 65 |
+
+## main::w1
+
+matched Rust fn: `w1`; DSL lock depth 1; Rust lock calls 1
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 13 | lock m1 | matched | 13 |
+| 13 | post ready | matched | 14 |
+| 13 | wait cv1 | matched | 16 |
+
+## main::w2
+
+matched Rust fn: `w2`; DSL lock depth 1; Rust lock calls 1
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 16 | lock m2 | matched | 22 |
+| 16 | post ready | matched | 23 |
+| 16 | wait cv2 | matched | 25 |
+
+## main::notifier
+
+matched Rust fn: `notifier`; DSL lock depth 2; Rust lock calls 2
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 20 | take ready | matched | 37 |
+| 21 | take ready | matched | 38 |
+| 22 | lock m1 | matched | 39 |
+| 22 | lock m2 | matched | 40 |
+| 22 | notify_all cv1 | matched | 43 |
+| 22 | notify_all cv2 | matched | 44 |

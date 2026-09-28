@@ -70,5 +70,9 @@
       }
     ]
   },
-  "contract": "condvar/bare_wait_no_predicate/contract.json"
+  "contract": "condvar/bare_wait_no_predicate/contract.json",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

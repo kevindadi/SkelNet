@@ -1,20 +1,18 @@
-//! Reference program for condvar/bare_wait_no_predicate.
+//! Defect program for condvar/bare_wait_no_predicate.
 //!
-//! Matches gold.skel: waiter and notifier share mutex `m` and condvar `cv`.
-//! The flag `ready` lives in `m`. The waiter re-checks it after every wake,
-//! so a signal that arrives first is not lost.
-//!
-//! Rewritten from the previous Arc<(Mutex, Condvar)> `pair` program, which
-//! did not print the terminal line and did not use the entity names.
+//! Source: ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/condvar/bare_wait_no_predicate/rust/buggy.rs
+//! The defect is unchanged: the waiter calls wait() without looking at the
+//! flag, so a signal that already happened is lost and the waiter blocks.
+//! Adapted only to bind `m` and `cv` separately, use the role names, and
+//! print the flag the waiter observed.
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
 fn waiter(m: Arc<Mutex<bool>>, cv: Arc<Condvar>) -> bool {
-    let mut ready = m.lock().unwrap();
-    while !*ready {
-        ready = cv.wait(ready).unwrap();
-    }
+    let ready = m.lock().unwrap();
+    // Wait without checking the flag first. A signal that already happened is lost.
+    let ready = cv.wait(ready).unwrap();
     *ready
 }
 

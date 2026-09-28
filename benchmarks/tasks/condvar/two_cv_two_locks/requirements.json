@@ -61,5 +61,10 @@
       }
     ]
   },
-  "contract": "condvar/two_cv_two_locks/contract.json"
+  "contract": "condvar/two_cv_two_locks/contract.json",
+  "terminal_v2": "DONE w1=1 w2=1",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

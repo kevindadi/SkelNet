@@ -1,27 +1,23 @@
-//! Reference program for condvar/bare_wait_no_predicate.
+//! Defect program for condvar/lost_wakeup_notify_before_wait.
 //!
-//! Matches gold.skel: waiter and notifier share mutex `m` and condvar `cv`.
-//! The flag `ready` lives in `m`. The waiter re-checks it after every wake,
-//! so a signal that arrives first is not lost.
-//!
-//! Rewritten from the previous Arc<(Mutex, Condvar)> `pair` program, which
-//! did not print the terminal line and did not use the entity names.
+//! The notifier signals `cv` before it stores true into `ready`, and the
+//! waiter waits once without checking the flag. A signal that runs first is
+//! lost, and the waiter then blocks even though the flag becomes true.
+//! New program (SkelNet R7a-2); there was no imported buggy.rs for this task.
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
 fn waiter(m: Arc<Mutex<bool>>, cv: Arc<Condvar>) -> bool {
-    let mut ready = m.lock().unwrap();
-    while !*ready {
-        ready = cv.wait(ready).unwrap();
-    }
+    let ready = m.lock().unwrap();
+    let ready = cv.wait(ready).unwrap();
     *ready
 }
 
 fn notifier(m: Arc<Mutex<bool>>, cv: Arc<Condvar>) {
+    cv.notify_one();
     let mut ready = m.lock().unwrap();
     *ready = true;
-    cv.notify_one();
 }
 
 fn main() {
