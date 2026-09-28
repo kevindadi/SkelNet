@@ -23,8 +23,10 @@ def build_client(spec: ModelSpec, params: Any, *, budget: Any,
                  sleep: Callable[[float], None] = time.sleep):
     """Construct the inner client for a model, or raise ChannelUnavailable.
 
-    `params` is a :class:`~skelnet.params.RunParams`. The thinking switch is
-    sent per channel through ``extra_body``; the base URL comes from the
+    `params` is a :class:`~skelnet.params.RunParams`. DeepSeek/DashScope send
+    their thinking switch through ``extra_body``; Moonshot (Kimi) always
+    reasons and instead carries the strength as a **top-level**
+    ``reasoning_effort`` (never a ``thinking`` key). The base URL comes from the
     channel registry.
     """
     if spec.status != "available" or not spec.model_id:
@@ -48,6 +50,17 @@ def build_client(spec: ModelSpec, params: Any, *, budget: Any,
                                 evidence_dir=evidence_dir, params=params,
                                 timeout=timeout, sdk_client=sdk_client,
                                 extra_body=extra_body, sleep=sleep)
+    if spec.channel == "moonshot-direct":
+        from .direct import DirectChatClient
+        # kimi-k3 always reasons; the strength is the top-level
+        # ``reasoning_effort`` (no ``thinking``/``extra_body``). Read it from
+        # ``params`` so the probe can vary it (low/high).
+        return DirectChatClient(api_key=api_key, base_url=base_url,
+                                model=spec.model_id, budget=budget,
+                                evidence_dir=evidence_dir, params=params,
+                                timeout=timeout, sdk_client=sdk_client,
+                                reasoning_effort=getattr(params, "reasoning_effort", None),
+                                sleep=sleep)
     if spec.channel == "opencode-go":
         from .opencode_go import OpenCodeGoClient, OpenCodeGoResponsesClient
         cls = OpenCodeGoResponsesClient if spec.surface == "responses" else OpenCodeGoClient

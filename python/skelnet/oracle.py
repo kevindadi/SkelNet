@@ -294,7 +294,10 @@ class RustOracle:
         functional = _conjunction(layers, self.layers)
         no_o4 = _conjunction(layers, tuple(n for n in self.layers if n != "O4"))
         if not check_terminal:
+            # Deterministic codegen has no task-specific terminal line: neither
+            # the main metric nor the sensitivity metric is defined.
             functional = None
+            no_o4 = None
         if o2 is None:
             terminal_check = "not_run"
         else:

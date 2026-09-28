@@ -6,8 +6,13 @@ from skelnet.backend import Backend, repo_root
 from skelnet.oracle import FakeOracle
 from skelnet.pipeline import extract_cir, run_cir_cell
 from skelnet.providers import ScriptedProvider
+from skelnet.rusttools.compile import CompileResult
 
 TASK = "lock-order/abba_2lock"
+
+
+def _ok_compile(tools, workdir, source, **kwargs):
+    return CompileResult(ok=True)
 
 
 def _gold() -> dict:
@@ -57,7 +62,7 @@ def test_cir_arm_accepts_valid_program(tmp_path):
     result = run_cir_cell(
         task="lock-order/abba_2lock", requirements="two workers, two locks",
         contract_path=contract, provider=provider, backend=Backend(),
-        oracle=FakeOracle(True), workdir=tmp_path, rounds=4)
+        oracle=FakeOracle(True), workdir=tmp_path, rounds=4, compile_fn=_ok_compile)
     assert result.accepted, result.history
     assert result.history[0]["outcome"] == "PASS"
     assert result.oracle.functional_ok
@@ -72,19 +77,21 @@ def test_cir_arm_extracts_fenced_reply(tmp_path):
     result = run_cir_cell(
         task="lock-order/abba_2lock", requirements="two workers, two locks",
         contract_path=contract, provider=provider, backend=Backend(),
-        oracle=FakeOracle(True), workdir=tmp_path, rounds=4)
+        oracle=FakeOracle(True), workdir=tmp_path, rounds=4, compile_fn=_ok_compile)
     assert result.accepted, result.history
     assert result.parse_ok
 
 
-def test_cir_check_ok_is_any_non_invalid_round(tmp_path):
+def test_cir_check_ok_excludes_invalid_and_unsupported(tmp_path):
+    # check_ok counts a semantic result that is neither INVALID nor UNSUPPORTED
+    # (D5-1); a FAIL round still counts.
     provider = ScriptedProvider([{"text": json.dumps(_invalid())},
                                  {"text": json.dumps(_buggy())}])
     result = run_cir_cell(
         task=TASK, requirements="two workers, two locks", contract_path=_contract(),
         provider=provider, backend=Backend(), oracle=FakeOracle(True),
         workdir=tmp_path, rounds=2)
-    assert result.check_ok is True  # round 2 is FAIL, not INVALID
+    assert result.check_ok is True  # round 2 is FAIL, not INVALID/UNSUPPORTED
     assert not result.accepted
 
 

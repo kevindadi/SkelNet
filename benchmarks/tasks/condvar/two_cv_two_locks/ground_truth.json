@@ -1,0 +1,12 @@
+{
+  "defect_family": "condvar",
+  "resources": [
+    "main::m1",
+    "main::m2",
+    "main::cv1",
+    "main::cv2"
+  ],
+  "statements": [],
+  "expected_outcome_fixed": "PASS",
+  "provenance": "subset of condvar/same_cv_different_locks (one condvar per waiter); not equivalent to that baseline (D9)"
+}

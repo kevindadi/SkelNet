@@ -31,12 +31,15 @@ def _api_key_present(spec) -> bool:
 
 
 def _policy(spec) -> dict[str, Any]:
+    channel = CHANNELS.get(spec.channel)
     return {
         "display_name": spec.display_name,
         "model_id": spec.model_id,
         "channel": spec.channel,
         "provider": spec.provider,
         "surface": spec.surface,
+        "base_url": channel.base_url if channel else None,
+        "api_key_env": channel.api_key_env if channel else None,
         "status": spec.status,
         "thinking": spec.thinking,
         "reasoning_effort": spec.reasoning_effort,
@@ -103,11 +106,15 @@ def _reasoning_tokens(usage) -> int | None:
     return normalize_token_usage(usage).get("reasoning")
 
 
+def _reasoning_content_present(outcome) -> bool:
+    text = getattr(outcome, "reasoning_content", None)
+    return bool(isinstance(text, str) and text.strip())
+
+
 def _thinking_accepted(outcome) -> bool | None:
     reasoning = _reasoning_tokens(getattr(outcome, "usage", None))
-    reasoning_text = getattr(outcome, "reasoning_content", None)
     if (isinstance(reasoning, int) and reasoning > 0) or (
-            isinstance(reasoning_text, str) and reasoning_text.strip()):
+            _reasoning_content_present(outcome)):
         return True
     return None
 
@@ -123,6 +130,7 @@ def _fill_basic(record: dict, outcome) -> None:
     record["returned_model"] = getattr(outcome, "response_model", None)
     record["usage"] = getattr(outcome, "usage", None)
     record["finish_reason"] = getattr(outcome, "finish_reason", None)
+    record["reasoning_content_present"] = _reasoning_content_present(outcome)
     record["seed_sent"] = getattr(outcome, "seed", None) is not None
 
 
@@ -130,7 +138,9 @@ def _probe_one(spec, build) -> dict[str, Any]:
     record = {**_policy(spec), "probed": True, "error": None,
               "thinking_accepted": None, "output_includes_reasoning": None,
               "requires_stream": None, "seed_deterministic": None,
-              "reasoning_tokens_low": None, "reasoning_tokens_medium": None}
+              "reasoning_content_present": None,
+              "reasoning_tokens_low": None, "reasoning_tokens_medium": None,
+              "reasoning_tokens_high": None}
     params = params_for_model(spec)
     try:
         client = build(params)
@@ -154,10 +164,18 @@ def _probe_one(spec, build) -> dict[str, Any]:
             _probe_stream_fallback(record, spec, build)
         return record
 
-    # Reasoning-effort variation for the reasoning models (GPT/Kimi).
-    if spec.surface == "responses" or spec.channel == "opencode-go":
-        for effort, key in (("low", "reasoning_tokens_low"),
-                            ("medium", "reasoning_tokens_medium")):
+    # Reasoning-effort variation for the reasoning models. Moonshot/Kimi uses
+    # low/high (its strengths are low/high/max); OpenCode GPT uses low/medium.
+    if spec.channel == "moonshot-direct":
+        variants = (("low", "reasoning_tokens_low"),
+                    ("high", "reasoning_tokens_high"))
+    elif spec.surface == "responses" or spec.channel == "opencode-go":
+        variants = (("low", "reasoning_tokens_low"),
+                    ("medium", "reasoning_tokens_medium"))
+    else:
+        variants = ()
+    if variants:
+        for effort, key in variants:
             try:
                 variant = build(params_for_model(spec, reasoning_effort=effort))
                 if hasattr(variant, "set_cell"):

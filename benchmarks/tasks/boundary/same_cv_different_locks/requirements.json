@@ -1,5 +1,5 @@
 {
-  "task": "condvar/same_cv_different_locks",
+  "task": "boundary/same_cv_different_locks",
   "requirements": [
     "A main task starts two waiter roles and one notifier role that run at the same time.",
     "Each waiter guards its own data with its own lock; the two waiters need not share one lock.",
@@ -57,5 +57,5 @@
       }
     ]
   },
-  "contract": "condvar/same_cv_different_locks/contract.json"
+  "contract": "boundary/same_cv_different_locks/contract.json"
 }

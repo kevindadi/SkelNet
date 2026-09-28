@@ -52,9 +52,13 @@ class DirectChatClient:
                  evidence_dir: Path | str, params: Any, timeout: float = 90.0,
                  sdk_client: Any | None = None,
                  extra_body: dict[str, Any] | None = None,
+                 reasoning_effort: str | None = None,
                  sleep: Callable[[float], None] = time.sleep) -> None:
         self.model = model
         self.base_url = base_url
+        # Top-level strength for models that always reason (Moonshot/kimi-k3);
+        # never wrapped in ``extra_body`` and never accompanied by ``thinking``.
+        self.reasoning_effort = reasoning_effort
         self.budget = budget
         self.params = params
         self.evidence_dir = Path(evidence_dir)
@@ -108,6 +112,8 @@ class DirectChatClient:
             kwargs["temperature"] = self.params.temperature
         if self.extra_body:
             kwargs["extra_body"] = self.extra_body
+        if self.reasoning_effort:
+            kwargs["reasoning_effort"] = self.reasoning_effort
         seed = self._seed()
         if seed is not None:
             kwargs["seed"] = seed
@@ -203,6 +209,9 @@ class DirectChatClient:
                 "stream": self.stream, "seed": self._seed(),
                 "truncation_retry": truncation_retry,
                 "content_sha256": _sha(parsed["text"]), "content": parsed["text"],
+                # Reasoning is recorded separately and never merged into the
+                # reply text (same rule as the DashScope streaming path).
+                "reasoning_content": parsed["reasoning"],
                 "wall_ms": int((time.monotonic() - started) * 1000),
             })
             if not truncated:

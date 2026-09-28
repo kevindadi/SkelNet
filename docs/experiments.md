@@ -34,12 +34,20 @@ concatenated `system_sha256`.
 
 ## Model parameters
 
-The four experimental models are GPT 6 Luna (`gpt-6-luna`, OpenCode Responses),
-Kimi (`kimi-k3`, OpenCode Chat), DeepSeek Flash (`deepseek-flash`, direct) and
-Qwen (`qwen3.8-flash`, DashScope direct). All four run with thinking enabled;
-GPT and Kimi use `reasoning_effort="medium"`; no temperature is sent
+The four experimental models are GPT 6 Luna (`gpt-6-luna`, OpenCode Responses,
+`OPENCODE_API_KEY`, reasoning effort `medium`), Kimi (`kimi-k3`, Moonshot direct
+Chat Completions, `MOONSHOT_API_KEY`, reasoning effort `high`), DeepSeek Flash
+(`deepseek-flash`, direct) and Qwen (`qwen3.8-flash`, DashScope direct). Kimi no
+longer runs through the OpenCode gateway: it uses the owner's own Moonshot key
+against `https://api.moonshot.cn/v1`. `kimi-k3` always reasons, so no `thinking`
+key is sent; its strength is the request's top-level `reasoning_effort`. That
+Kimi's effort differs from GPT's is the owner's decision, not a provider
+requirement. DeepSeek and Qwen are unchanged.
+
+All four run with thinking enabled; no temperature is sent
 (`provider_default`); each cell is capped at 5 calls / 200k tokens; one output
-is capped at 32768 tokens (retry cap 65536).
+is capped at 32768 tokens (retry cap 65536). Kimi's `reasoning_content` is
+recorded separately and never merged into the reply text.
 
 `RunParams` (in the MANIFEST as `run_params`) fixes the temperature policy,
 seed policy, per-cell call/token budgets, max output tokens and hint.
@@ -171,3 +179,46 @@ run directories can be compared in one call.
 - `--resume` reuses a run directory, skipping cells that already have a
   `result.json`, and requires matching arm/model/tasks/reps/rounds/RunParams.
 - `eval` re-runs the oracle on stored Rust without any model calls.
+
+## SKEL/CIR method rules (round 5)
+
+- **Budget.** A cell may make at most `--call-budget` LLM calls. The skeleton
+  stage gets `min(rounds, call_budget - 1)` calls (so at least one is left for
+  Rust); the Rust stage uses the rest. `_budget` reports the per-arm request
+  totals: G0 = 1, SKEL/CIR codegen = `min(rounds, call_budget-1)`, SKEL/CIR llm
+  and every round-4 baseline = `call_budget`.
+- **Skeleton acceptance (K5).** A skeleton is accepted only on `PASS ∧ complete`.
+  If the skeleton never verifies but a candidate exists, the last non-empty
+  skeleton still drives the Rust stage (`--rust-when-unverified last`, the
+  default); `--rust-when-unverified skip` records `rust_skipped="unverified"`.
+  The cell records `skel_verified=false` and `accepted=false`.
+- **Rust stage.** Generate once, then, whenever the program does not compile,
+  retry the same `rust_fix` stage (same system prompt, the rustc diagnostics)
+  until it compiles or the budget runs out. A reply without a program keeps the
+  previous version and repeats the stage with a format-retry note. The final
+  Rust is the latest version (even if it does not compile) and is scored by the
+  oracle.
+- **Compiler unavailable / timeout (shared with round 4).** If `cargo` cannot
+  run (`unavailable`), the compile times out (`timed_out`), or cargo exits
+  non-zero without any compiler error, the Rust stage stops immediately with no
+  further LLM call: the attempt records `compile: "unavailable"`/`"timeout"`,
+  `rust_compiled=null`, and the cell error is `compile_unavailable`/
+  `compile_timeout`. The latest Rust version is still scored by the oracle.
+  Only a real compiler error triggers `rust_fix`.
+- **`check_ok`.** SKEL: `check` was semantically valid on any round. CIR: the
+  explorer returned a semantic result that is neither `INVALID` nor
+  `UNSUPPORTED`.
+- **Codegen.** `--rust-mode codegen` needs the last skeleton to pass `check`;
+  otherwise the cell records `rust_skipped="skeleton_invalid"`. It reports
+  `run_ok` and the layer statuses only (`functional_ok` and
+  `functional_ok_no_o4` are `null`).
+- **`feedback_mode`** (`full`/`outcome_only`/`nocex`/`nomap`) trims the
+  verification-stage feedback only; the check stage is never trimmed. See
+  `docs/feedback.md`.
+- **Cache.** Within one cell the skeleton, `rust` and `rust_fix` calls have
+  consecutive call indices, so no two hit each other. `--replay-from` replays a
+  whole cell (including `rust_fix`) with zero network calls, and `--resume`
+  re-runs an interrupted cell from the cache. A shared `--cache-dir` lets the
+  byte-identical first call of SKEL and `--feedback-mode outcome_only` hit the
+  same entry (a paired design), while SKEL/CIR/G0 never share (different system
+  prompts).

@@ -10,7 +10,7 @@ SECRET = "SECRET-KEY-VALUE-123"
 
 def test_env_file_loaded_and_key_not_leaked(tmp_path, monkeypatch, capsys):
     env = tmp_path / ".env"
-    env.write_text(f"OPENCODE_API_KEY={SECRET}\n", encoding="utf-8")
+    env.write_text(f"MOONSHOT_API_KEY={SECRET}\n", encoding="utf-8")
     seen: dict = {}
 
     def fake_build_client(spec, params, **kwargs):

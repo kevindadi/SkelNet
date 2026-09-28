@@ -81,7 +81,18 @@ def test_codegen_skel_cell_persists_cir_trace(tmp_path):
     result = json.loads((cell / "result.json").read_text())
     assert result["oracle"]["terminal_check"] == "not_applicable"
     assert result["oracle"]["functional_ok"] is None
+    assert result["oracle"]["functional_ok_no_o4"] is None
     assert result["oracle"]["run_ok"] is True
+
+
+def test_codegen_unverified_skeleton_is_skipped(tmp_path):
+    out = _run_codegen("SKEL", ["```skel\nnot a valid skeleton\n```"],
+                       tmp_path, "badskel")
+    result = json.loads(
+        (out / "cells" / TASK / "0" / "result.json").read_text())
+    assert result["rust_skipped"] == "skeleton_invalid"
+    assert result["rust_compiled"] is None
+    assert result["accepted"] is False
 
 
 def test_codegen_cir_cell_persists_cir_trace(tmp_path):
@@ -92,6 +103,7 @@ def test_codegen_cir_cell_persists_cir_trace(tmp_path):
     result = json.loads((cell / "result.json").read_text())
     assert result["oracle"]["terminal_check"] == "not_applicable"
     assert result["oracle"]["functional_ok"] is None
+    assert result["oracle"]["functional_ok_no_o4"] is None
 
 
 def test_eval_rewrites_summary_and_report(tmp_path):

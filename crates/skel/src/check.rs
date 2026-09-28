@@ -863,9 +863,26 @@ impl Checker {
         if !name.is_qualified() && ctx.lookup_local(&name.ident).is_some() {
             return;
         }
-        if resolve_resource(&self.modules, self.module, name).is_none() {
-            // A plain identifier might still be a module-level function used as
-            // a name (not a value); compute footprints accept resources only.
+        if resolve_resource(&self.modules, self.module, name).is_some() {
+            // `compute` is a sequential hole: it must not touch shared state
+            // implicitly. Naming a shared resource here would make this access
+            // disappear when the hole lowers to `nop` (S110).
+            self.errors.push(
+                SkError::error(
+                    "S110",
+                    name.span,
+                    format!(
+                        "`compute` may only read or write local variables, but `{}` is a shared resource",
+                        name.text()
+                    ),
+                )
+                .with_hint(
+                    "keep `compute` to local variables and manipulate shared state explicitly in the skeleton",
+                ),
+            );
+        } else {
+            // Not a local and not a resource: an undefined name (compute
+            // footprints may name only local variables).
             self.err("S101", name.span, format!("undefined name `{}`", name.text()));
         }
     }

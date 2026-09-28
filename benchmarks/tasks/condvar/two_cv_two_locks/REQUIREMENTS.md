@@ -16,4 +16,4 @@ R10. The program must print exactly the line `DONE done=1` and then exit. [U]
 Use these exact names in the design and in the program.
 
 - Roles (threads/functions): w1, w2, notifier.
-- Shared resources: m1 (lock), m2 (lock), cv (condition variable), ready (semaphore).
+- Shared resources: m1 (lock), m2 (lock), cv1 (condition variable), cv2 (condition variable), ready (semaphore).
