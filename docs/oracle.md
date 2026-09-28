@@ -109,7 +109,9 @@ rewrite (`thread::spawn(`, a `.spawn(` method call, or `thread::scope`), the
 instrumentation has not covered every thread. In that case `monitor_fail` and
 the count-based `extra_sync` still fail, but a thread shortage, `not_observed`
 and `unmapped` are reported as O4 `unsupported` / `instrument_unsupported` (the
-residual forms are listed in `detail`, and `oracle_complete` is false).
+residual forms are listed in `detail`, and `oracle_complete` is false). With a
+residual spawn, O4 can be at best `unsupported` / `instrument_unsupported`, even
+when every property passes.
 
 Category priority when several fire: `monitor_fail` > `design_loss` >
 `instrument_unsupported` > `unmapped` > `not_observed`; every triggered category

@@ -136,6 +136,7 @@ class FakeTools:
                  instrument_ok: bool = True, miri_output: str = "",
                  miri_rc: int = 0, shuttle_deadlock: bool = False,
                  shuttle_rc: int = 0, shuttle_output: str = "",
+                 shuttle_no_concurrency: bool = False,
                  annotated: str | None = None,
                  traces: list[list[dict]] | None = None,
                  o2_hang: bool = False,
@@ -151,6 +152,7 @@ class FakeTools:
         self.shuttle_deadlock = shuttle_deadlock
         self.shuttle_rc = shuttle_rc
         self.shuttle_output = shuttle_output
+        self.shuttle_no_concurrency = shuttle_no_concurrency
         self.annotated = annotated
         self.traces = traces if traces is not None else [DEFAULT_TRACE]
         self.o2_hang = o2_hang
@@ -184,6 +186,8 @@ class FakeTools:
         if name.endswith("shuttle_probe"):
             if self.shuttle_deadlock:
                 return ns(1, "", "deadlock! blocked tasks: [main, t1, t2]")
+            if self.shuttle_no_concurrency:
+                return ns(101, "", "test closure did not exercise any concurrency")
             return ns(self.shuttle_rc, self.shuttle_output, self.shuttle_output)
         # A program run: write the trace the instrumented runtime would.
         trace_out = env.get("CIR_TRACE_OUT")

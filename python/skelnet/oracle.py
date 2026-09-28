@@ -151,9 +151,20 @@ def _combine_o3(shuttle: LayerResult, miri: LayerResult) -> LayerResult:
     started_wall = (shuttle.wall_ms or 0) + (miri.wall_ms or 0)
     data = {"shuttle": {**shuttle.to_dict(), **shuttle.data},
             "miri": {**miri.to_dict(), **miri.data}, "complete": True}
+    no_concurrency = bool(shuttle.data.get("no_concurrency"))
+    if no_concurrency:
+        # Promote the marker to the O3 layer so calibration can list it.
+        data["no_concurrency"] = True
+
+    def finish(status: str, category: str | None,
+               detail: str | None) -> LayerResult:
+        if no_concurrency and "no concurrency to explore" not in (detail or ""):
+            detail = (detail + "; " if detail else "") + "no concurrency to explore"
+        return LayerResult("O3", status, category, detail, started_wall, data)
+
     if shuttle.status == UNAVAILABLE and miri.status == UNAVAILABLE:
-        return LayerResult("O3", UNAVAILABLE, "tools_unavailable",
-                           "shuttle and miri both unavailable", started_wall, data)
+        return finish(UNAVAILABLE, "tools_unavailable",
+                      "shuttle and miri both unavailable")
 
     deciding = [(name, layer) for name, layer in (("shuttle", shuttle), ("miri", miri))
                 if layer.status in (PASS, FAIL)]
@@ -166,23 +177,21 @@ def _combine_o3(shuttle: LayerResult, miri: LayerResult) -> LayerResult:
         # unavailable: no half could decide the conjunction.
         categories = [layer.category for _, layer in skipped if layer.category]
         if all(layer.status == UNSUPPORTED for _, layer in skipped):
-            return LayerResult("O3", UNSUPPORTED,
-                               categories[0] if categories else "unsupported",
-                               "shuttle and miri both unsupported",
-                               started_wall, data)
-        return LayerResult("O3", UNAVAILABLE,
-                           categories[0] if categories else "tools_unavailable",
-                           "no half could decide", started_wall, data)
+            return finish(UNSUPPORTED,
+                          categories[0] if categories else "unsupported",
+                          "shuttle and miri both unsupported")
+        return finish(UNAVAILABLE,
+                      categories[0] if categories else "tools_unavailable",
+                      "no half could decide")
     for name, layer in deciding:
         if layer.status == FAIL:
             detail = layer.detail
             if skipped:
                 detail = f"{skipped[0][0]} skipped; {name}: {detail}"
-            return LayerResult("O3", FAIL, layer.category, detail,
-                               started_wall, data)
+            return finish(FAIL, layer.category, detail)
     category = skipped[0][1].category if skipped else None
     detail = "; ".join(f"{name} {layer.status}" for name, layer in skipped) or None
-    return LayerResult("O3", PASS, category, detail, started_wall, data)
+    return finish(PASS, category, detail)
 
 
 class RustOracle:

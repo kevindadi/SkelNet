@@ -96,6 +96,35 @@ def test_matches_semantics():
     assert _matches(result, {"functional": True}) is False
 
 
+def test_no_concurrency_reaches_o3_and_calibration(tmp_path):
+    tools = FakeTools(shuttle_no_concurrency=True)
+    oracle = RustOracle(terminal="DONE t1=1 t2=1", runner=tools,
+                        task_dir=FIXTURE / "abba_2lock")
+    result = oracle.evaluate("fn main() {}", tmp_path / "o3")
+    o3 = result.layers["O3"]
+    assert o3.status == "pass"
+    assert o3.data.get("no_concurrency") is True
+    assert "no concurrency to explore" in (o3.detail or "")
+
+    cmd_calibrate(_args(tmp_path, "--mutants"),
+                  runner=FakeTools(shuttle_no_concurrency=True))
+    document = _document(tmp_path)
+    assert document["no_concurrency"]
+    assert "## no_concurrency" in (tmp_path / "cal" / "CALIBRATION.md").read_text()
+
+
+def test_no_concurrency_marker_kept_when_miri_fails(tmp_path):
+    tools = FakeTools(shuttle_no_concurrency=True, miri_rc=1,
+                      miri_output="error: deadlock")
+    oracle = RustOracle(terminal="DONE t1=1 t2=1", runner=tools,
+                        task_dir=FIXTURE / "abba_2lock")
+    result = oracle.evaluate("fn main() {}", tmp_path / "o3")
+    o3 = result.layers["O3"]
+    assert o3.status == "fail" and o3.category == "deadlock"
+    assert o3.data.get("no_concurrency") is True
+    assert "no concurrency to explore" in (o3.detail or "")
+
+
 @rust_tools
 def test_fixture_fixed_passes_all_layers(tmp_path):
     fixed = (FIXTURE / "abba_2lock" / "rust" / "fixed.rs").read_text(encoding="utf-8")
@@ -168,3 +197,12 @@ def test_panic_words_program_passes_o3(tmp_path):
                         task_dir=FIXTURE / "abba_2lock", stress_runs=2, monitor_runs=1)
     result = oracle.evaluate(source, tmp_path / "panic_words")
     assert result.layers["O3"].status == "pass", result.layers["O3"].to_dict()
+
+
+@rust_tools
+def test_fixture_no_concurrency_lists_print_only_and_serialized(tmp_path):
+    cmd_calibrate(_args(tmp_path, "--mutants", "--report-only"))
+    document = _document(tmp_path)
+    assert set(document["no_concurrency"]) == {
+        "abba_2lock/mutant:print_only", "abba_2lock/mutant:serialized"}
+    assert "## no_concurrency" in (tmp_path / "cal" / "CALIBRATION.md").read_text()
