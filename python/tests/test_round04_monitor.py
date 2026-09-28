@@ -141,3 +141,17 @@ def test_monitor_feedback_drops_reference_design_and_goal(tmp_path):
     # The reference-design failure is real, and it must not decide acceptance.
     assert result.category == "monitor_fail" or result.blocking
     assert result.blocking  # the safety FAIL still blocks
+
+
+def test_opaque_property_ids_hide_the_raw_id(tmp_path):
+    result = run_monitor_feedback(
+        ToolRunner(runner=FakeTools(
+            monitor_report=_report([
+                {"id": "safety-main", "kind": "safety", "source": "properties",
+                 "req": "R1", "status": "FAIL", "detail": "both locks"},
+            ]),
+            resources=DEFAULT_RESOURCES, traces=[DEFAULT_TRACE]), toolchain=None),
+        tmp_path / "feedback", "fn main() {}\n", task_dir=_task(tmp_path),
+        property_ids="opaque", runs=1, timeout=5)
+    assert "safety-main" not in result.feedback
+    assert "id: P1" in result.feedback

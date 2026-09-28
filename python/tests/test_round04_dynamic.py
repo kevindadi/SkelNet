@@ -9,6 +9,7 @@ from skelnet.rusttools.runner import ToolRunner
 from skelnet.rusttools.seeds import (FEEDBACK_MIRI_SEED_COUNT,
                                      FEEDBACK_MIRI_SEED_DEFAULT_COUNT,
                                      FEEDBACK_MIRI_SEED_START,
+                                     FEEDBACK_SHUTTLE_SEED,
                                      feedback_miri_window, feedback_shuttle_seed,
                                      miri_many_seeds_flag)
 
@@ -80,7 +81,7 @@ class MarkerRunner:
     def _shuttle(self, src: str):
         if "SKELNET_DEADLOCK" in src:
             return ns(1, "",
-                      "thread 'main' panicked at runtime/execution.rs:1:1:\n"
+                      "thread 'main' (4242) panicked at runtime/execution.rs:1:1:\n"
                       "deadlock! blocked tasks: [main, t1, t2]\n"
                       "failing schedule:\n\"\nPCT 1 2 3\n\"\n")
         if "SKELNET_NOCONC" in src:
@@ -135,6 +136,7 @@ def test_dynamic_shuttle_deadlock_includes_failure_text(tmp_path):
     shuttle = next(s for s in result.slices if s.name == "shuttle")
     assert shuttle.category == "deadlock" and shuttle.blocking
     assert "deadlock! blocked tasks" in result.feedback
+    assert "(4242)" not in result.feedback
     saved = (tmp_path / "shuttle" / "failure.txt").read_text(encoding="utf-8")
     assert "deadlock! blocked tasks" in saved
     assert "PCT 1 2 3" in result.feedback
@@ -146,6 +148,7 @@ def test_dynamic_no_concurrency_passes(tmp_path):
     assert shuttle.category is None or shuttle.status == "pass"
     assert not shuttle.blocking
     assert result.passed
+    assert "treated as pass" in result.feedback
 
 
 def test_dynamic_shuttle_unsupported_does_not_block(tmp_path):
@@ -198,6 +201,7 @@ def test_feedback_seeds_flow_through_dynamic_then_oracle(tmp_path):
     shuttle_seeds = [env.get("SHUTTLE_RANDOM_SEED") for env in runner.envs
                      if env.get("SHUTTLE_RANDOM_SEED")]
     miri_flags = [env.get("MIRIFLAGS") for env in runner.envs if env.get("MIRIFLAGS")]
+    assert shuttle_seeds[0] == str(FEEDBACK_SHUTTLE_SEED)
     assert shuttle_seeds[0] == str(feedback_shuttle_seed())
     assert shuttle_seeds[-1] == str(ORACLE_SHUTTLE_SEED)
     start, count = feedback_miri_window(FEEDBACK_MIRI_SEED_DEFAULT_COUNT)

@@ -9,6 +9,7 @@ counts as a pass.
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -131,10 +132,21 @@ def _stress_text(layer, terminal: str | None) -> str:
     return "\n".join(lines)
 
 
+# Shuttle's panic line includes the OS thread id (`thread 'main' (12345)`).
+# That id changes every process, so it is stripped before the text becomes
+# feedback. Otherwise a later call's cache key would miss on replay even when
+# the failing schedule is identical.
+_OS_THREAD_ID = re.compile(r"(thread '[^']+') \(\d+\)")
+
+
+def _stabilize(text: str) -> str:
+    return _OS_THREAD_ID.sub(r"\1", text)
+
+
 def _shuttle_text(layer, failure_file: Path) -> str:
     raw = ""
     if failure_file.is_file():
-        raw = failure_file.read_text(encoding="utf-8", errors="replace")
+        raw = _stabilize(failure_file.read_text(encoding="utf-8", errors="replace"))
     schedule = (layer.data or {}).get("schedule")
     if layer.status == PASS and (layer.data or {}).get("no_concurrency"):
         return "## shuttle\nno concurrency to explore (treated as pass)"
@@ -203,10 +215,8 @@ def run_dynamic(tools: ToolRunner, workdir: Path | str, source: str, *,
         tools, workdir, source, shim_path=SHUTTLE_SHIM_CRATE,
         iterations=shuttle_iterations, depth=shuttle_depth,
         seed=shuttle_seed, timeout=timeout, cargo=cargo)
+    # no_concurrency is already PASS. unsupported does not block (D4-4).
     shuttle_block = shuttle.status != PASS and not _nonblocking(shuttle.category)
-    # no_concurrency is PASS already; unsupported is non-blocking.
-    if shuttle.category == "shuttle_unsupported":
-        shuttle_block = False
     failure_file = workdir / "shuttle" / "failure.txt"
     shuttle_body = relativize(_shuttle_text(shuttle, failure_file), workdir)
     slices.append(ToolSlice(

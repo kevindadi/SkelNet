@@ -99,6 +99,8 @@ def run_lockbud(tools: ToolRunner, workdir: Path | str, source: str, *,
             "RUSTUP_TOOLCHAIN": LOCKBUD_TOOLCHAIN,
             "RUSTC_WRAPPER": str(binary),
             "LOCKBUD_FLAGS": flags,
+            # JSON reports are log::warn!; they stay silent unless this is set.
+            "LOCKBUD_LOG": "warn",
         })
     wall = int((time.monotonic() - started) * 1000)
     combined = (call.stdout or "") + "\n" + (call.stderr or "")

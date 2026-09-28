@@ -1,0 +1,20 @@
+{
+  "text": "```rust\n//! Calibration fixture reference (round 3).\n//!\n//! Binding names match the contract entities (`a`, `b`, `t1`, `t2`); both\n//! workers take the locks in the same global order and the program prints the\n//! expected terminal line.\n\nuse std::sync::{Arc, Mutex};\nuse std::thread;\n\nfn t1(a: Arc<Mutex<()>>, b: Arc<Mutex<()>>) {\n    let ga = a.lock().unwrap();\n    let gb = b.lock().unwrap();\n    drop(gb);\n    drop(ga);\n}\n\nfn t2(a: Arc<Mutex<()>>, b: Arc<Mutex<()>>) {\n    let ga = a.lock().unwrap();\n    let gb = b.lock().unwrap();\n    drop(gb);\n    drop(ga);\n}\n\nfn main() {\n    let a = Arc::new(Mutex::new(()));\n    let b = Arc::new(Mutex::new(()));\n\n    let w1 = {\n        let a = Arc::clone(&a);\n        let b = Arc::clone(&b);\n        thread::spawn(move || t1(a, b))\n    };\n    let w2 = {\n        let a = Arc::clone(&a);\n        let b = Arc::clone(&b);\n        thread::spawn(move || t2(a, b))\n    };\n\n    w1.join().unwrap();\n    w2.join().unwrap();\n    println!(\"DONE t1=1 t2=1\");\n}\n\n```",
+  "usage": null,
+  "finish_reason": "stop",
+  "response_model": null,
+  "request_id": "replay",
+  "cost": null,
+  "reasoning_content": null,
+  "session": null,
+  "seed": null,
+  "wall_ms": 0,
+  "transport_attempt": 1,
+  "prompt_sha256": "",
+  "messages": [],
+  "requested_model": "deepseek-v4-flash",
+  "truncation_retry": false,
+  "finish_reasons": [],
+  "usage_attempts": [],
+  "temperature_sent": null
+}

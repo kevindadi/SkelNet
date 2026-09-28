@@ -194,6 +194,7 @@ def run_rust_iter_cell(*, arm, task, requirements, provider, oracle, workdir,
             return
         pending = False
         directory = Path(workdir) / "feedback" / f"r{rounds[-1]['call']}"
+        directory.mkdir(parents=True, exist_ok=True)
         outcome = feedback_fn(source, directory)
         rounds[-1]["tools"] = outcome.tools
         rounds[-1]["seeds"] = outcome.seeds
@@ -247,8 +248,9 @@ def run_rust_iter_cell(*, arm, task, requirements, provider, oracle, workdir,
         version += 1
         source = reply.source
         current = source
-        compiled_result = compile_fn(tools, Path(workdir) / "compile" / f"c{version}",
-                                     source)
+        compile_dir = Path(workdir) / "compile" / f"c{version}"
+        compile_dir.mkdir(parents=True, exist_ok=True)
+        compiled_result = compile_fn(tools, compile_dir, source)
         compiled = bool(getattr(compiled_result, "ok", False))
         if compiled:
             any_compiled = True

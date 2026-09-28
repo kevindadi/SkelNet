@@ -1,0 +1,20 @@
+{
+  "text": "```rust\n//! Calibration fixture defect (round 3).\n//!\n//! Source: ConcPlanVerify commit 8bf9fa49b,\n//! `benchmarks/families/lock-order/abba_2lock/rust/buggy.rs` (public repo).\n//! Changes: binding names renamed to the contract entities (`a`, `b`, `t1`,\n//! `t2`), the two spawn closures call named worker functions so the instrumenter\n//! can label them, and the expected terminal line is printed after the joins.\n//! The ABBA interleaving usually hangs O2 (the run watchdog fires) before O3's\n//! Shuttle exploration deterministically reports the deadlock.\n//! Expected defect: ABBA deadlock (t1 takes a->b, t2 takes b->a).\n\nuse std::sync::{Arc, Mutex};\nuse std::thread;\n\nfn t1(a: Arc<Mutex<()>>, b: Arc<Mutex<()>>) {\n    let ga = a.lock().unwrap();\n    let gb = b.lock().unwrap();\n    drop(gb);\n    drop(ga);\n}\n\nfn t2(a: Arc<Mutex<()>>, b: Arc<Mutex<()>>) {\n    let gb = b.lock().unwrap(); // opposite order\n    let ga = a.lock().unwrap();\n    drop(ga);\n    drop(gb);\n}\n\nfn main() {\n    let a = Arc::new(Mutex::new(()));\n    let b = Arc::new(Mutex::new(()));\n\n    let w1 = {\n        let a = Arc::clone(&a);\n        let b = Arc::clone(&b);\n        thread::spawn(move || t1(a, b))\n    };\n    let w2 = {\n        let a = Arc::clone(&a);\n        let b = Arc::clone(&b);\n        thread::spawn(move || t2(a, b))\n    };\n\n    w1.join().unwrap();\n    w2.join().unwrap();\n    println!(\"DONE t1=1 t2=1\");\n}\n\n```",
+  "usage": null,
+  "finish_reason": "stop",
+  "response_model": null,
+  "request_id": "replay",
+  "cost": null,
+  "reasoning_content": null,
+  "session": null,
+  "seed": null,
+  "wall_ms": 0,
+  "transport_attempt": 1,
+  "prompt_sha256": "",
+  "messages": [],
+  "requested_model": "deepseek-v4-flash",
+  "truncation_retry": false,
+  "finish_reasons": [],
+  "usage_attempts": [],
+  "temperature_sent": null
+}

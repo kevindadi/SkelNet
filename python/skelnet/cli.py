@@ -213,6 +213,7 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         }, indent=2))
         return 0
 
+    _preflight_baseline_tools(args)
     out = Path(args.out)
     if args.resume:
         _check_resume(out, args, run_params)
@@ -261,10 +262,25 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
                 provider.set_cell(f"{task}/{rep}", task, rep)
             base = _base_cell(args, spec, run_params, task, tier, rep)
             try:
-                if args.arm == "G0":
+                if args.arm in prompts.BASELINE_ARMS:
+                    if args.rust_mode == "codegen":
+                        raise SystemExit(
+                            f"--arm {args.arm} writes Rust directly and has no "
+                            "codegen stage; use --rust-mode llm")
+                    from .baselines import run_baseline_cell
+                    cell = run_baseline_cell(
+                        arm=args.arm, task=task, requirements=requirements,
+                        task_dir=task_dir, terminal=terminal, provider=provider,
+                        oracle=task_oracle, workdir=workdir, replicate=rep,
+                        run_params=run_params, tools=compile_tools,
+                        tools_missing=_missing_baseline_tools(args),
+                        miri_seed_count=args.feedback_miri_seeds,
+                        timeout=args.timeout)
+                elif args.arm == "G0":
                     cell = run_g0_cell(task=task, requirements=requirements,
                                        provider=provider, oracle=task_oracle,
-                                       workdir=workdir, replicate=rep)
+                                       workdir=workdir, replicate=rep,
+                                       tools=compile_tools)
                 elif args.arm == "SKEL":
                     cell = run_skel_cell(task=task, requirements=requirements,
                                          contract_path=contract, provider=provider,
@@ -393,6 +409,10 @@ def _check_resume(out: Path, args, run_params) -> None:
             for t in _select_tasks(repo_root(), args.tasks)]
     if selected != want:
         raise SystemExit("--resume: tasks do not match the existing run")
+    recorded = manifest.get("baseline_tools")
+    current = _baseline_tools_snapshot(args)
+    if recorded != current:
+        raise SystemExit("--resume: baseline_tools do not match the existing run")
 
 
 def _write_summary(out: Path, summary: dict) -> None:
@@ -528,6 +548,7 @@ def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
             "cargo": _tool_version("cargo"),
             "python": sys.version.split()[0],
         },
+        "baseline_tools": _baseline_tools_snapshot(args),
         "started_at": started_at,
         "ended_at": ended_at,
         "status": "running",
@@ -644,6 +665,13 @@ class _ChatProvider:
 
 def _stage_for(arm: str, request) -> str:
     """Resolve the prompt stage for a request from the arm and its content."""
+    if arm in prompts.BASELINE_ARMS:
+        stage = getattr(request, "stage", None)
+        allowed = {prompts.STAGE_GENERATE, prompts.STAGE_RUST_FIX,
+                   prompts.STAGE_REVIEW, prompts.STAGE_TOOL_FEEDBACK}
+        if stage not in allowed:
+            raise KeyError(f"unknown baseline stage {stage!r} for arm {arm}")
+        return stage
     if arm == "G0":
         return prompts.STAGE_GENERATE
     if request.stage == "rust":
@@ -668,6 +696,16 @@ def _user_prompt_for(arm: str, stage: str, request) -> str:
                 request.requirements, request.previous_candidate or "")
         return prompts.rust_from_skel_user_prompt(
             request.requirements, request.previous_candidate or "")
+    if stage == prompts.STAGE_REVIEW:
+        return prompts.baseline_review_user_prompt(
+            request.requirements, request.current_program or "",
+            feedback=request.feedback)
+    if stage == prompts.STAGE_TOOL_FEEDBACK:
+        source = {"STATIC": "static", "DYNAMIC": "dynamic",
+                  "DYNAMIC_M": "dynamic_monitor"}.get(arm, "static")
+        return prompts.baseline_tool_feedback_user_prompt(
+            request.requirements, request.current_program or "",
+            request.feedback or "", source=source)
     return prompts.requirements_only_user_prompt(
         request.requirements, previous_candidate=request.previous_candidate,
         feedback=request.feedback)
@@ -675,7 +713,16 @@ def _user_prompt_for(arm: str, stage: str, request) -> str:
 
 def _build_provider(args: argparse.Namespace, audit: AuditLog, out: Path,
                     spec, run_params, ledger, *, client_factory=None):
-    if client_factory is None:
+    if client_factory is not None:
+        inner = client_factory(spec, out)
+    elif args.replay_from:
+        # Replay must not load a key or open a socket. A miss raises before
+        # this inner client is asked to complete.
+        class _ReplayOnly:
+            def complete(self, system, user):  # pragma: no cover - miss path
+                raise TransportError("replay_only")
+        inner = _ReplayOnly()
+    else:
         # Only the real path loads .env; dry-run and injected factories do not.
         env_file = Path(args.env_file) if args.env_file else repo_root() / ".env"
         from .env import load_dotenv
@@ -687,8 +734,6 @@ def _build_provider(args: argparse.Namespace, audit: AuditLog, out: Path,
         inner = build_client(spec, run_params, budget=ledger,
                              evidence_dir=out / "evidence", api_key=key,
                              timeout=args.timeout)
-    else:
-        inner = client_factory(spec, out)
     cache = ResponseCache(args.cache_dir if args.cache_dir else out / "cache")
     replay = None
     if args.replay_from:
@@ -698,7 +743,8 @@ def _build_provider(args: argparse.Namespace, audit: AuditLog, out: Path,
             replay_dir = replay_dir / "cache"
         replay = ResponseCache(replay_dir)
     cached = CachedClient(inner, cache=cache, replay=replay,
-                          model_id=spec.model_id or "", params=run_params)
+                          model_id=spec.model_id or "", params=run_params,
+                          first_round=getattr(args, "first_round", "auto"))
     audited = _make_audited(cached, audit=audit, out=out, spec=spec, arm=args.arm)
     return _ChatProvider(audited, arm=args.arm, params=run_params)
 
@@ -712,6 +758,172 @@ def _make_audited(inner, *, audit, out, spec, arm):
 class _Budget:
     def reserve(self) -> None:  # pragma: no cover - only in real runs
         return None
+
+
+_CLIPPY_VERSION: str | None | bool = False
+_CLIPPY_PROBE: dict | None = None
+_MIRI_PRESENT: bool | None = None
+_SHUTTLE_PRESENT: bool | None = None
+
+
+def _toolchain_env() -> dict:
+    env = dict(os.environ)
+    channel = repo_toolchain_channel()
+    if channel:
+        env["RUSTUP_TOOLCHAIN"] = channel
+    return env
+
+
+def _clippy_version() -> str | None:
+    """``cargo clippy --version`` on the repo toolchain, or None."""
+    global _CLIPPY_VERSION
+    if _CLIPPY_VERSION is not False:
+        return _CLIPPY_VERSION  # type: ignore[return-value]
+    try:
+        proc = subprocess.run(
+            ["cargo", "clippy", "--version"], capture_output=True, text=True,
+            timeout=60, env=_toolchain_env())
+    except (OSError, subprocess.TimeoutExpired):
+        _CLIPPY_VERSION = None
+        return None
+    text = (proc.stdout or "").strip()
+    _CLIPPY_VERSION = text if proc.returncode == 0 and text else None
+    return _CLIPPY_VERSION
+
+
+def _clippy_probe() -> dict | None:
+    """probe_lints result, cached so a resume snapshot matches the first one."""
+    global _CLIPPY_PROBE
+    if _CLIPPY_PROBE is not None:
+        return _CLIPPY_PROBE
+    if _clippy_version() is None:
+        return None
+    import tempfile
+    from .rusttools.clippy import probe_lints
+    from .rusttools.runner import ToolRunner
+    with tempfile.TemporaryDirectory(prefix="skelnet-clippy-probe-") as directory:
+        found = probe_lints(ToolRunner(), directory, timeout=180.0)
+    _CLIPPY_PROBE = {name: bool(ok) for name, ok in found.items()}
+    return _CLIPPY_PROBE
+
+
+def _miri_present() -> bool:
+    global _MIRI_PRESENT
+    if _MIRI_PRESENT is not None:
+        return _MIRI_PRESENT
+    try:
+        proc = subprocess.run(
+            ["cargo", "miri", "--version"], capture_output=True, text=True,
+            timeout=60, env=_toolchain_env())
+    except (OSError, subprocess.TimeoutExpired):
+        _MIRI_PRESENT = False
+        return False
+    _MIRI_PRESENT = proc.returncode == 0
+    return _MIRI_PRESENT
+
+
+def _shuttle_prefetched() -> bool:
+    """True when the cargo registry already contains shuttle 0.8.1."""
+    global _SHUTTLE_PRESENT
+    if _SHUTTLE_PRESENT is not None:
+        return _SHUTTLE_PRESENT
+    homes = [Path(os.environ.get("CARGO_HOME", Path.home() / ".cargo"))]
+    default = Path.home() / ".cargo"
+    if default not in homes:
+        homes.append(default)
+    found = False
+    for home in homes:
+        if any(home.glob("registry/src/*/shuttle-0.8.1")):
+            found = True
+            break
+    _SHUTTLE_PRESENT = found
+    return found
+
+
+def _missing_baseline_tools(args) -> list[str]:
+    """Tools a baseline arm needs. Empty for G0/SKEL/CIR/REFINE."""
+    arm = getattr(args, "arm", None)
+    if arm not in prompts.BASELINE_ARMS:
+        return []
+    missing: list[str] = []
+    if arm == "STATIC":
+        if _clippy_version() is None:
+            missing.append("clippy")
+        from .rusttools.lockbud import locate_lockbud
+        if locate_lockbud() is None:
+            missing.append("lockbud")
+    if arm in ("DYNAMIC", "DYNAMIC_M"):
+        if not _shuttle_prefetched():
+            missing.append("shuttle")
+        if not _miri_present():
+            missing.append("miri")
+    if arm == "DYNAMIC_M":
+        from .backend import find_binary
+        for name, env_var in (("concir-instrument", "CONCIR_INSTRUMENT"),
+                              ("concir-backend", "CONCIR_BACKEND")):
+            try:
+                find_binary(name, env_var=env_var)
+            except FileNotFoundError:
+                missing.append(name)
+    return missing
+
+
+def _preflight_baseline_tools(args) -> None:
+    """Refuse a baseline run whose tools are missing, unless allowed."""
+    from .rusttools.seeds import FEEDBACK_MIRI_SEED_COUNT
+    count = getattr(args, "feedback_miri_seeds", 16)
+    if not isinstance(count, int) or isinstance(count, bool) or count < 0 \
+            or count > FEEDBACK_MIRI_SEED_COUNT:
+        raise SystemExit(
+            f"--feedback-miri-seeds must be between 0 and "
+            f"{FEEDBACK_MIRI_SEED_COUNT}")
+    missing = _missing_baseline_tools(args)
+    if missing and not getattr(args, "allow_missing_tools", False):
+        raise SystemExit(
+            "missing baseline tools: " + ", ".join(missing)
+            + " (install them, or pass --allow-missing-tools)")
+
+
+def _baseline_tools_snapshot(args) -> dict:
+    """Deterministic MANIFEST record of the feedback-tool configuration."""
+    from .rusttools.lockbud import LOCKBUD_TOOLCHAIN, lockbud_commit
+    from .rusttools.seeds import (FEEDBACK_MIRI_SEED_COUNT, FEEDBACK_SHUTTLE_SEED,
+                                  feedback_miri_window)
+    count = getattr(args, "feedback_miri_seeds", 16)
+    try:
+        start, used = feedback_miri_window(count)
+    except ValueError:
+        start, used = 0, 0
+    arm = getattr(args, "arm", None)
+    clippy = None
+    lockbud = None
+    if arm == "STATIC":
+        version = _clippy_version()
+        clippy = {"version": version, "lints": _clippy_probe() if version else None}
+        lockbud = {"commit": lockbud_commit(),
+                   "toolchain": LOCKBUD_TOOLCHAIN,
+                   "present": _lockbud_present()}
+    return {
+        "clippy": clippy,
+        "lockbud": lockbud,
+        "shuttle": "0.8.1" if _shuttle_prefetched() else None,
+        "seeds": {
+            "shuttle": FEEDBACK_SHUTTLE_SEED,
+            "miri_start": start,
+            "miri_count": used,
+            "miri_window": FEEDBACK_MIRI_SEED_COUNT,
+        },
+        "stress": {"runs": 20, "timeout_s": 10.0,
+                   "shuttle_iterations": 2000, "shuttle_depth": 3},
+        "first_round": getattr(args, "first_round", "auto"),
+        "feedback_miri_seeds": count,
+        "missing": _missing_baseline_tools(args),
+    }
+
+
+def _lockbud_present() -> bool:
+    from .rusttools.lockbud import locate_lockbud
+    return locate_lockbud() is not None
 
 
 def cmd_eval(args: argparse.Namespace, *, runner=None) -> int:
@@ -866,7 +1078,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="run an arm")
-    run.add_argument("--arm", default="SKEL", choices=["G0", "SKEL", "CIR"])
+    run.add_argument("--arm", default="SKEL",
+                     choices=["G0", "SKEL", "CIR", "REFINE", "STATIC",
+                              "DYNAMIC", "DYNAMIC_M"])
     run.add_argument("--model", default="DeepSeek Flash")
     run.add_argument("--tasks", default="all")
     run.add_argument("--reps", type=int, default=3)
@@ -897,6 +1111,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--replay-from", default=None)
     run.add_argument("--env-file", default=None)
     run.add_argument("--dry-run", action="store_true")
+    run.add_argument("--first-round", default="auto",
+                     choices=["auto", "require-cache"])
+    run.add_argument("--allow-missing-tools", action="store_true")
+    run.add_argument("--feedback-miri-seeds", type=int, default=16)
     run.add_argument("--timeout", type=float, default=300.0)
     run.set_defaults(func=cmd_run)
 
