@@ -9,8 +9,8 @@ from skelnet.oracle import FakeOracle
 from skelnet.transport import BudgetExceeded
 
 from _fake_sdk import (RUST, FakeSDK, chat_response, patch_build_client,
-                       run_args, sequence_chat_handler, sequence_handler,
-                       write_env)
+                       responses_response, run_args, sequence_chat_handler,
+                       sequence_handler, write_env)
 
 
 def _args(tmp_path, out, **extra):
@@ -70,3 +70,43 @@ def test_budget_exceeded_from_sdk_stops_the_run(tmp_path, monkeypatch):
     assert manifest["status"] == "budget_exhausted"
     for path in (out / "cells").rglob("result.json"):
         assert json.loads(path.read_text())["error"] != "BudgetExceeded"
+
+
+def _opencode_truncate_then_succeed(tmp_path, monkeypatch, model, surface, name):
+    first_usage = {"prompt_tokens": 10, "completion_tokens": 5,
+                   "completion_tokens_details": {"reasoning_tokens": 3}}
+    second_usage = {"prompt_tokens": 20, "completion_tokens": 7}
+    if surface == "responses":
+        sdk = FakeSDK(responses_handler=sequence_handler([
+            responses_response("", status="incomplete",
+                               incomplete_reason="max_output_tokens",
+                               usage=first_usage),
+            responses_response(RUST, usage=second_usage),
+        ]))
+    else:
+        sdk = FakeSDK(chat_handler=sequence_handler([
+            chat_response("", finish_reason="length", usage=first_usage),
+            chat_response(RUST, finish_reason="stop", usage=second_usage),
+        ]))
+    patch_build_client(monkeypatch, sdk)
+    env = write_env(tmp_path, OPENCODE_API_KEY="k")
+    out = tmp_path / name
+    args = run_args("G0", out, model=model, env_file=str(env),
+                    budget_file=str(tmp_path / "budget.json"))
+    assert cli.cmd_run(args, oracle_factory=lambda t, term: FakeOracle(True)) == 0
+    snapshot = BudgetLedger(tmp_path / "budget.json").snapshot()
+    # The truncation retry is a second real request: both reserve.
+    assert snapshot["requests"] == 2
+    assert snapshot["input"] == 30
+    assert snapshot["output"] == 12
+    assert snapshot["reasoning"] == 3
+    assert billable_tokens(snapshot) == 42
+
+
+def test_opencode_chat_truncation_retry_reserves(tmp_path, monkeypatch):
+    _opencode_truncate_then_succeed(tmp_path, monkeypatch, "Kimi", "chat", "kimi")
+
+
+def test_opencode_responses_truncation_retry_reserves(tmp_path, monkeypatch):
+    _opencode_truncate_then_succeed(tmp_path, monkeypatch, "GPT 6 Luna",
+                                    "responses", "gpt")

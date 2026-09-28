@@ -43,7 +43,10 @@ A validation failure is a program bug and aborts the run.
   retries (A4); `truncation_retry` marks the larger-cap retry (A6). Transport and
   truncation retries do not consume the cell call budget. `finish_reasons` is the
   ordered per-attempt finish reason (required; length 1 without a truncation
-  retry), while `finish_reason` is the final one.
+  retry), while `finish_reason` is the final one. A call that fails with
+  `transport_truncated` still records its per-attempt `usage` and
+  `finish_reasons` (so its tokens count against `budget_used` and the global
+  ledger).
 - `budget_used`: logical calls and billable tokens (`input + output`). Chat
   `completion_tokens` and Responses `output_tokens` already include reasoning, so
   `reasoning` is counted only when `output` is absent; it is still recorded

@@ -88,3 +88,50 @@ def test_responses_twice_truncated(tmp_path, monkeypatch):
     out, rc = _run(tmp_path, monkeypatch, "GPT 6 Luna", sdk)
     assert rc == 0
     assert _cell(out, "GPT 6 Luna")["error"] == "transport_truncated"
+
+
+def _error_event(out):
+    events = [json.loads(line) for line in
+              (out / "audit.jsonl").read_text().splitlines() if line.strip()]
+    errors = [event for event in events if event.get("status") == "error"]
+    assert len(errors) == 1
+    return errors[0]
+
+
+def _assert_twice_truncated_accounted(out, model):
+    cell = _cell(out, model)
+    assert cell["error"] == "transport_truncated"
+    call = cell["calls"][0]
+    assert call["truncation_retry"] is True
+    assert len(call["finish_reasons"]) == 2
+    # Two attempts of input 10 / output 5 / reasoning 3 each.
+    assert call["usage"]["input"] == 20
+    assert call["usage"]["output"] == 10
+    assert call["usage"]["reasoning"] == 6
+    assert cell["budget_used"]["calls"] == 1
+    assert cell["budget_used"]["tokens"] == 30  # billable = input + output
+    event = _error_event(out)
+    assert event["truncation_retry"] is True
+    assert len(event["finish_reasons"]) == 2
+
+
+def test_twice_truncated_keeps_usage_direct(tmp_path, monkeypatch):
+    sdk = FakeSDK(chat_handler=sequence_handler([
+        chat_response("", finish_reason="length", usage=USAGE),
+        chat_response("", finish_reason="length", usage=USAGE),
+    ]))
+    out, rc = _run(tmp_path, monkeypatch, "DeepSeek Flash", sdk)
+    assert rc == 0
+    _assert_twice_truncated_accounted(out, "DeepSeek Flash")
+
+
+def test_twice_truncated_keeps_usage_responses(tmp_path, monkeypatch):
+    sdk = FakeSDK(responses_handler=sequence_handler([
+        responses_response("", status="incomplete",
+                           incomplete_reason="max_output_tokens", usage=USAGE),
+        responses_response("", status="incomplete",
+                           incomplete_reason="max_output_tokens", usage=USAGE),
+    ]))
+    out, rc = _run(tmp_path, monkeypatch, "GPT 6 Luna", sdk)
+    assert rc == 0
+    _assert_twice_truncated_accounted(out, "GPT 6 Luna")

@@ -212,7 +212,10 @@ class DirectChatClient:
                 max_tokens = min(2 * max_tokens,
                                  getattr(self.params, "max_output_tokens_cap", 65536))
                 continue
-            raise TransportTruncated()
+            raise TransportTruncated(
+                truncation_retry=truncation_retry,
+                finish_reasons=finish_reasons,
+                usage_attempts=usage_attempts)
         wall_ms = int((time.monotonic() - started) * 1000)
         return DirectOutcome(
             text=parsed["text"], messages=messages, requested_model=self.model,

@@ -127,8 +127,11 @@ class AuditedClient:
                 returned_model=None, usage_raw=None, started_at=started,
                 ended_at=time.time(), prompt=prompt, response="",
                 candidate_round=self.attempt, attempt_id=attempt_id, status="error",
-                cache_hit=False, temperature_sent=None, truncation_retry=False,
-                finish_reasons=[], error_type=type(exc).__name__, error=str(exc),
+                cache_hit=False,
+                temperature_sent=getattr(exc, "temperature_sent", None),
+                truncation_retry=bool(getattr(exc, "truncation_retry", False)),
+                finish_reasons=list(getattr(exc, "finish_reasons", []) or []),
+                error_type=type(exc).__name__, error=str(exc),
                 **meta)
             raise
         ended = time.time()

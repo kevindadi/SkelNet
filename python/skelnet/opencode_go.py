@@ -190,7 +190,10 @@ class OpenCodeGoClient(_OpenCodeBase):
                 truncation_retry = True
                 max_tokens = self._next_cap(max_tokens)
                 continue
-            raise TransportTruncated()
+            raise TransportTruncated(
+                truncation_retry=truncation_retry,
+                finish_reasons=finish_reasons,
+                usage_attempts=usage_attempts)
         wall_ms = int((time.monotonic() - started) * 1000)
         return OpenCodeOutcome(
             text=content, messages=messages, requested_model=self.model,
@@ -282,7 +285,10 @@ class OpenCodeGoResponsesClient(_OpenCodeBase):
                 truncation_retry = True
                 max_tokens = self._next_cap(max_tokens)
                 continue
-            raise TransportTruncated()
+            raise TransportTruncated(
+                truncation_retry=truncation_retry,
+                finish_reasons=finish_reasons,
+                usage_attempts=usage_attempts)
         wall_ms = int((time.monotonic() - started) * 1000)
         return OpenCodeOutcome(
             text=parsed["text"], messages=messages, requested_model=self.model,

@@ -570,7 +570,11 @@ class _ChatProvider:
         except BudgetExceeded:
             raise
         except TransportError as exc:
-            self._record(stage, system, user, None, error=exc)
+            # A failed call can still carry usage/truncation accounting (e.g.
+            # TransportTruncated): record and bill it like a real call.
+            self._record(stage, system, user, exc, error=exc)
+            if self.cell_budget is not None:
+                self.cell_budget.add_tokens(self._usage_of(exc))
             return CandidateResponse(text="", source="llm", provider=self.name,
                                      error=str(exc))
         self._record(stage, system, user, outcome)

@@ -37,10 +37,20 @@ class TemperatureRejected(TransportError):
 
 
 class TransportTruncated(TransportError):
-    """The reply was truncated (or empty) even after the larger retry."""
+    """The reply was truncated (or empty) even after the larger retry.
 
-    def __init__(self, message: str = "transport_truncated") -> None:
+    Carries the per-attempt accounting of the failed call so the provider and
+    audit can still record the spend and the truncation metadata.
+    """
+
+    def __init__(self, message: str = "transport_truncated", *,
+                 truncation_retry: bool = False,
+                 finish_reasons: list | None = None,
+                 usage_attempts: list | None = None) -> None:
         super().__init__(message)
+        self.truncation_retry = truncation_retry
+        self.finish_reasons = list(finish_reasons or [])
+        self.usage_attempts = list(usage_attempts or [])
 
 
 class ReplayMiss(TransportError):

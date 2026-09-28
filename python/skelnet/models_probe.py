@@ -138,6 +138,7 @@ def _probe_one(spec, build) -> dict[str, Any]:
             client.set_cell("probe", 0)
         first = client.complete(PROBE_SYSTEM, PROBE_USER)
         _fill_basic(record, first)
+        record["requires_stream"] = False
         record["thinking_accepted"] = _thinking_accepted(first)
         record["output_includes_reasoning"] = _output_includes_reasoning(
             getattr(first, "usage", None))

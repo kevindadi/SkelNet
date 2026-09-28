@@ -131,3 +131,33 @@ def test_replay_from_run_directory_and_rep_miss(tmp_path, monkeypatch):
     second_cell = json.loads(
         (out3 / "cells" / "lock-order" / "abba_2lock" / "1" / "result.json").read_text())
     assert second_cell["error"] == "replay_miss"
+
+
+def test_set_cell_resets_call_index_across_cells(tmp_path, monkeypatch):
+    # Two G0 runs share one --cache-dir. The first walks both lock-order tasks
+    # (so the second task's cells would carry a non-1 call_index if set_cell did
+    # not reset it); the second selects only that second task and must hit the
+    # cache with zero SDK requests.
+    sdk = FakeSDK(chat_handler=sequence_chat_handler([RUST] * 10))
+    patch_build_client(monkeypatch, sdk)
+    env = write_env(tmp_path, DEEPSEEK_API_KEY="k")
+    cache_dir = tmp_path / "shared-cache"
+    budget = tmp_path / "budget.json"
+
+    first = tmp_path / "run_first"
+    args = run_args("G0", first, tasks="lock-order/*", reps=2,
+                    model="DeepSeek Flash", env_file=str(env),
+                    budget_file=str(budget), cache_dir=str(cache_dir))
+    assert cli.cmd_run(args, oracle_factory=lambda t, term: FakeOracle(True)) == 0
+    assert len(sdk.chat.completions.calls) == 10  # 5 lock-order tasks x 2 reps
+
+    second = tmp_path / "run_second"
+    args2 = run_args("G0", second, tasks="lock-order/cross_module_cycle", reps=2,
+                     model="DeepSeek Flash", env_file=str(env),
+                     budget_file=str(budget), cache_dir=str(cache_dir))
+    assert cli.cmd_run(args2, oracle_factory=lambda t, term: FakeOracle(True)) == 0
+    assert len(sdk.chat.completions.calls) == 10  # no new requests: all hits
+    cells = list(_cells(second))
+    assert len(cells) == 2
+    for cell in cells:
+        assert all(call["cache_hit"] is True for call in cell["calls"])
