@@ -1,33 +1,56 @@
 {
   "schema_version": "skelnet-deviations-v1",
-  "note": "Deviations from the frozen BASELINE / mapping rules that need human confirmation. BASELINE.json itself is never modified.",
+  "note": "Deviations from the frozen BASELINE / mapping rules, with their resolutions. BASELINE.json itself is never modified.",
   "deviations": [
     {
       "kind": "baseline_deviation",
       "task": "condvar/same_cv_different_locks",
+      "moved_to": "boundary/same_cv_different_locks",
       "baseline_outcome": "UNSUPPORTED",
       "baseline_reason": "condvar_multiple_locks: one condvar waited on with two mutexes",
       "dsl_gold_skel_outcome": "PASS",
-      "action": "The original structure is inexpressible in the DSL (a condvar is bound to one mutex; `lock m2 { cv.wait(); }` for a cv bound to m1 is S104 - covered by a test). A subset gold.skel satisfying the requirement text was written with one condvar per waiter (cv1 for m1, cv2 for m2) and its explore result recorded. Awaiting human confirmation.",
+      "action": "The original structure is inexpressible in the DSL (a condvar is bound to one mutex; `lock m2 { cv.wait(); }` for a cv bound to m1 is S104). The original task was moved under `boundary/` as a negative example (direct.skel -> S104, gold.cir.json -> UNSUPPORTED), and the subset skeleton was promoted to the new task `condvar/two_cv_two_locks` (recorded in BASELINE_EXT.json; not claimed equivalent to the frozen baseline).",
+      "resolution": {
+        "decision": "D9",
+        "status": "resolved",
+        "summary": "Original task moved to boundary/same_cv_different_locks (SKEL reports S104, CIR reports UNSUPPORTED); the subset skeleton became the separate task condvar/two_cv_two_locks, explicitly not equivalent to the baseline."
+      },
       "tests": [
         "crates/skel/tests/equivalence.rs::same_cv_different_locks_direct_translation_is_s104",
-        "crates/skel/tests/equivalence.rs::gold_skels_match_baseline"
+        "crates/skel/tests/equivalence.rs::gold_skels_match_baseline",
+        "crates/skel/tests/equivalence.rs::baseline_ext_matches_verify_and_shipped_cir"
       ]
     },
     {
       "kind": "mapping_deviation",
       "mapping": "compute -> ConcIR nop (not seq_hole)",
       "reason": "ConcIR a35dc86 classifies seq_hole as UNSUPPORTED in the precise backend. Emitting seq_hole would make every skeleton containing a compute hole UNSUPPORTED, so no PASS baseline could be reproduced.",
-      "mitigation": "Source-map construct remains `seq_hole` so codegen/adhere can identify the hole.",
+      "mitigation": "compute lowers to the semantics-neutral nop; the source-map construct is `compute`. The front-end rejects compute footprints that name a shared resource (S110), so a hole can only read/write locals and nop is a sound abstraction for synchronization semantics. The cost is that a hole's effect on local data is invisible in the model.",
+      "resolution": {
+        "decision": "D9",
+        "status": "resolved",
+        "summary": "compute stays mapped to nop; the source-map construct is renamed to compute; S110 guarantees the reads/writes footprint contains only local variables."
+      },
       "tests": [
-        "crates/skel/tests/verify.rs::mapping_table_covers_each_row"
+        "crates/skel/tests/verify.rs::mapping_table_covers_each_row",
+        "crates/skel/tests/verify.rs::compute_lowers_to_nop_and_maps_as_compute",
+        "crates/skel/tests/frontend.rs::s110_compute_shared_write_negative",
+        "crates/skel/tests/frontend.rs::s110_compute_mutex_read_negative",
+        "crates/skel/tests/frontend.rs::s110_compute_local_footprint_positive",
+        "crates/skel/tests/equivalence.rs::gold_skels_pass_frontend_without_s110"
       ]
     },
     {
       "kind": "naming_deviation",
       "mapping": "worker_with_payload extern helper",
       "reason": "The plan's `extern fn compute();` uses `compute`, which is a DSL keyword (the compute hole). The sequential helper is named `helper` in gold.skel; the contract does not reference the helper by name, so verification is unaffected.",
-      "action": "Awaiting human confirmation; could be avoided by allowing `compute` in name position."
+      "action": "Accepted; no code change.",
+      "resolution": {
+        "decision": "D9",
+        "status": "resolved",
+        "summary": "accepted: contract does not reference the helper name"
+      },
+      "tests": []
     }
   ]
 }
