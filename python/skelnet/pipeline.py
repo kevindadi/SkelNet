@@ -438,8 +438,19 @@ def run_g0_cell(*, task: str, requirements: str, provider: CandidateProvider,
     if tools is None:
         tools = ToolRunner()
     compiled = compile_fn(tools, Path(workdir) / "compile" / "c1", result.rust or "")
-    result.check_ok = bool(getattr(compiled, "ok", False))
-    result.accepted = result.check_ok
+    if getattr(compiled, "unavailable", None):
+        result.check_ok = False
+        result.accepted = False
+        if not result.error:
+            result.error = "compile_unavailable"
+    elif getattr(compiled, "timed_out", False):
+        result.check_ok = False
+        result.accepted = False
+        if not result.error:
+            result.error = "compile_timeout"
+    else:
+        result.check_ok = bool(getattr(compiled, "ok", False))
+        result.accepted = result.check_ok
     result.oracle = oracle.evaluate(result.rust or "", workdir)
     return result
 

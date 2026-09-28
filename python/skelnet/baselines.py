@@ -43,9 +43,10 @@ def _nbytes(text: str | None) -> int:
     return len((text or "").encode("utf-8"))
 
 
-def _round(call: int, stage: str, reply_kind: str, version: int, compiled: bool,
-           feedback: str | None, *, truncated: bool = False, tools: dict | None = None,
-           seeds: dict | None = None) -> dict:
+def _round(call: int, stage: str, reply_kind: str, version: int,
+           compiled: bool | None, feedback: str | None, *,
+           compile: str | None = None, truncated: bool = False,
+           tools: dict | None = None, seeds: dict | None = None) -> dict:
     text = feedback or ""
     return {
         "call": call,
@@ -53,12 +54,28 @@ def _round(call: int, stage: str, reply_kind: str, version: int, compiled: bool,
         "reply_kind": reply_kind,
         "version": version,
         "compiled": compiled,
+        "compile": compile,
         "tools": tools or {},
         "seeds": seeds or {},
         "feedback_sha256": _sha(text),
         "feedback_bytes": _nbytes(text),
         "truncated": truncated or "[truncated]" in text,
     }
+
+
+def _compile_disposition(compiled_result) -> tuple[bool | None, str]:
+    """Classify one ``compile_rust`` result the same way SKEL/CIR do.
+
+    ``unavailable`` or ``timed_out`` is not a compile failure: the compiler
+    never produced a verdict. A non-zero cargo exit with no compiler error is
+    already reported as ``unavailable`` by ``compile_rust``.
+    """
+    if getattr(compiled_result, "unavailable", None):
+        return None, "unavailable"
+    if getattr(compiled_result, "timed_out", False):
+        return None, "timeout"
+    ok = bool(getattr(compiled_result, "ok", False))
+    return ok, "ok" if ok else "error"
 
 
 def _static_feedback(tools, directory, source, *, timeout: float) -> _Feedback:
@@ -251,18 +268,28 @@ def run_rust_iter_cell(*, arm, task, requirements, provider, oracle, workdir,
         compile_dir = Path(workdir) / "compile" / f"c{version}"
         compile_dir.mkdir(parents=True, exist_ok=True)
         compiled_result = compile_fn(tools, compile_dir, source)
-        compiled = bool(getattr(compiled_result, "ok", False))
+        compiled, compile_kind = _compile_disposition(compiled_result)
+        if compiled is None:
+            # The compiler did not run. Stop; do not ask for rust_fix.
+            rounds.append(_round(call, stage, "program", version, None, None,
+                                 compile=compile_kind))
+            result.history.append({"call": call, "stage": stage,
+                                   "reply_kind": "program", "version": version,
+                                   "compiled": None})
+            cell_error = ("compile_timeout" if compile_kind == "timeout"
+                          else "compile_unavailable")
+            if not result.error:
+                result.error = cell_error
+            accept_reason = cell_error
+            break
         if compiled:
             any_compiled = True
-        if compiled:
-            outgoing = ""
-        else:
-            outgoing = render_compile_errors(compiled_result)
-            if not outgoing and getattr(compiled_result, "unavailable", None):
-                outgoing = str(compiled_result.unavailable)
-        rounds.append(_round(call, stage, "program", version, compiled, outgoing))
+        outgoing = "" if compiled else render_compile_errors(compiled_result)
+        rounds.append(_round(call, stage, "program", version, compiled, outgoing,
+                             compile=compile_kind))
         result.history.append({"call": call, "stage": stage,
-                               "reply_kind": "program", "version": version})
+                               "reply_kind": "program", "version": version,
+                               "compiled": compiled})
         if not compiled:
             stage = "rust_fix"
             feedback = outgoing

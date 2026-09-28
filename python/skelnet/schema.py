@@ -184,8 +184,21 @@ def _validate_baseline_fields(cell: dict) -> list[str]:
                         "feedback_sha256", "feedback_bytes", "truncated"):
                 if key not in round_:
                     errors.append(f"baseline.rounds[{i}].{key} is required")
-            if "compiled" in round_ and not isinstance(round_["compiled"], bool):
-                errors.append(f"baseline.rounds[{i}].compiled must be a bool")
+            compiled = round_.get("compiled")
+            if "compiled" in round_ and not (
+                    compiled is None or isinstance(compiled, bool)):
+                errors.append(f"baseline.rounds[{i}].compiled must be a bool or null")
+            compile_state = round_.get("compile")
+            if "compile" in round_ and compile_state not in (
+                    None, "ok", "error", "unavailable", "timeout"):
+                errors.append(
+                    f"baseline.rounds[{i}].compile must be ok, error, "
+                    "unavailable, timeout, or null")
+            if compiled is None and round_.get("reply_kind") == "program" \
+                    and compile_state not in ("unavailable", "timeout"):
+                errors.append(
+                    f"baseline.rounds[{i}].compile must be unavailable or "
+                    "timeout when compiled is null")
             if "truncated" in round_ and not isinstance(round_["truncated"], bool):
                 errors.append(f"baseline.rounds[{i}].truncated must be a bool")
             if "feedback_bytes" in round_ and (

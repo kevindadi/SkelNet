@@ -10,6 +10,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from skelnet import cli
 from skelnet.baselines import _Feedback, run_baseline_cell
 from skelnet.oracle import FakeOracle
@@ -147,6 +149,45 @@ def test_budget_exhausted_keeps_the_fifth_version(tmp_path):
     assert result.extra["baseline"]["accept_reason"] == "budget_exhausted"
     assert 'println!("4")' in result.rust
     assert oracle.n == 1
+
+
+def _compiler_did_not_run(kind: str):
+    def fn(tools, workdir, source):
+        if kind == "timeout":
+            return SimpleNamespace(ok=False, unavailable=None, timed_out=True,
+                                   errors=[])
+        return SimpleNamespace(ok=False, unavailable="cargo missing",
+                               timed_out=False, errors=[])
+    return fn
+
+
+@pytest.mark.parametrize("arm,kind,cell_error", [
+    ("REFINE", "unavailable", "compile_unavailable"),
+    ("STATIC", "timeout", "compile_timeout"),
+    ("DYNAMIC", "unavailable", "compile_unavailable"),
+    ("DYNAMIC_M", "timeout", "compile_timeout"),
+])
+def test_compiler_did_not_run_stops_without_rust_fix(
+        tmp_path, arm, kind, cell_error):
+    """M2: unavailable/timeout is not a compile error and ends the loop."""
+    result, provider, oracle = _run(
+        tmp_path, arm,
+        [_rust('println!("v1");'), _rust('println!("v2");')],
+        budget=5, min_calls=1, compile_fn=_compiler_did_not_run(kind),
+        feedback=_SeqFeedback([True], reason="static_clean"))
+    assert len(provider.calls) == 1
+    assert provider.calls[0].stage == "generate"
+    assert result.accepted is False
+    assert result.error == cell_error
+    row = result.extra["baseline"]["rounds"][0]
+    assert row["compiled"] is None
+    assert row["compile"] == ("timeout" if kind == "timeout" else "unavailable")
+    assert result.extra["baseline"]["accept_reason"] == cell_error
+    assert "rust_fix" not in [item.stage for item in provider.calls]
+    assert oracle.n == 1
+    assert 'println!("v1")' in result.rust
+    from skelnet.schema import _validate_baseline_fields
+    assert _validate_baseline_fields({"baseline": result.extra["baseline"]}) == []
 
 
 def test_compile_failure_uses_rust_fix_then_accepts(tmp_path):

@@ -36,6 +36,15 @@ plus the runtime appendix, and the user text is `render_compile_errors`
 (errors only, 8192 bytes). Group-specific feedback starts only after a
 version compiles.
 
+A compiler that does not produce a verdict is not a compile failure (round
+5b, M2). `compile_rust` reports `unavailable` when cargo cannot run or exits
+non-zero with no compiler error, and `timed_out` when the build times out.
+That round records `compiled: null` and `compile: "unavailable"` or
+`"timeout"`. The loop stops with no further LLM call and no `rust_fix`,
+`accepted` is false, and an empty cell `error` becomes
+`compile_unavailable` or `compile_timeout`. The oracle still scores the
+latest Rust. G0 uses the same error strings.
+
 ## Acceptance details
 
 ### REFINE (D4-6)
@@ -162,9 +171,9 @@ detection rate.
 
 | Field | Meaning |
 | --- | --- |
-| `rounds` | one record per LLM call: `call`, `stage`, `reply_kind`, `version`, `compiled`, per-tool `status`/`category`, `seeds`, `feedback_sha256`, `feedback_bytes`, `truncated` |
+| `rounds` | one record per LLM call: `call`, `stage`, `reply_kind`, `version`, `compiled` (`null` when the compiler did not run), `compile` (`ok` / `error` / `unavailable` / `timeout`), per-tool `status`/`category`, `seeds`, `feedback_sha256`, `feedback_bytes`, `truncated` |
 | `accepted_at_call` | the call that met the in-group rule, or null |
-| `accept_reason` | `no_issues`, `static_clean`, `dynamic_pass`, `dynamic_monitor_pass`, `budget_exhausted`, or `model_error` |
+| `accept_reason` | `no_issues`, `static_clean`, `dynamic_pass`, `dynamic_monitor_pass`, `budget_exhausted`, `model_error`, `compile_unavailable`, or `compile_timeout` |
 | `final_version` | index of the latest program (0 if none) |
 | `first_round_cache_hit` | cache hit of call 1, when the provider records one |
 | `tools_missing` | names reported by preflight |

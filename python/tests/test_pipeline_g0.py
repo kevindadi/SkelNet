@@ -32,6 +32,21 @@ def test_g0_compiles_but_oracle_fails_is_accepted(tmp_path):
     assert oracle.calls == [result.rust]
 
 
+def test_g0_compiler_unavailable_sets_error_and_still_scores(tmp_path):
+    def missing(_tools, _workdir, _source):
+        return SimpleNamespace(ok=False, unavailable="cargo missing",
+                               timed_out=False, errors=[])
+
+    provider = ScriptedProvider([{"text": RUST}])
+    oracle = FakeOracle(functional_ok=True)
+    result = run_g0_cell(task="t", requirements="do a thing", provider=provider,
+                         oracle=oracle, workdir=tmp_path, compile_fn=missing)
+    assert result.accepted is False
+    assert result.check_ok is False
+    assert result.error == "compile_unavailable"
+    assert oracle.calls == [result.rust]
+
+
 def test_g0_does_not_compile_is_rejected_and_oracle_still_runs(tmp_path):
     provider = ScriptedProvider([{"text": RUST}])
     oracle = FakeOracle(functional_ok=True)
