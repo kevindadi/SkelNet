@@ -109,7 +109,7 @@ def test_skel_prompt_routing(tmp_path):
     assert got == [
         _joined_sha((prompts.SKEL_GENERATION_ASSET,)),
         _joined_sha((prompts.SKEL_GENERATION_ASSET, prompts.SKEL_FEEDBACK_ASSET)),
-        _joined_sha((prompts.RUST_FROM_SKEL_ASSET,)),
+        _joined_sha((prompts.RUST_FROM_SKEL_ASSET, prompts.RUST_RUNTIME_API_ASSET)),
     ]
     # The feedback-round system prompt still contains the generation grammar.
     feedback_prompt = client.system_prompts[1]
@@ -125,7 +125,7 @@ def test_cir_prompt_routing(tmp_path):
     assert got == [
         _joined_sha((prompts.CIR_GENERATION_ASSET,)),
         _joined_sha((prompts.CIR_GENERATION_ASSET, prompts.CIR_FEEDBACK_ASSET)),
-        _joined_sha((prompts.RUST_FROM_CIR_ASSET,)),
+        _joined_sha((prompts.RUST_FROM_CIR_ASSET, prompts.RUST_RUNTIME_API_ASSET)),
     ]
     feedback_prompt = client.system_prompts[1]
     assert prompts.read_asset(prompts.CIR_GENERATION_ASSET) in feedback_prompt
@@ -135,7 +135,8 @@ def test_cir_prompt_routing(tmp_path):
 def test_g0_prompt_routing(tmp_path):
     out, client = _run_arm("G0", [RUST], tmp_path)
     got = [hashlib.sha256(s.encode()).hexdigest() for s in client.system_prompts]
-    assert got == [_joined_sha((prompts.RUST_GENERATION_ASSET,))]
+    assert got == [_joined_sha((prompts.RUST_GENERATION_V2_ASSET,
+                                prompts.RUST_RUNTIME_API_ASSET))]
 
 
 def test_budget_exact_upper_bound():
@@ -154,17 +155,20 @@ def test_manifest_and_audit_cell_ids(tmp_path):
     out, client = _run_arm("SKEL", [BUGGY, FIXED, RUST], tmp_path)
     manifest = json.loads((out / "MANIFEST.json").read_text())
     for key in ("git_sha", "git_dirty", "binaries", "prompts", "model", "model_id",
-                "channel", "arm", "rust_mode", "tasks", "rounds", "reps", "seed",
-                "seed_applied", "temperature", "timeout", "versions", "started_at",
-                "ended_at"):
+                "channel", "model_policy", "arm", "rust_mode", "hint", "stage",
+                "run_params", "budget_file", "cache_dir", "replay_from", "tasks",
+                "rounds", "reps", "temperature", "timeout", "versions", "started_at",
+                "ended_at", "status"):
         assert key in manifest, key
     assert manifest["binaries"]["skelnet"]
     assert manifest["binaries"]["concir-backend"]
     assert manifest["arm"] == "SKEL"
     assert manifest["model_id"] and manifest["channel"]
     assert manifest["tasks"]["selected"] == ["lock-order/abba_2lock"]
-    assert manifest["seed"] is None and manifest["seed_applied"] is False
     assert manifest["ended_at"] is not None
+    assert manifest["status"] == "complete"
+    assert manifest["run_params"]["hint"] == "h0"
+    assert manifest["run_params"]["temperature_policy"] == "provider_default"
     assert manifest["versions"]["python"]
     assert repo_toolchain_channel() == _expected_toolchain_channel()
     assert manifest["versions"]["toolchain"] == _expected_toolchain_channel()
@@ -180,8 +184,12 @@ def test_manifest_and_audit_cell_ids(tmp_path):
 
 
 def test_audit_rounds_and_cells(tmp_path):
-    # Two reps, SKEL: bad -> bad -> good -> Rust (rounds=3).
-    responses = [BUGGY, BUGGY, FIXED, RUST] * 2
+    # Two reps, SKEL: bad -> bad -> good -> Rust (rounds=3). The two bad
+    # skeletons differ because the per-run response cache returns the previous
+    # reply for an identical request.
+    buggy2 = BUGGY.replace("fn t2() { lock b { lock a { } } }",
+                           "fn t2() { lock b { } }")
+    responses = [BUGGY, buggy2, FIXED, RUST] * 2
     out, _ = _run_arm("SKEL", responses, tmp_path, rounds=3, reps=2)
     events = [json.loads(line) for line in
               (out / "audit.jsonl").read_text().splitlines() if line.strip()]
@@ -217,7 +225,9 @@ def test_terminal_wired_through_cmd_run(tmp_path):
                      oracle_factory=factory)
     assert rc == 0
     assert seen["abba_2lock"] == "DONE t1=1 t2=1"
-    assert seen["rwlock_unsupported"] is None
+    # The boundary task has no requirements text: it is skipped, so no oracle
+    # (and no LLM request) is ever created for it.
+    assert "rwlock_unsupported" not in seen
 
 
 def test_real_oracle_terminal_pass_through_cmd_run(tmp_path):
@@ -378,19 +388,28 @@ def test_default_oracle_path_passes_terminal(tmp_path):
     assert result["oracle"]["functional_ok"] is True
 
 
-def test_default_oracle_path_absent_for_boundary(tmp_path):
+def test_default_oracle_path_skips_boundary_task(tmp_path):
+    # Boundary tasks have no REQUIREMENTS.md: the cell is skipped before any
+    # LLM request, so the default oracle path is never reached.
     out = tmp_path / "run_default_boundary"
+    created: list[RecordingClient] = []
+
+    def factory(spec, o):
+        client = RecordingClient([RUST])
+        created.append(client)
+        return client
+
     args = cli.build_parser().parse_args([
         "run", "--arm", "G0", "--tasks", "boundary/rwlock_unsupported", "--reps", "1",
         "--rounds", "1", "--out", str(out)])
-    rc = cli.cmd_run(args, client_factory=lambda spec, o: RecordingClient([RUST]),
-                     oracle_runner=_terminal_pass_runner)
+    rc = cli.cmd_run(args, client_factory=factory, oracle_runner=_terminal_pass_runner)
     assert rc == 0
     result = json.loads(
         (out / "cells" / "boundary" / "rwlock_unsupported" / "0"
          / "result.json").read_text())
-    assert result["oracle"]["terminal_check"] == "absent"
-    assert result["oracle"]["functional_ok"] is False
+    assert result["status"] == "skipped"
+    assert result["skip_reason"] == "no_requirements_text"
+    assert created[0].system_prompts == []
 
 
 def test_manifest_written_at_start_and_updated(tmp_path):

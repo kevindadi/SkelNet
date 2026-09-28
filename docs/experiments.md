@@ -23,20 +23,38 @@ template second:
 
 | arm | generate | feedback | rust |
 | --- | --- | --- | --- |
-| `SKEL` | `skel_generation_v1.md` | `skel_generation_v1.md` + `skel_feedback_v1.md` | `rust_from_skel_v1.md` |
-| `CIR` | `concir_generation_v4.md` | `concir_generation_v4.md` + `concir_feedback_v1.md` | `rust_from_cir_v2.md` |
-| `G0` | `rust_generation_v1.md` | — | — |
+| `SKEL` | `skel_generation_v1.md` | `skel_generation_v1.md` + `skel_feedback_v1.md` | `rust_from_skel_v1.md` + `rust_runtime_api_v1.md` |
+| `CIR` | `concir_generation_v4.md` | `concir_generation_v4.md` + `concir_feedback_v1.md` | `rust_from_cir_v2.md` + `rust_runtime_api_v1.md` |
+| `G0` | `rust_generation_v2.md` + `rust_runtime_api_v1.md` | — | — |
 
-A missing route raises; the workflow never falls back to another arm's prompt.
-`--dry-run` prints, per stage, the ordered asset list, each asset's sha256, and
-the concatenated `system_sha256`.
+`rust_runtime_api_v1.md` is the current `concir_sync` public API. A missing
+route raises; the workflow never falls back to another arm's prompt. `--dry-run`
+prints, per stage, the ordered asset list, each asset's sha256, and the
+concatenated `system_sha256`.
+
+## Model parameters
+
+The four experimental models are GPT 6 Luna (`gpt-6-luna`, OpenCode Responses),
+Kimi (`kimi-k3`, OpenCode Chat), DeepSeek Flash (`deepseek-flash`, direct) and
+Qwen (`qwen3.8-flash`, DashScope direct). All four run with thinking enabled;
+GPT and Kimi use `reasoning_effort="medium"`; no temperature is sent
+(`provider_default`); each cell is capped at 5 calls / 200k tokens; one output
+is capped at 32768 tokens (retry cap 65536).
+
+`RunParams` (in the MANIFEST as `run_params`) fixes the temperature policy,
+seed policy, per-cell call/token budgets, max output tokens and hint.
+`--temperature` is only accepted with `--temperature-policy fixed`. The
+`models probe --dry-run` command lists each model's policy and whether its key
+is present (never the value).
 
 ## Terminal line
 
 The required terminating stdout line is read from
-`benchmarks/tasks/<task>/requirements.json["terminal"]` (e.g.
-`"DONE t1=1 t2=1"`). Tasks without a `requirements.json` (the boundary tasks)
-have no terminal line.
+`benchmarks/tasks/<task>/requirements.json`. With `--hint h0` the `terminal`
+field is used; otherwise `terminal_v2` is preferred when present (falling back
+to `terminal`). The default is `h1` so tooling that does not pass a hint uses
+the v2 line once it exists. Tasks without a `requirements.json` (the boundary
+tasks) have no terminal line.
 
 The oracle records `terminal_check` as one of:
 
@@ -57,20 +75,25 @@ mode).
 ```
 experiments/<run_id>/
   MANIFEST.json          # git sha + dirty, binary sha, prompt sha, model +
-                         # model_id + channel, arm, rust_mode, tasks (pattern +
-                         # selected), rounds, reps, seed (null until applied) +
-                         # seed_applied, temperature, timeout, tool versions,
-                         # started_at, ended_at (written at start, updated at end)
+                         # model_policy + model_id + channel, arm, rust_mode,
+                         # hint, stage, run_params, budget_file, cache_dir,
+                         # replay_from, tasks (pattern + selected), rounds,
+                         # reps, temperature, timeout, tool versions,
+                         # started_at, ended_at, status
   audit.jsonl            # one record per real model call (real cell/task/rep)
   raw/                   # raw prompt/response text (optional)
+  cache/                 # response cache for this run
   cells/<task>/<rep>/
     candidate_<n>.skel   # per-round artifacts
     candidate.rs         # final Rust
     cir_trace.rs         # deterministic-codegen runtime, when --rust-mode codegen
-    result.json          # CellResult (history, ledger, oracle, metrics)
+    result.json          # skelnet-cell-v1 (see docs/result-schema.md)
   SUMMARY.json
   REPORT.md
 ```
+
+`MANIFEST.json` is written at run start with `status: "running"` and updated to
+`"complete"` (or `"budget_exhausted"`) at the end.
 
 `--rust-mode codegen` skips the Rust LLM call after a PASS and uses
 `skelnet codegen` (SKEL) or `concir-backend codegen` (CIR) instead. The
@@ -121,10 +144,19 @@ run directories can be compared in one call.
 ## Reproducibility
 
 - `MANIFEST.json` records the git sha (+ dirty flag), binary sha256, prompt
-  sha256, model/model_id/channel, arm, rust_mode, the task pattern and selected
+  sha256, model policy (`model_policy`) and ids, arm, rust_mode, hint, stage,
+  `run_params`, the budget/cache/replay settings, the task pattern and selected
   list, rounds/reps, temperature, timeout, tool versions, and start/end times.
-  It is written at run start (`ended_at: null`) and updated at the end. `--seed`
-  is recorded as `"seed": null` with `"seed_applied": false` until it actually
-  takes effect.
+  It is written at run start (`status: "running"`) and updated at the end.
+- Per-cell seeds are derived as `seed_for(task, rep)` and sent only to models
+  whose registry entry sets `supports_seed` (Responses never send a seed).
 - Prompts are content-addressed (`prompts.prompt_asset_record()`).
+- The global request/token ledger (`--budget-file`, default
+  `experiments/budget.json`) accumulates across restarts; `--stage` separates
+  budgets. Per-cell call/token budgets are enforced before each call.
+- `--cache-dir` shares responses across runs; `--replay-from` replays a run or
+  cache directory without any network call. Cache hits count as a logical call
+  but not against the global spend.
+- `--resume` reuses a run directory, skipping cells that already have a
+  `result.json`, and requires matching arm/model/tasks/reps/rounds/RunParams.
 - `eval` re-runs the oracle on stored Rust without any model calls.

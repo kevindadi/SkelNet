@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .audit import AuditLog
 from .transport import CHANNELS, ModelSpec, TransportError, verify_identity
@@ -17,38 +17,43 @@ class ChannelUnavailable(TransportError):
     """The model's channel is blocked or has no key; the caller must skip it."""
 
 
-def build_client(spec: ModelSpec, *, budget: Any, evidence_dir: Path | str,
-                 api_key: str, timeout: float = 90.0, max_tokens: int = 4096,
-                 temperature: float = 0.0):
-    """Construct the inner client for a model, or raise ChannelUnavailable."""
+def build_client(spec: ModelSpec, params: Any, *, budget: Any,
+                 evidence_dir: Path | str, api_key: str, timeout: float = 90.0,
+                 sdk_client: Any | None = None,
+                 sleep: Callable[[float], None] = time.sleep):
+    """Construct the inner client for a model, or raise ChannelUnavailable.
 
+    `params` is a :class:`~skelnet.params.RunParams`. The thinking switch is
+    sent per channel through ``extra_body``; the base URL comes from the
+    channel registry.
+    """
     if spec.status != "available" or not spec.model_id:
         raise ChannelUnavailable(
             f"{spec.display_name} is {spec.status}: {spec.blocked_reason}")
     timeout = max(timeout, _CHANNEL_TIMEOUT.get(spec.channel, timeout))
+    base_url = CHANNELS[spec.channel].base_url or ""
     if spec.channel == "deepseek-direct":
         from .direct import DirectChatClient
-        return DirectChatClient(api_key=api_key,
-                                base_url=CHANNELS[spec.channel].base_url or "",
+        extra_body = {"thinking": {"type": "enabled" if params.thinking else "disabled"}}
+        return DirectChatClient(api_key=api_key, base_url=base_url,
                                 model=spec.model_id, budget=budget,
-                                evidence_dir=evidence_dir, timeout=timeout,
-                                max_tokens=max_tokens, temperature=temperature,
-                                extra_body={"thinking": {"type": "disabled"}})
+                                evidence_dir=evidence_dir, params=params,
+                                timeout=timeout, sdk_client=sdk_client,
+                                extra_body=extra_body, sleep=sleep)
     if spec.channel == "dashscope-direct":
         from .direct import DirectChatClient
-        return DirectChatClient(api_key=api_key,
-                                base_url=CHANNELS[spec.channel].base_url or "",
+        extra_body = {"enable_thinking": bool(params.thinking)}
+        return DirectChatClient(api_key=api_key, base_url=base_url,
                                 model=spec.model_id, budget=budget,
-                                evidence_dir=evidence_dir, timeout=timeout,
-                                max_tokens=max_tokens, temperature=temperature,
-                                extra_body={"enable_thinking": False})
+                                evidence_dir=evidence_dir, params=params,
+                                timeout=timeout, sdk_client=sdk_client,
+                                extra_body=extra_body, sleep=sleep)
     if spec.channel == "opencode-go":
         from .opencode_go import OpenCodeGoClient, OpenCodeGoResponsesClient
         cls = OpenCodeGoResponsesClient if spec.surface == "responses" else OpenCodeGoClient
-        return cls(api_key=api_key, budget=budget,
-                   evidence_dir=evidence_dir, model=spec.model_id,
-                   timeout=timeout, max_tokens=max_tokens,
-                   temperature=temperature)
+        return cls(api_key=api_key, base_url=base_url, model=spec.model_id,
+                   budget=budget, evidence_dir=evidence_dir, params=params,
+                   timeout=timeout, sdk_client=sdk_client, sleep=sleep)
     raise ChannelUnavailable(f"no client for channel {spec.channel!r}")
 
 
@@ -77,11 +82,19 @@ class AuditedClient:
         self.stage = stage
 
     def set_cell(self, cell_id: str, task_id: str, replicate: int) -> None:
-        """Bind subsequent calls to a real cell (task/replicate)."""
+        """Bind subsequent calls to a real cell (task/replicate).
+
+        Each cell gets a fresh OpenCode session and the client learns the task
+        and replicate so it can derive a per-cell seed.
+        """
         self.cell_id = cell_id
         self.task_id = task_id
         self.replicate = replicate
         self.attempt = 0
+        if hasattr(self.inner, "new_session"):
+            self.inner.new_session()
+        if hasattr(self.inner, "set_cell"):
+            self.inner.set_cell(task_id, replicate)
 
     def set_attempt(self, attempt: int) -> None:
         """Record the pipeline's attempt number for this request."""
@@ -113,8 +126,10 @@ class AuditedClient:
             raise
         ended = time.time()
         returned = getattr(outcome, "response_model", None)
-        confirmed = verify_identity(self.spec.model_id or "", returned)
+        confirmed = verify_identity(self.spec.model_id or "", returned,
+                                    aliases=self.spec.confirmed_response_aliases)
         usage = getattr(outcome, "usage", None)
+        seed = getattr(outcome, "seed", None)
         self.audit.model_call(
             run_id=self.run_id, cell_id=self.cell_id, model=self.spec.display_name,
             provider=self.spec.provider, transport=self.spec.channel,
@@ -126,6 +141,9 @@ class AuditedClient:
             request_id=getattr(outcome, "request_id", None),
             transport_attempt=getattr(outcome, "transport_attempt", 1),
             cost=getattr(outcome, "cost", None),
+            finish_reason=getattr(outcome, "finish_reason", None),
+            session=getattr(outcome, "session", None),
+            seed=seed, seed_sent=seed is not None,
             notes=None if confirmed else "identity unconfirmed (model not reported)",
             **meta)
         return outcome

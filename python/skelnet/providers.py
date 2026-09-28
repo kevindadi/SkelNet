@@ -37,18 +37,20 @@ class CandidateResponse:
     error: str | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    cached_tokens: int | None = None
     wall_ms: int = 0
 
     @classmethod
     def from_usage(cls, text: str, source: str, provider: str, *, model_id: str | None,
                    usage: dict[str, Any] | None) -> "CandidateResponse":
         # Missing usage is recorded as unknown (None), never coerced to zero.
-        if usage is None:
-            inp = out = None
-        else:
-            inp, out = normalize_token_usage(usage)
+        tokens = normalize_token_usage(usage)
         return cls(text=text, source=source, provider=provider, model_id=model_id,
-                   usage=usage, input_tokens=inp, output_tokens=out)
+                   usage=usage, input_tokens=tokens["input"],
+                   output_tokens=tokens["output"],
+                   reasoning_tokens=tokens["reasoning"],
+                   cached_tokens=tokens["cached"])
 
 
 class CandidateProvider(Protocol):
