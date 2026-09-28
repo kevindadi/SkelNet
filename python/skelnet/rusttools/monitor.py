@@ -4,8 +4,8 @@
 ``resources.json``; the annotated program is built and run K times, each writing
 a trace; ``concir-backend monitor`` then checks the task contract against the
 observed traces. This module also generates the resource-alignment mapping
-(instrumented names carry a ``#site`` suffix and a type counter) and the
-``design_loss`` checks.
+(instrumented names carry a ``#site`` suffix and a type counter), counts the
+threads actually started from the traces, and derives ``design_loss``.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections import Counter
 from pathlib import Path
 
 from .base import FAIL, NOT_RUN, PASS, UNAVAILABLE, UNSUPPORTED, LayerResult
@@ -20,9 +21,19 @@ from .runner import ToolRunner
 
 _SITE_RE = re.compile(r"#\d+$")
 _TYPE_RE = re.compile(r"_(mutex|condvar|semaphore|sem|channel|rwlock|barrier|once|atomic)\d+$")
-_SYNC_KINDS = {"Mutex", "Condvar", "Semaphore", "RwLock", "Barrier", "Once", "Channel"}
+# Only these three count for `extra_sync`; channels name their endpoints
+# differently, so a name-based rule would misfire.
+_SYNC_KINDS = ("Mutex", "Condvar", "Semaphore")
 _SAFETY_KINDS = {"safety", "never_holds_all", "unreachable"}
 _REACH_KINDS = {"preserved", "reachable", "reachability", "always_reachable"}
+
+# Spawn forms the instrumenter does not rewrite. `cir_trace::spawn(` and
+# `__skelnet_serial_spawn(` do not match these patterns.
+_RESIDUAL_PATTERNS = [
+    (re.compile(r"\bthread\s*::\s*spawn\s*\("), "thread::spawn"),
+    (re.compile(r"\.spawn\s*\("), ".spawn("),
+    (re.compile(r"\bthread\s*::\s*scope\b"), "thread::scope"),
+]
 
 
 def instrumented_cargo_toml(concir_sync_path: Path | str, *, name: str = "o4_probe") -> str:
@@ -112,49 +123,149 @@ def reference_thread_count(gold: dict) -> int:
     return total
 
 
-def _resource_kinds(resources: list[dict]) -> dict[str, str]:
-    return {r.get("name", ""): r.get("kind", "") for r in resources}
+def residual_spawns(annotated: str) -> list[str]:
+    """Spawn forms left un-rewritten in the annotated program."""
+    return [name for pattern, name in _RESIDUAL_PATTERNS if pattern.search(annotated)]
 
 
-def _map_properties(report: dict) -> tuple[str, str | None, str | None, dict]:
+def trace_thread_count(traces_dir: Path | str) -> int:
+    """Max worker-thread count observed across the traces.
+
+    Actual threads = max(distinct non-``t0`` tags, ``spawn`` events) per run;
+    un-instrumented threads still get a lazy ``t<n>`` tag at their first sync
+    operation.
+    """
+    best = 0
+    for path in sorted(Path(traces_dir).glob("*.jsonl")):
+        tags: set[str] = set()
+        spawns = 0
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+            tag = event.get("t") or ""
+            if tag and tag != "t0":
+                tags.add(tag)
+            if event.get("op") == "spawn":
+                spawns += 1
+        best = max(best, len(tags), spawns)
+    return best
+
+
+def gold_resource_types(gold: dict) -> Counter:
+    counts: Counter = Counter()
+
+    def walk(value):
+        if isinstance(value, dict):
+            if value.get("kind") == "sync" and isinstance(value.get("type"), str):
+                counts[value["type"]] += 1
+            for child in value.values():
+                walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                walk(child)
+
+    walk(gold)
+    return counts
+
+
+def extra_sync_reason(resources: list[dict], gold: dict | None) -> str | None:
+    """`extra_sync` when the program builds more Mutex/Condvar/Semaphore sites
+    than the reference design declares."""
+    if not gold:
+        return None
+    program: Counter = Counter()
+    for resource in resources:
+        kind = resource.get("kind")
+        if kind in _SYNC_KINDS:
+            program[kind] += 1
+    reference = gold_resource_types(gold)
+    for kind in _SYNC_KINDS:
+        have = program.get(kind, 0)
+        want = reference.get(kind, 0)
+        if have > want:
+            sites = [r.get("name", "") for r in resources if r.get("kind") == kind]
+            return f"extra_sync: {kind} {have} > {want} ({', '.join(sites)})"
+    return None
+
+
+def _property_categories(report: dict) -> tuple[set[str], str, bool]:
     properties = report.get("properties") or []
     total = len(properties)
     applicable = [p for p in properties if p.get("status") != "unsupported"]
     coverage = f"{len(applicable)}/{total}"
-    fail_kind = None
-    not_observed = False
-    unmapped = False
+    categories: set[str] = set()
     for prop in properties:
         status = prop.get("status")
         kind = prop.get("kind")
         if kind in _SAFETY_KINDS and status == "FAIL":
-            fail_kind = "monitor_fail"
+            categories.add("monitor_fail")
         elif status == "unmapped":
-            unmapped = True
+            categories.add("unmapped")
         elif kind in _REACH_KINDS and status == "not_observed":
-            not_observed = True
-    if fail_kind:
-        return FAIL, fail_kind, f"coverage {coverage}", {}
-    if unmapped:
-        return FAIL, "unmapped", f"coverage {coverage}", {}
-    if total and not applicable:
-        return UNSUPPORTED, None, f"coverage {coverage}", {}
-    if not_observed:
-        return FAIL, "not_observed", f"coverage {coverage}", {}
-    return PASS, None, f"coverage {coverage}", {}
+            categories.add("not_observed")
+    all_unsupported = bool(total) and not applicable
+    return categories, coverage, all_unsupported
 
 
-def _design_loss(resources: list[dict], mapping: dict[str, str],
-                 gold: dict | None) -> str | None:
-    kinds = _resource_kinds(resources)
-    actual_spawns = sum(1 for kind in kinds.values() if kind == "Spawn")
+def classify_o4(report: dict, resources: list[dict], resource_names: list[str],
+                mapping: dict[str, str], gold: dict | None, annotated: str,
+                traces_dir: Path | str, wall: int | None) -> LayerResult:
+    residual = residual_spawns(annotated)
+    prop_cats, coverage, all_unsupported = _property_categories(report)
+    actual = trace_thread_count(traces_dir)
     reference = reference_thread_count(gold) if gold else None
-    if reference is not None and actual_spawns < reference:
-        return f"threads: {actual_spawns} < reference {reference}"
-    for name, kind in kinds.items():
-        if kind in _SYNC_KINDS and name not in mapping:
-            return f"extra_sync: {name}"
-    return None
+    thread_loss = reference is not None and actual < reference
+    extra = extra_sync_reason(resources, gold)
+
+    categories = set(prop_cats)
+    if extra:
+        categories.add("design_loss")
+    if thread_loss and not residual:
+        categories.add("design_loss")
+    if residual:
+        categories.add("instrument_unsupported")
+
+    detail_parts: list[str] = []
+    if extra:
+        detail_parts.append(extra)
+    if thread_loss and not residual:
+        detail_parts.append(f"threads: {actual} < reference {reference}")
+    if residual:
+        detail_parts.append("residual spawn: " + ", ".join(residual))
+
+    if "monitor_fail" in categories:
+        status, category = FAIL, "monitor_fail"
+    elif "design_loss" in categories:
+        status, category = FAIL, "design_loss"
+    elif "instrument_unsupported" in categories:
+        status, category = UNSUPPORTED, "instrument_unsupported"
+    elif "unmapped" in categories:
+        status, category = FAIL, "unmapped"
+    elif "not_observed" in categories:
+        status, category = FAIL, "not_observed"
+    elif all_unsupported:
+        status, category = UNSUPPORTED, None
+    else:
+        status, category = PASS, None
+
+    detail = "; ".join(detail_parts) if detail_parts else f"coverage {coverage}"
+    data = {
+        "report": report,
+        "mapping": mapping,
+        "coverage": coverage,
+        "categories": sorted(categories),
+        "unmapped_program_resources": [n for n in resource_names if n not in mapping],
+        "actual_threads": actual,
+        "reference_threads": reference,
+    }
+    return LayerResult("O4", status, category, detail, wall, data)
 
 
 def evaluate_o4(tools: ToolRunner, workdir: Path | str, src: str, *,
@@ -209,6 +320,7 @@ def evaluate_o4(tools: ToolRunner, workdir: Path | str, src: str, *,
         return LayerResult("O4", FAIL, "monitor_fail",
                            "instrument produced no annotated.rs/resources.json",
                            int((time.monotonic() - started) * 1000))
+    annotated_text = annotated.read_text(encoding="utf-8")
     resources_doc = json.loads(resources_path.read_text(encoding="utf-8"))
     resources = resources_doc.get("resources") or []
     resource_names = [r.get("name", "") for r in resources if r.get("name")]
@@ -223,8 +335,7 @@ def evaluate_o4(tools: ToolRunner, workdir: Path | str, src: str, *,
     (project / "src").mkdir(parents=True, exist_ok=True)
     (project / "Cargo.toml").write_text(
         instrumented_cargo_toml(concir_sync_path), encoding="utf-8")
-    (project / "src" / "main.rs").write_text(annotated.read_text(encoding="utf-8"),
-                                             encoding="utf-8")
+    (project / "src" / "main.rs").write_text(annotated_text, encoding="utf-8")
     if runtime.exists():
         (project / "src" / "cir_trace.rs").write_text(runtime.read_text(encoding="utf-8"),
                                                       encoding="utf-8")
@@ -245,9 +356,13 @@ def evaluate_o4(tools: ToolRunner, workdir: Path | str, src: str, *,
         trace_path = traces_dir / f"run{index}.jsonl"
         run = tools.run([str(binary)], project, timeout=run_timeout,
                         env_extra={"CIR_TRACE_OUT": str(trace_path)})
-        if run.error is not None or run.timed_out:
+        if run.error is not None:
             return LayerResult("O4", FAIL, "monitor_fail",
-                               f"instrumented run {index} failed",
+                               f"instrumented run {index} failed: {run.error}",
+                               int((time.monotonic() - started) * 1000))
+        if run.timed_out:
+            return LayerResult("O4", FAIL, "monitor_fail",
+                               f"instrumented run {index} timeout",
                                int((time.monotonic() - started) * 1000))
 
     monitor = tools.run(
@@ -266,15 +381,8 @@ def evaluate_o4(tools: ToolRunner, workdir: Path | str, src: str, *,
                            f"monitor produced no JSON: {_first_line(monitor.stderr)}",
                            wall)
 
-    design_loss = _design_loss(resources, mapping, gold)
-    if design_loss is not None:
-        return LayerResult("O4", FAIL, "design_loss", design_loss, wall,
-                           data={"report": report, "mapping": mapping})
-
-    status, category, detail, _ = _map_properties(report)
-    return LayerResult("O4", status, category, detail, wall,
-                       data={"report": report, "mapping": mapping,
-                             "coverage": detail})
+    return classify_o4(report, resources, resource_names, mapping, gold,
+                       annotated_text, traces_dir, wall)
 
 
 def _first_line(text: str) -> str:

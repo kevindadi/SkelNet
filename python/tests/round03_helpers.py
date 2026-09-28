@@ -1,8 +1,11 @@
 """Shared helpers for the round-3 oracle tests.
 
 The ``rust_tools`` marker skips tests that need real cargo / miri / Shuttle and
-prints why. :class:`FakeTools` is a runner that stands in for the outermost
-subprocess only; the oracle's layer logic is always exercised.
+prints why. Availability is probed with the repository's pinned toolchain
+(``cargo miri --version``), not ``shutil.which("miri")``: a standard rustup
+install has no ``miri`` proxy, only ``cargo-miri``. :class:`FakeTools` is a
+runner that stands in for the outermost subprocess only; the oracle's layer
+logic is always exercised.
 """
 
 from __future__ import annotations
@@ -10,11 +13,20 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _toolchain() -> str | None:
+    from skelnet.oracle import repo_toolchain_channel
+    return repo_toolchain_channel()
 
 
 def _shuttle_available() -> bool:
@@ -25,10 +37,6 @@ def _shuttle_available() -> bool:
     return False
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
 def _concir_binary(name: str, env_var: str) -> bool:
     if os.environ.get(env_var):
         return True
@@ -37,18 +45,50 @@ def _concir_binary(name: str, env_var: str) -> bool:
                for profile in ("debug", "release"))
 
 
-def rust_tools_available() -> bool:
-    return bool(shutil.which("cargo") and shutil.which("miri") and _shuttle_available()
+_AVAIL_CACHE: dict[str, bool] = {}
+
+
+def _check(cmd: list[str], runner=None) -> bool:
+    """Run ``cmd --version``; a runner may be injected for tests."""
+    key = " ".join(cmd)
+    if runner is None and key in _AVAIL_CACHE:
+        return _AVAIL_CACHE[key]
+    run = runner or subprocess.run
+    env = dict(os.environ)
+    toolchain = _toolchain()
+    if toolchain:
+        env["RUSTUP_TOOLCHAIN"] = toolchain
+    try:
+        proc = run(cmd, capture_output=True, text=True, timeout=120, env=env)
+        result = getattr(proc, "returncode", 1) == 0
+    except Exception:  # noqa: BLE001 - any failure means "not available"
+        result = False
+    if runner is None:
+        _AVAIL_CACHE[key] = result
+    return result
+
+
+def cargo_available(runner=None) -> bool:
+    return _check(["cargo", "--version"], runner)
+
+
+def miri_available(runner=None) -> bool:
+    return _check(["cargo", "miri", "--version"], runner)
+
+
+def rust_tools_available(runner=None) -> bool:
+    return bool(cargo_available(runner) and miri_available(runner)
+                and _shuttle_available()
                 and _concir_binary("concir-instrument", "CONCIR_INSTRUMENT")
                 and _concir_binary("concir-backend", "CONCIR_BACKEND"))
 
 
 def _reason() -> str:
     missing = []
-    if not shutil.which("cargo"):
+    if not cargo_available():
         missing.append("cargo")
-    if not shutil.which("miri"):
-        missing.append("miri")
+    if not miri_available():
+        missing.append("cargo miri (run scripts/setup_oracle_tools.sh)")
     if not _shuttle_available():
         missing.append("shuttle-0.8.1 (run scripts/setup_oracle_tools.sh)")
     if not _concir_binary("concir-instrument", "CONCIR_INSTRUMENT"):
@@ -58,7 +98,10 @@ def _reason() -> str:
     return "missing rust tools: " + ", ".join(missing)
 
 
+# Real cargo / miri / Shuttle / concir binaries.
 rust_tools = pytest.mark.skipif(not rust_tools_available(), reason=_reason())
+# Only real cargo is needed (O1 build / workspace tests).
+cargo_only = pytest.mark.skipif(not cargo_available(), reason=_reason())
 
 
 def ns(returncode: int, stdout: str = "", stderr: str = "") -> SimpleNamespace:
@@ -91,7 +134,11 @@ class FakeTools:
                  monitor_report: dict | None = None,
                  o2_stdout: str | None = None, build_ok: bool = True,
                  instrument_ok: bool = True, miri_output: str = "",
-                 shuttle_deadlock: bool = False,
+                 miri_rc: int = 0, shuttle_deadlock: bool = False,
+                 shuttle_rc: int = 0, shuttle_output: str = "",
+                 annotated: str | None = None,
+                 traces: list[list[dict]] | None = None,
+                 o2_hang: bool = False,
                  instrument_writes: bool = True, on_build=None) -> None:
         self.terminal = terminal
         self.resources = resources if resources is not None else DEFAULT_RESOURCES
@@ -100,12 +147,19 @@ class FakeTools:
         self.build_ok = build_ok
         self.instrument_ok = instrument_ok
         self.miri_output = miri_output
+        self.miri_rc = miri_rc
         self.shuttle_deadlock = shuttle_deadlock
+        self.shuttle_rc = shuttle_rc
+        self.shuttle_output = shuttle_output
+        self.annotated = annotated
+        self.traces = traces if traces is not None else [DEFAULT_TRACE]
+        self.o2_hang = o2_hang
         self.instrument_writes = instrument_writes
         self.on_build = on_build
         self.calls: list[list[str]] = []
         self.envs: list[dict] = []
         self.builds: list[Path] = []
+        self._run_index = 0
 
     def __call__(self, cmd, cwd, timeout, env):
         cmd = [str(part) for part in cmd]
@@ -113,13 +167,12 @@ class FakeTools:
         self.calls.append(list(cmd))
         self.envs.append(dict(env))
         name = Path(cmd[0]).name
-        joined = " ".join(cmd)
         if name == "concir-instrument":
             return self._instrument(cmd)
         if name == "concir-backend":
             return ns(0, json.dumps(self.monitor_report), "")
         if "miri" in cmd:
-            return ns(0, self.miri_output, self.miri_output)
+            return ns(self.miri_rc, self.miri_output, self.miri_output)
         if "build" in cmd:
             self.builds.append(cwd)
             if self.on_build is not None:
@@ -131,11 +184,17 @@ class FakeTools:
         if name.endswith("shuttle_probe"):
             if self.shuttle_deadlock:
                 return ns(1, "", "deadlock! blocked tasks: [main, t1, t2]")
-            return ns(0, "", "")
+            return ns(self.shuttle_rc, self.shuttle_output, self.shuttle_output)
         # A program run: write the trace the instrumented runtime would.
         trace_out = env.get("CIR_TRACE_OUT")
         if trace_out:
-            Path(trace_out).write_text(self.trace_text(), encoding="utf-8")
+            trace = self.traces[min(self._run_index, len(self.traces) - 1)]
+            self._run_index += 1
+            Path(trace_out).write_text(
+                "\n".join(json.dumps(event) for event in trace) + "\n",
+                encoding="utf-8")
+        elif self.o2_hang:
+            raise subprocess.TimeoutExpired(cmd, timeout)
         return ns(0, self.o2_stdout, "")
 
     def _instrument(self, cmd):
@@ -144,17 +203,14 @@ class FakeTools:
         out = Path(cmd[cmd.index("--out") + 1])
         out.mkdir(parents=True, exist_ok=True)
         if self.instrument_writes:
-            (out / "annotated.rs").write_text(
-                "mod cir_trace;\nfn main() { cir_trace::init(); cir_trace::finish(); }\n",
-                encoding="utf-8")
+            annotated = self.annotated or (
+                "mod cir_trace;\nfn main() { cir_trace::init(); cir_trace::finish(); }\n")
+            (out / "annotated.rs").write_text(annotated, encoding="utf-8")
             (out / "cir_trace.rs").write_text("// generated runtime\n", encoding="utf-8")
         (out / "resources.json").write_text(
             json.dumps({"schema_version": "cir-resources-v1",
                         "resources": self.resources}), encoding="utf-8")
         return ns(0, json.dumps({"mode": "wrappers"}), "")
-
-    def trace_text(self) -> str:
-        return "\n".join(json.dumps(event) for event in DEFAULT_TRACE) + "\n"
 
 
 # The measured instrumented names for the abba fixture (task statement).
@@ -177,6 +233,12 @@ DEFAULT_TRACE = [
     {"t": "t2", "sid": "s8", "op": "mutex_lock", "r": "b_mutex0#124"},
     {"t": "t2", "sid": "s9", "op": "mutex_unlock", "r": "b_mutex0#124"},
     {"t": "t2", "sid": "s10", "op": "mutex_unlock", "r": "a_mutex0#86"},
+]
+
+# A trace with no worker tags and no spawn events.
+EMPTY_TRACE: list[dict] = [
+    {"t": "t0", "sid": "s1", "op": "mutex_lock", "r": "a_mutex0#86"},
+    {"t": "t0", "sid": "s2", "op": "mutex_unlock", "r": "a_mutex0#86"},
 ]
 
 DEFAULT_REPORT = {

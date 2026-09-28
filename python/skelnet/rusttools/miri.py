@@ -1,24 +1,31 @@
-"""O3 (miri half): run the program under miri with a fixed multi-seed range."""
+"""O3 (miri half): run the program under miri with a fixed multi-seed range.
+
+Only the tool's own diagnostics decide the category, and only when the exit
+code is non-zero: a program that merely prints ``panic``/``deadlock`` passes.
+"""
 
 from __future__ import annotations
 
 import time
 from pathlib import Path
 
-from .base import FAIL, PASS, UNAVAILABLE, LayerResult
+from .base import FAIL, PASS, UNAVAILABLE, UNSUPPORTED, LayerResult
 from .runner import ToolRunner
 from .seeds import miri_many_seeds_flag
 
 
-def _classify(text: str) -> str | None:
+def classify_miri(text: str) -> str | None:
+    """Map miri's diagnostic to a category (non-zero exit only)."""
     low = text.lower()
-    if "undefined behavior" in low or "unsupported operation: " in low:
+    if "unsupported operation" in low:
+        return "unsupported"
+    if "error: undefined behavior" in low:
         return "ub"
-    if "deadlock" in low:
+    if "error: deadlock" in low:
         return "deadlock"
     if "main thread terminated without waiting for all remaining threads" in low:
         return "thread_leak"
-    if "panicked at" in low or "panic" in low:
+    if "panicked at" in low:
         return "panic"
     return None
 
@@ -29,7 +36,7 @@ def evaluate_miri(tools: ToolRunner, project_dir: Path | str, *,
     started = time.monotonic()
     flags = miri_many_seeds_flag(seed_start, seed_count)
     call = tools.run([cargo, "miri", "run"], project_dir, timeout=timeout,
-                     env_extra={"MIRIFLAGS": flags, "MIRI_FORCE_ALL_SYSROOTS": "1"})
+                     env_extra={"MIRIFLAGS": flags})
     wall = int((time.monotonic() - started) * 1000)
     if call.error is not None:
         return LayerResult("O3", UNAVAILABLE, "miri_unavailable",
@@ -40,12 +47,15 @@ def evaluate_miri(tools: ToolRunner, project_dir: Path | str, *,
                            "miri is not installed", wall)
     if call.timed_out:
         return LayerResult("O3", FAIL, "deadlock", "miri timed out", wall)
-    category = _classify(combined)
+    if call.returncode == 0:
+        return LayerResult("O3", PASS, None, None, wall)
+    category = classify_miri(combined)
+    if category == "unsupported":
+        return LayerResult("O3", UNSUPPORTED, "miri_unsupported",
+                           _first_line(combined), wall)
     if category is not None:
         return LayerResult("O3", FAIL, category, _first_line(combined), wall)
-    if call.returncode != 0:
-        return LayerResult("O3", FAIL, "panic", _first_line(combined), wall)
-    return LayerResult("O3", PASS, None, None, wall)
+    return LayerResult("O3", FAIL, "panic", _first_line(combined), wall)
 
 
 def _first_line(text: str) -> str:

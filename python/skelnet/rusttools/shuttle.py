@@ -90,6 +90,29 @@ def write_shuttle_project(project_dir: Path | str, transformed: str,
     return project_dir / "target" / "debug" / name
 
 
+_SCHEDULE_RE = re.compile(r"failing schedule:\s*\n\"\n(.*?)\n\"", re.S)
+
+
+def parse_schedule(text: str) -> str | None:
+    """The serialized Shuttle schedule from a failure message, if present."""
+    match = _SCHEDULE_RE.search(text)
+    return match.group(1) if match else None
+
+
+def _diagnostic_line(text: str) -> str:
+    """The `deadlock!` line, else the `panicked` line, else the first line."""
+    for needle in ("deadlock!", "panicked"):
+        for line in text.splitlines():
+            if needle in line:
+                return line.strip()[:200]
+    return _first_line(text)
+
+
+def _save_failure(project_dir: Path, output: str) -> None:
+    """Persist the full Shuttle output next to the project (kept on cleanup)."""
+    (project_dir / "failure.txt").write_text(output, encoding="utf-8")
+
+
 def evaluate_shuttle(tools: ToolRunner, workdir: Path | str, src: str, *,
                      shim_path: Path | str, iterations: int = 2000, depth: int = 3,
                      seed: int = 0, timeout: float = 300.0,
@@ -118,17 +141,26 @@ def evaluate_shuttle(tools: ToolRunner, workdir: Path | str, src: str, *,
     if run.error is not None:
         return LayerResult("O3", UNSUPPORTED, "shuttle_unsupported",
                            f"shuttle run unavailable: {run.error}", wall)
-    if run.timed_out:
-        return LayerResult("O3", FAIL, "deadlock", "shuttle timed out", wall)
     combined = (run.stderr or "") + (run.stdout or "")
+    if run.timed_out:
+        _save_failure(project_dir, combined)
+        return LayerResult("O3", FAIL, "deadlock", "shuttle timed out", wall,
+                           data={"schedule": parse_schedule(combined)})
+    # The tool's own exit code decides; program output never does.
+    if run.returncode == 0:
+        return LayerResult("O3", PASS, None, None, wall)
     if "did not exercise any concurrency" in combined:
-        return LayerResult("O3", UNSUPPORTED, "shuttle_unsupported",
-                           "no concurrency to explore", wall)
-    if "deadlock" in combined.lower():
-        return LayerResult("O3", FAIL, "deadlock", _first_line(combined), wall)
-    if run.returncode != 0:
-        return LayerResult("O3", FAIL, "panic", _first_line(combined), wall)
-    return LayerResult("O3", PASS, None, None, wall)
+        # PCT only asserts this after a complete first execution with no
+        # scheduling points: nothing to explore, not a defect.
+        return LayerResult("O3", PASS, None, "no concurrency to explore", wall,
+                           data={"no_concurrency": True})
+    _save_failure(project_dir, combined)
+    schedule = parse_schedule(combined)
+    if "deadlock! blocked tasks" in combined:
+        return LayerResult("O3", FAIL, "deadlock", _diagnostic_line(combined),
+                           wall, data={"schedule": schedule})
+    return LayerResult("O3", FAIL, "panic", _diagnostic_line(combined), wall,
+                       data={"schedule": schedule})
 
 
 def _first_line(text: str) -> str:

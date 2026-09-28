@@ -2,11 +2,16 @@
 
 import json
 import os
+import shutil
 import subprocess
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
-from skelnet.rusttools.runner import ToolRunner, cleanup_target
+import pytest
+
+import round03_helpers
+from skelnet.rusttools.runner import ToolRunner, cleanup_target, default_runner
 
 from round03_helpers import ns
 
@@ -50,3 +55,38 @@ def test_cleanup_target_respects_keep(tmp_path, monkeypatch):
     monkeypatch.setenv("SKELNET_KEEP_TARGET", "1")
     assert cleanup_target(tmp_path) is False
     assert target.exists()
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+
+
+def test_default_runner_kills_the_process_group(tmp_path):
+    pidfile = tmp_path / "pid"
+    cmd = ["sh", "-c", f"sleep 30 >/dev/null 2>&1 & echo $! > {pidfile}; wait"]
+    with pytest.raises(subprocess.TimeoutExpired):
+        default_runner(cmd, tmp_path, 0.5, dict(os.environ))
+    pid = int(pidfile.read_text(encoding="utf-8").strip())
+    for _ in range(50):
+        if not _alive(pid):
+            break
+        time.sleep(0.05)
+    assert not _alive(pid), "grandchild survived the timeout"
+
+
+def test_miri_available_uses_cargo_miri(monkeypatch):
+    # A standard rustup has no `miri` proxy on PATH.
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    assert round03_helpers.miri_available(
+        runner=lambda cmd, **kw: ns(0, "miri 0.1.0", "")) is True
+    assert round03_helpers.miri_available(
+        runner=lambda cmd, **kw: ns(1, "", "unknown proxy name: 'miri'")) is False
+
+
+def test_reason_mentions_cargo_miri(monkeypatch):
+    monkeypatch.setattr(round03_helpers, "miri_available", lambda runner=None: False)
+    assert "cargo miri" in round03_helpers._reason()

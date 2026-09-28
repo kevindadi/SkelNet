@@ -4,8 +4,9 @@
 //! `benchmarks/families/lock-order/abba_2lock/rust/buggy.rs` (public repo).
 //! Changes: binding names renamed to the contract entities (`a`, `b`, `t1`,
 //! `t2`), the two spawn closures call named worker functions so the instrumenter
-//! can label them, and the expected terminal line is printed after the joins
-//! (so a non-deadlocking schedule still passes O2; the defect is caught by O3).
+//! can label them, and the expected terminal line is printed after the joins.
+//! The ABBA interleaving usually hangs O2 (the run watchdog fires) before O3's
+//! Shuttle exploration deterministically reports the deadlock.
 //! Expected defect: ABBA deadlock (t1 takes a->b, t2 takes b->a).
 
 use std::sync::{Arc, Mutex};

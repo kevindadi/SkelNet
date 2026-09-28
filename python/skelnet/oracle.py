@@ -149,36 +149,40 @@ def _complete(layers: dict[str, LayerResult]) -> bool:
 
 def _combine_o3(shuttle: LayerResult, miri: LayerResult) -> LayerResult:
     started_wall = (shuttle.wall_ms or 0) + (miri.wall_ms or 0)
-    data = {"shuttle": shuttle.to_dict(), "miri": miri.to_dict(), "complete": True}
+    data = {"shuttle": {**shuttle.to_dict(), **shuttle.data},
+            "miri": {**miri.to_dict(), **miri.data}, "complete": True}
     if shuttle.status == UNAVAILABLE and miri.status == UNAVAILABLE:
         return LayerResult("O3", UNAVAILABLE, "tools_unavailable",
                            "shuttle and miri both unavailable", started_wall, data)
-    if shuttle.status == UNSUPPORTED:
+
+    deciding = [(name, layer) for name, layer in (("shuttle", shuttle), ("miri", miri))
+                if layer.status in (PASS, FAIL)]
+    skipped = [(name, layer) for name, layer in (("shuttle", shuttle), ("miri", miri))
+               if layer.status in (UNSUPPORTED, UNAVAILABLE)]
+    if skipped:
         data["complete"] = False
-        if miri.status == UNAVAILABLE:
-            return LayerResult("O3", UNAVAILABLE, "shuttle_unsupported",
-                               "shuttle unsupported and miri unavailable",
+    if not deciding:
+        # Both halves are unsupported, or one is unsupported and the other
+        # unavailable: no half could decide the conjunction.
+        categories = [layer.category for _, layer in skipped if layer.category]
+        if all(layer.status == UNSUPPORTED for _, layer in skipped):
+            return LayerResult("O3", UNSUPPORTED,
+                               categories[0] if categories else "unsupported",
+                               "shuttle and miri both unsupported",
                                started_wall, data)
-        if miri.status == FAIL:
-            return LayerResult("O3", FAIL, miri.category,
-                               "shuttle unsupported; miri: " + (miri.detail or ""),
+        return LayerResult("O3", UNAVAILABLE,
+                           categories[0] if categories else "tools_unavailable",
+                           "no half could decide", started_wall, data)
+    for name, layer in deciding:
+        if layer.status == FAIL:
+            detail = layer.detail
+            if skipped:
+                detail = f"{skipped[0][0]} skipped; {name}: {detail}"
+            return LayerResult("O3", FAIL, layer.category, detail,
                                started_wall, data)
-        return LayerResult("O3", PASS, "shuttle_unsupported",
-                           "shuttle unsupported; miri passed", started_wall, data)
-    if miri.status == UNAVAILABLE:
-        data["complete"] = False
-        if shuttle.status == FAIL:
-            return LayerResult("O3", FAIL, shuttle.category,
-                               "miri unavailable; shuttle: " + (shuttle.detail or ""),
-                               started_wall, data)
-        return LayerResult("O3", PASS, "miri_unavailable",
-                           "miri unavailable; shuttle passed", started_wall, data)
-    if shuttle.status == FAIL:
-        return LayerResult("O3", FAIL, shuttle.category, shuttle.detail,
-                           started_wall, data)
-    if miri.status == FAIL:
-        return LayerResult("O3", FAIL, miri.category, miri.detail, started_wall, data)
-    return LayerResult("O3", PASS, None, None, started_wall, data)
+    category = skipped[0][1].category if skipped else None
+    detail = "; ".join(f"{name} {layer.status}" for name, layer in skipped) or None
+    return LayerResult("O3", PASS, category, detail, started_wall, data)
 
 
 class RustOracle:
@@ -266,7 +270,12 @@ class RustOracle:
                          check_terminal=check_terminal)
         layers["O2"] = o2
         layers["O3"] = self._o3(tools, workdir, rust_source)
-        layers["O4"] = self._o4(tools, workdir, rust_source)
+        if o2.category in ("hang", "crash"):
+            # A program that hangs/crashes cannot be instrumented meaningfully;
+            # O4 depends on O2's termination.
+            layers["O4"] = LayerResult("O4", NOT_RUN, None, f"O2 {o2.category}")
+        else:
+            layers["O4"] = self._o4(tools, workdir, rust_source)
         result = self._finish(workdir, layers, check_terminal, o1, o2)
         return result
 
@@ -295,6 +304,8 @@ class RustOracle:
 
     @staticmethod
     def _cleanup(workdir: Path) -> None:
+        if os.environ.get("SKELNET_KEEP_TARGET") == "1":
+            return
         for target in (workdir / "target", workdir / "shuttle" / "target",
                        workdir / "o4" / "project" / "target"):
             if target.exists():

@@ -85,6 +85,10 @@ def _programs(task_dir: Path, *, with_mutants: bool) -> list[dict]:
 
 
 def _matches(result, expect: dict) -> bool:
+    """Whether the expected layer failed with the expected category.
+
+    `matched` does **not** require the expected layer to be the first to fail.
+    """
     if result.functional_ok != expect.get("functional"):
         return False
     if "layer" in expect:
@@ -96,6 +100,14 @@ def _matches(result, expect: dict) -> bool:
     return True
 
 
+def _first_fail_layer(result) -> str | None:
+    for name in ("O1", "O2", "O3", "O4"):
+        layer = result.layers.get(name)
+        if layer is not None and layer.status == "fail":
+            return name
+    return None
+
+
 def cmd_calibrate(args: argparse.Namespace, *, runner=None) -> int:
     from . import cli
     layers = _parse_layers(args.layers)
@@ -105,6 +117,8 @@ def cmd_calibrate(args: argparse.Namespace, *, runner=None) -> int:
 
     report_tasks: list[dict] = []
     shuttle_unsupported: list[str] = []
+    instrument_unsupported: list[str] = []
+    no_concurrency: list[str] = []
     o4_coverage: list[dict] = []
     design_loss: list[str] = []
     mismatches = 0
@@ -138,6 +152,7 @@ def cmd_calibrate(args: argparse.Namespace, *, runner=None) -> int:
                 "functional_ok_no_o4": result.functional_ok_no_o4,
                 "terminal_check": result.terminal_check,
                 "oracle_complete": result.oracle_complete,
+                "first_fail_layer": _first_fail_layer(result),
                 "layers": {name: layer.to_dict() for name, layer in result.layers.items()},
                 "wall_ms": {name: (layer.wall_ms or 0)
                             for name, layer in result.layers.items()},
@@ -147,6 +162,11 @@ def cmd_calibrate(args: argparse.Namespace, *, runner=None) -> int:
             for name, layer in result.layers.items():
                 if layer.category == "shuttle_unsupported":
                     shuttle_unsupported.append(f"{label}:O3")
+                if layer.category == "instrument_unsupported":
+                    instrument_unsupported.append(f"{label}:O4")
+            o3 = result.layers.get("O3")
+            if o3 is not None and o3.data.get("no_concurrency"):
+                no_concurrency.append(label)
             o4 = result.layers.get("O4")
             if o4 is not None and o4.detail and "coverage" in (o4.detail or ""):
                 o4_coverage.append({"program": label, "detail": o4.detail})
@@ -162,6 +182,8 @@ def cmd_calibrate(args: argparse.Namespace, *, runner=None) -> int:
                     "mismatched": mismatches},
         "tasks": report_tasks,
         "shuttle_unsupported": shuttle_unsupported,
+        "instrument_unsupported": instrument_unsupported,
+        "no_concurrency": no_concurrency,
         "o4_coverage": o4_coverage,
         "design_loss": design_loss,
     }
@@ -174,31 +196,43 @@ def cmd_calibrate(args: argparse.Namespace, *, runner=None) -> int:
     return 0
 
 
+def _layer_cell(layer: dict | None) -> str:
+    if not layer:
+        return "-"
+    status = layer.get("status", "-")
+    category = layer.get("category")
+    return f"{status}({category})" if category else status
+
+
 def _markdown(document: dict) -> str:
     lines = ["# Oracle calibration", "",
              f"- total: {document['summary']['total']}",
              f"- matched: {document['summary']['matched']}",
              f"- mismatched: {document['summary']['mismatched']}", "",
-             "| task | program | functional_ok | O1 | O2 | O3 | O4 | matched |",
-             "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+             "| task | program | functional_ok | O1 | O2 | O3 | O4 "
+             "| first_fail | matched |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for task in document["tasks"]:
         for program in task["programs"]:
             if program.get("unsupported"):
-                lines.append(f"| {task['task']} | {program['program']} | - | - | - | - | - | no |")
+                lines.append(f"| {task['task']} | {program['program']} | - | - | - | - "
+                             f"| - | - | no |")
                 continue
             layers = program["layers"]
-            cells = [layers.get(name, {}).get("status", "-")
-                     for name in ("O1", "O2", "O3", "O4")]
+            cells = [_layer_cell(layers.get(name)) for name in ("O1", "O2", "O3", "O4")]
             lines.append(
                 f"| {task['task']} | {program['program']} | {program['functional_ok']} "
                 f"| {cells[0]} | {cells[1]} | {cells[2]} | {cells[3]} "
+                f"| {program.get('first_fail_layer') or '-'} "
                 f"| {'yes' if program['matched'] else 'no'} |")
-    if document["shuttle_unsupported"]:
-        lines += ["", "## shuttle_unsupported", ""]
-        lines += [f"- {item}" for item in document["shuttle_unsupported"]]
-    if document["design_loss"]:
-        lines += ["", "## design_loss", ""]
-        lines += [f"- {item}" for item in document["design_loss"]]
+    for title, key in (("shuttle_unsupported", "shuttle_unsupported"),
+                       ("instrument_unsupported", "instrument_unsupported"),
+                       ("no_concurrency", "no_concurrency"),
+                       ("design_loss", "design_loss")):
+        items = document.get(key) or []
+        if items:
+            lines += ["", f"## {title}", ""]
+            lines += [f"- {item}" for item in items]
     if document["o4_coverage"]:
         lines += ["", "## O4 coverage", ""]
         lines += [f"- {item['program']}: {item['detail']}"
