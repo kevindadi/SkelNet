@@ -52,10 +52,13 @@ def _run_skel(tmp_path, client, **extra):
 
 
 def test_cell_call_budget(tmp_path):
+    # With B=2 the skeleton stage gets min(rounds, B-1)=1 call and the Rust
+    # stage the remaining 1; the cell uses exactly the budget (no provider
+    # exhaustion error is raised).
     client = ScriptedTransportClient([BUGGY, BUGGY2, FIXED, RUST])
     result = _run_skel(tmp_path, client, call_budget=2)
-    assert result["error"] == "cell_budget_exhausted"
     assert result["budget_used"]["calls"] == 2
+    assert result["rust_calls"] == 1
 
 
 def test_cell_token_budget(tmp_path):

@@ -3,9 +3,12 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from skelnet.backend import Backend, repo_root
-from skelnet.prompts import (PRESERVED_DETAIL, build_cir_feedback,
-                             build_explore_feedback, render_feedback)
+from skelnet.prompts import (PRESERVED_DETAIL, apply_feedback_mode,
+                             build_cir_feedback, build_explore_feedback,
+                             render_feedback)
 
 BUGGY = """skeleton abba_bug;
 mutex a;
@@ -58,6 +61,29 @@ def test_feedback_has_lines_and_no_goal(tmp_path):
         assert ce["steps"]
         for step in ce["steps"]:
             assert step["line"] is not None and step["line"] > 0
+
+
+@pytest.mark.parametrize("mode", ["full", "outcome_only", "nocex", "nomap"])
+def test_no_goal_in_all_feedback_modes(tmp_path, mode):
+    root = repo_root()
+    contract = root / "benchmarks/tasks/lock-order/abba_2lock/contract.json"
+    skel = tmp_path / "buggy.skel"
+    skel.write_text(BUGGY, encoding="utf-8")
+    skel_feedback = apply_feedback_mode(
+        build_explore_feedback(Backend().verify(skel, contract)), mode)
+    _assert_no_goal(render_feedback(skel_feedback))
+
+    program = json.loads(
+        (root / "benchmarks/tasks/lock-order/abba_2lock/gold.cir.json").read_text())
+    for module in program["modules"]:
+        for fn in module["functions"]:
+            if fn["name"] == "t2":
+                fn["body"] = [s for s in fn["body"] if s.get("resource") != "main::b"]
+    cir = tmp_path / "partial.cir.json"
+    cir.write_text(json.dumps(program), encoding="utf-8")
+    cir_feedback = apply_feedback_mode(
+        build_cir_feedback(Backend().verify_cir(cir, contract)), mode)
+    _assert_no_goal(render_feedback(cir_feedback))
 
 
 def test_preserved_detail_sanitized_in_both_arms(tmp_path):

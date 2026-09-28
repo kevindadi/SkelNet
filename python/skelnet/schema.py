@@ -47,10 +47,13 @@ def validate_cell(cell: Any) -> list[str]:
         errors.append("error is required (may be null)")
     if "accepted" not in cell:
         errors.append("accepted is required")
+    elif not isinstance(cell["accepted"], bool):
+        errors.append("accepted must be a bool")
 
     errors.extend(_validate_calls(cell.get("calls")))
     errors.extend(_validate_budget_used(cell.get("budget_used")))
     errors.extend(_validate_oracle(cell.get("oracle")))
+    errors.extend(_validate_method_fields(cell))
 
     for key in ("parse_ok", "check_ok", "evidence_sufficient"):
         if not isinstance(cell.get(key), bool):
@@ -65,6 +68,34 @@ def validate_cell(cell: Any) -> list[str]:
     if not isinstance(cell.get("rust_mode"), str):
         errors.append("rust_mode must be a string")
     errors.extend(_validate_baseline_fields(cell))
+    return errors
+
+
+def _validate_method_fields(cell: Any) -> list[str]:
+    """Type-check the SKEL/CIR method fields when present (G0/baselines omit)."""
+    errors: list[str] = []
+    for key in ("skel_verified", "rust_compiled"):
+        if key in cell and not (cell[key] is None or isinstance(cell[key], bool)):
+            errors.append(f"{key} must be a bool or null")
+    for key in ("skel_status", "feedback_mode", "rust_when_unverified",
+                "property_ids", "rust_skipped"):
+        if key in cell and not (cell[key] is None or isinstance(cell[key], str)):
+            errors.append(f"{key} must be a string or null")
+    if "rust_calls" in cell and (not isinstance(cell["rust_calls"], int)
+                                 or isinstance(cell["rust_calls"], bool)):
+        errors.append("rust_calls must be an int")
+    if "rust_attempts" in cell:
+        attempts = cell["rust_attempts"]
+        if not isinstance(attempts, list):
+            errors.append("rust_attempts must be a list")
+        else:
+            for i, attempt in enumerate(attempts):
+                if not isinstance(attempt, dict):
+                    errors.append(f"rust_attempts[{i}] is not an object")
+                    continue
+                for key in ("call", "stage", "reply_kind", "compiled"):
+                    if key not in attempt:
+                        errors.append(f"rust_attempts[{i}].{key} is required")
     return errors
 
 
@@ -196,4 +227,10 @@ def _validate_layers(layers: Any) -> list[str]:
                 f"oracle.layers.{name}.status must be one of {sorted(_LAYER_STATUSES)}")
         if "category" not in layer or "detail" not in layer or "wall_ms" not in layer:
             errors.append(f"oracle.layers.{name} needs category/detail/wall_ms")
+        else:
+            for key in ("category", "detail"):
+                if not (layer[key] is None or isinstance(layer[key], str)):
+                    errors.append(f"oracle.layers.{name}.{key} must be a string or null")
+            if not _is_int_or_none(layer["wall_ms"]):
+                errors.append(f"oracle.layers.{name}.wall_ms must be an int or null")
     return errors
