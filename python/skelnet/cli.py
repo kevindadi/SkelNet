@@ -199,7 +199,7 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
             "sample_seed": ({"task": first_task, "rep": 0,
                              "seed": seed_for(first_task, 0)} if first_task else None),
             "model_policy": _model_policy(spec),
-            "model_policies": [_model_policy_entry(s)
+            "model_policies": [_model_policy_entry(s, run_params)
                                for s in experimental_models()],
             "prompt_routes": {
                 stage: {
@@ -375,10 +375,9 @@ def _model_policy(spec) -> dict:
     }
 
 
-def _model_policy_entry(spec) -> dict:
-    params = params_for_model(spec)
+def _model_policy_entry(spec, run_params) -> dict:
     return {**_model_policy(spec),
-            "temperature_sent": params.temperature_policy == "fixed"}
+            "temperature_sent": run_params.temperature_policy == "fixed"}
 
 
 def _task_tier(task_dir: Path) -> str | None:
@@ -693,9 +692,11 @@ def _user_prompt_for(arm: str, stage: str, request) -> str:
     if stage == prompts.STAGE_RUST:
         if arm == "CIR":
             return prompts.rust_from_cir_user_prompt(
-                request.requirements, request.previous_candidate or "")
+                request.requirements, request.previous_candidate or "",
+                retry_note=request.feedback)
         return prompts.rust_from_skel_user_prompt(
-            request.requirements, request.previous_candidate or "")
+            request.requirements, request.previous_candidate or "",
+            retry_note=request.feedback)
     if stage == prompts.STAGE_REVIEW:
         return prompts.baseline_review_user_prompt(
             request.requirements, request.current_program or "",

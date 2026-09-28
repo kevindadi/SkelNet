@@ -85,18 +85,31 @@ class RustReply:
     source: str | None = None
 
 
+_FENCE_RE = re.compile(r"```([A-Za-z0-9_+.-]*)")
+_RUST_FENCE_RE = re.compile(r"```\s*(?:rust|rs)\b", re.IGNORECASE)
+
+
 def classify_rust_reply(text: str, *, allow_no_issues: bool = False) -> RustReply:
     """Classify a Rust reply: a program, an explicit ``NO_ISSUES``, or other.
 
     ``allow_no_issues`` is only set by arms whose Rust stage may legitimately
     return "no issues"; the reply must reduce to exactly ``NOISSUES`` after
     dropping every non-letter character (so ``NO_ISSUES``/``No issues.`` match).
+
+    A reply with no ```rust block whose first code block carries a non-rust
+    language tag (e.g. ```skel/```json) is ``other``: the skeleton DSL itself
+    contains ``fn main`` and must not be mistaken for a program.
     """
     if allow_no_issues:
         letters = re.sub(r"[^A-Za-z]", "", text or "")
         if letters.upper() == "NOISSUES":
             return RustReply(kind="no_issues")
-    source = extract_rust(text or "")
+    body = text or ""
+    if not _RUST_FENCE_RE.search(body):
+        first = _FENCE_RE.search(body)
+        if first and first.group(1) and first.group(1).lower() not in ("rust", "rs"):
+            return RustReply(kind="other")
+    source = extract_rust(body)
     if source and "fn main" in source:
         return RustReply(kind="program", source=source)
     return RustReply(kind="other")
@@ -184,12 +197,32 @@ def _run_rust_stage(*, arm: str, rust_mode: str, design: str | None,
         call_number = calls_used + extra["rust_calls"]
         reply = classify_rust_reply(response.text)
         entry = {"call": call_number, "stage": stage, "reply_kind": reply.kind,
-                 "compiled": None}
+                 "compiled": None, "compile": None}
         if reply.kind == "program":
             current_program = reply.source
             compiled_result = compile_fn(
                 tools, workdir / "compile" / f"c{call_number}", current_program)
+            if compiled_result.unavailable:
+                # The compiler itself could not run: stop, never retry.
+                entry["compile"] = "unavailable"
+                extra["rust_attempts"].append(entry)
+                result.history.append({"attempt": extra["rust_calls"],
+                                       "stage": stage, "compiled": None})
+                compiled = None
+                if not error:
+                    error = "compile_unavailable"
+                break
+            if compiled_result.timed_out:
+                entry["compile"] = "timeout"
+                extra["rust_attempts"].append(entry)
+                result.history.append({"attempt": extra["rust_calls"],
+                                       "stage": stage, "compiled": None})
+                compiled = None
+                if not error:
+                    error = "compile_timeout"
+                break
             entry["compiled"] = bool(compiled_result.ok)
+            entry["compile"] = "ok" if compiled_result.ok else "error"
             compiled = bool(compiled_result.ok)
             extra["rust_attempts"].append(entry)
             result.history.append({"attempt": extra["rust_calls"], "stage": stage,
@@ -223,8 +256,10 @@ def run_skel_cell(*, task: str, requirements: str, contract_path: Path,
     result = CellResult(arm="SKEL", task=task, replicate=replicate, rust_mode=rust_mode)
     feedback: str | None = None
     candidate: str | None = None
+    last_nonempty: str | None = None
     last_path: Path | None = None
     last_check_ok = False
+    last_status: str | None = None
     property_index: dict[str, str] = {}
     attempts = max(1, min(rounds, call_budget - 1))
     for attempt in range(1, attempts + 1):
@@ -237,18 +272,22 @@ def run_skel_cell(*, task: str, requirements: str, contract_path: Path,
             break
         candidate = extract_skel(response.text)
         result.candidate = candidate
-        if not candidate:
-            feedback = prompts.FORMAT_RETRY_NOTE
-            continue
-        last_path = workdir / f"candidate_{attempt}.skel"
-        last_path.write_text(candidate, encoding="utf-8")
-        check, verify = _skel_verify(backend, last_path, contract_path)
-        last_check_ok = check.ok
+        # Always write and check the reply, even an empty one (9dfaefe), but
+        # only a non-empty reply can drive the Rust stage (D5-6).
+        skel_path = workdir / f"candidate_{attempt}.skel"
+        skel_path.write_text(candidate, encoding="utf-8")
+        check, verify = _skel_verify(backend, skel_path, contract_path)
         if attempt == 1:
             result.parse_ok = bool(candidate) and check.kind == "semantic" and not _has_parse_error(check)
         if check.ok:
             result.check_ok = True
+        if candidate:
+            last_nonempty = candidate
+            last_path = skel_path
+            last_check_ok = check.ok
         if verify is None:
+            if candidate:
+                last_status = "check_failed"
             feedback = prompts.render_feedback(prompts.build_check_feedback(
                 check, property_ids=property_ids, index=property_index))
             result.history.append({"attempt": attempt, "stage": "check",
@@ -258,21 +297,23 @@ def run_skel_cell(*, task: str, requirements: str, contract_path: Path,
         result.history.append({"attempt": attempt, "stage": "verify",
                                "outcome": verify.outcome, "complete": verify.complete,
                                "unmapped": (verify.payload or {}).get("unmapped")})
+        if candidate:
+            last_status = verify.outcome
         if verify.outcome == "PASS" and verify.complete:
             result.accepted = True
-            last_path = workdir / f"candidate_{attempt}.skel"
             result.ledger = evidence.property_ledger(verify.payload)
             result.evidence_sufficient = evidence.evidence_sufficient(verify.payload)
             break
         feedback = prompts.render_feedback(prompts.apply_feedback_mode(
-            prompts.build_explore_feedback(verify, property_ids=property_ids,
-                                           index=property_index),
+            prompts.build_explore_feedback(
+                verify, property_ids=property_ids, index=property_index,
+                include_concir_loc=(feedback_mode == "nomap")),
             feedback_mode))
     return _finish_cell(result, arm="SKEL", requirements=requirements,
-                        design=candidate, design_path=last_path,
-                        last_check_ok=last_check_ok, provider=provider,
-                        backend=backend, oracle=oracle, workdir=workdir,
-                        rust_mode=rust_mode, call_budget=call_budget,
+                        design=last_nonempty, design_path=last_path,
+                        last_check_ok=last_check_ok, skel_status=last_status,
+                        provider=provider, backend=backend, oracle=oracle,
+                        workdir=workdir, rust_mode=rust_mode, call_budget=call_budget,
                         rust_when_unverified=rust_when_unverified,
                         feedback_mode=feedback_mode, property_ids=property_ids,
                         compile_fn=compile_fn, tools=tools)
@@ -288,8 +329,10 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
     result = CellResult(arm="CIR", task=task, replicate=replicate, rust_mode=rust_mode)
     feedback: str | None = None
     candidate: str | None = None
+    last_nonempty: str | None = None
     last_path: Path | None = None
     last_check_ok = False
+    last_status: str | None = None
     property_index: dict[str, str] = {}
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
     attempts = max(1, min(rounds, call_budget - 1))
@@ -303,19 +346,21 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
             break
         candidate = extract_cir(response.text)
         result.candidate = candidate
-        if not candidate:
-            feedback = prompts.FORMAT_RETRY_NOTE
-            continue
-        last_path = workdir / f"candidate_{attempt}.cir.json"
+        cir_path = workdir / f"candidate_{attempt}.cir.json"
         # CIR is never normalised: the backend sees the extracted bytes as-is.
-        last_path.write_text(candidate, encoding="utf-8")
-        verify = backend.verify_cir(last_path, contract_path)
-        last_check_ok = verify.kind == "semantic" and verify.outcome not in (
+        cir_path.write_text(candidate, encoding="utf-8")
+        verify = backend.verify_cir(cir_path, contract_path)
+        ok = verify.kind == "semantic" and verify.outcome not in (
             "INVALID", "UNSUPPORTED")
         if attempt == 1:
             result.parse_ok = bool(candidate) and verify.kind == "semantic"
-        if last_check_ok:
+        if ok:
             result.check_ok = True
+        if candidate:
+            last_nonempty = candidate
+            last_path = cir_path
+            last_check_ok = ok
+            last_status = verify.outcome
         result.history.append({"attempt": attempt, "stage": "verify",
                                "outcome": verify.outcome, "complete": verify.complete})
         if verify.outcome == "PASS" and verify.complete:
@@ -329,10 +374,10 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
                                        index=property_index),
             feedback_mode))
     return _finish_cell(result, arm="CIR", requirements=requirements,
-                        design=candidate, design_path=last_path,
-                        last_check_ok=last_check_ok, provider=provider,
-                        backend=backend, oracle=oracle, workdir=workdir,
-                        rust_mode=rust_mode, call_budget=call_budget,
+                        design=last_nonempty, design_path=last_path,
+                        last_check_ok=last_check_ok, skel_status=last_status,
+                        provider=provider, backend=backend, oracle=oracle,
+                        workdir=workdir, rust_mode=rust_mode, call_budget=call_budget,
                         rust_when_unverified=rust_when_unverified,
                         feedback_mode=feedback_mode, property_ids=property_ids,
                         compile_fn=compile_fn, tools=tools)
@@ -340,6 +385,7 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
 
 def _finish_cell(result: CellResult, *, arm: str, requirements: str,
                  design: str | None, design_path: Path | None, last_check_ok: bool,
+                 skel_status: str | None,
                  provider, backend, oracle, workdir, rust_mode, call_budget,
                  rust_when_unverified, feedback_mode, property_ids, compile_fn,
                  tools) -> CellResult:
@@ -363,22 +409,11 @@ def _finish_cell(result: CellResult, *, arm: str, requirements: str,
         result.error = error
     result.accepted = skel_verified and bool(extra["rust_compiled"])
     if rust_mode == "llm":
-        extra["skel_status"] = _skel_status(result, design)
+        extra["skel_status"] = skel_status if design is not None else "no_candidate"
     extra["feedback_mode"] = feedback_mode
     extra["property_ids"] = property_ids
     result.extra = extra
     return result
-
-
-def _skel_status(result: CellResult, design: str | None) -> str | None:
-    if design is None:
-        return "no_candidate"
-    for entry in reversed(result.history):
-        if entry.get("stage") == "verify":
-            return entry.get("outcome")
-        if entry.get("stage") == "check":
-            return "check_failed"
-    return None
 
 
 def run_g0_cell(*, task: str, requirements: str, provider: CandidateProvider,

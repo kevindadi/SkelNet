@@ -12,6 +12,7 @@ from skelnet.providers import ScriptedProvider
 from skelnet.rusttools.compile import CompileResult
 
 from _fake_sdk import BUGGY, FIXED, RUST, ScriptedTransportClient, run_args
+from round03_helpers import rust_tools
 from test_pipeline_skel import BUGGY as SKEL_BUGGY, FIXED as SKEL_FIXED
 
 CONTRACT = repo_root() / "benchmarks/tasks/lock-order/abba_2lock/contract.json"
@@ -53,7 +54,8 @@ class _Result:
 
 
 def _feedback(mode):
-    fb = prompts.build_explore_feedback(_Result(_explore_payload()))
+    fb = prompts.build_explore_feedback(
+        _Result(_explore_payload()), include_concir_loc=(mode == "nomap"))
     return prompts.apply_feedback_mode(fb, mode)
 
 
@@ -61,7 +63,11 @@ def test_full_is_unchanged():
     fb = prompts.build_explore_feedback(_Result(_explore_payload()))
     assert prompts.apply_feedback_mode(fb, "full") == fb
     assert fb["counterexamples"][0]["steps"][0]["line"] == 5
-    assert fb["diagnostics"][0]["concir_loc"] == "main::main::s1"
+    # `full` keeps the 9dfaefe field sets: no `concir_loc`.
+    assert set(fb["diagnostics"][0]) == {"property", "outcome", "message",
+                                         "skel", "unmapped"}
+    assert set(fb["counterexamples"][0]["steps"][0]) == {
+        "step", "thread", "function", "line", "statement"}
 
 
 def test_outcome_only_keeps_only_ids():
@@ -86,6 +92,31 @@ def test_nomap_keeps_only_concir_position():
     step = fb["counterexamples"][0]["steps"][0]
     assert "line" not in step and "statement" not in step
     assert step["concir_loc"] == "main::main::s1"
+
+
+@rust_tools
+def test_full_and_nomap_field_sets_real(tmp_path):
+    from skelnet.backend import Backend
+    from test_feedback_disclosure import BUGGY
+    contract = (repo_root() / "benchmarks/tasks/lock-order/abba_2lock"
+                / "contract.json")
+    skel = tmp_path / "buggy.skel"
+    skel.write_text(BUGGY, encoding="utf-8")
+    verify = Backend().verify(skel, contract)
+    full = prompts.build_explore_feedback(verify)
+    assert "concir_loc" not in prompts.render_feedback(full)
+    for diag in full["diagnostics"]:
+        assert set(diag) == {"property", "outcome", "message", "skel", "unmapped"}
+    for ce in full["counterexamples"]:
+        for step in ce["steps"]:
+            assert set(step) == {"step", "thread", "function", "line", "statement"}
+    nomap = prompts.apply_feedback_mode(
+        prompts.build_explore_feedback(verify, include_concir_loc=True), "nomap")
+    assert nomap["counterexamples"]
+    for ce in nomap["counterexamples"]:
+        for step in ce["steps"]:
+            assert "concir_loc" in step
+            assert "line" not in step and "statement" not in step
 
 
 def test_nomap_matches_full_for_cir():

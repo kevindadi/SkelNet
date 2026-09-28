@@ -106,3 +106,12 @@ def test_dry_run_lists_all_model_policies(capsys, tmp_path):
     assert len(policies) == 4
     assert all(p["temperature_sent"] is False for p in policies)
     assert "model_policy" in document
+
+
+def test_dry_run_temperature_sent_follows_the_run(capsys, tmp_path):
+    args = run_args("G0", tmp_path / "out", tasks="lock-order/abba_2lock",
+                    temperature_policy="fixed", temperature=0.2)
+    args.dry_run = True
+    assert cli.cmd_run(args) == 0
+    document = json.loads(capsys.readouterr().out)
+    assert all(p["temperature_sent"] is True for p in document["model_policies"])

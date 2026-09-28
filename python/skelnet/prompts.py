@@ -181,7 +181,9 @@ def requirements_only_user_prompt(requirements: str, *,
     return "\n".join(parts)
 
 
-def rust_from_skel_user_prompt(requirements: str, skeleton: str) -> str:
+def rust_from_skel_user_prompt(requirements: str, skeleton: str, *,
+                               retry_note: str | None = None) -> str:
+    note = (retry_note.strip() + "\n\n") if retry_note else ""
     return (
         "Write a single-file std-only Rust program implementing the skeleton "
         "below. Use the skeleton's resource and function names as Rust "
@@ -189,11 +191,14 @@ def rust_from_skel_user_prompt(requirements: str, skeleton: str) -> str:
         "`post`/`take` via `concir_sync`, and keep `// @Rn` comments.\n\n"
         "<domain_requirements>\n" + requirements.strip() + "\n</domain_requirements>\n\n"
         "<skeleton>\n" + skeleton.strip() + "\n</skeleton>\n\n"
+        + note +
         "Output only one ```rust code block."
     )
 
 
-def rust_from_cir_user_prompt(requirements: str, cir: str) -> str:
+def rust_from_cir_user_prompt(requirements: str, cir: str, *,
+                              retry_note: str | None = None) -> str:
+    note = (retry_note.strip() + "\n\n") if retry_note else ""
     return (
         "Write a single-file std-only Rust program implementing the ConcIR "
         "program below. Use the program's resource and function names as "
@@ -202,6 +207,7 @@ def rust_from_cir_user_prompt(requirements: str, cir: str) -> str:
         "comments.\n\n"
         "<domain_requirements>\n" + requirements.strip() + "\n</domain_requirements>\n\n"
         "<concir>\n" + cir.strip() + "\n</concir>\n\n"
+        + note +
         "Output only one ```rust code block."
     )
 
@@ -307,19 +313,32 @@ def build_check_feedback(result, *, property_ids: str = "keep",
     }
 
 
+def _normalize_id(pid: Any) -> Any:
+    """Drop a backend ``property:`` prefix so one property has one number."""
+    if isinstance(pid, str) and pid.startswith("property:"):
+        return pid[len("property:"):]
+    return pid
+
+
 def _register_and_show(ids, property_ids: str, index: dict[str, str]):
     for pid in ids:
         if pid:
-            present_property_id(pid, property_ids, index)
+            present_property_id(_normalize_id(pid), property_ids, index)
 
     def show(pid):
-        return present_property_id(pid, property_ids, index) if pid else pid
+        return present_property_id(_normalize_id(pid), property_ids, index) if pid else pid
 
     def show_text(text):
         if property_ids == "keep" or not text:
             return text
+        replacements: dict[str, str] = {}
         for original, shown in index.items():
-            text = text.replace(original, shown)
+            replacements[original] = shown
+            if original.startswith("preserved: "):
+                # Free text carries the bare description, not the prefix.
+                replacements[original[len("preserved: "):]] = shown
+        for original in sorted(replacements, key=len, reverse=True):
+            text = text.replace(original, replacements[original])
         return text
 
     return show, show_text
@@ -327,8 +346,13 @@ def _register_and_show(ids, property_ids: str, index: dict[str, str]):
 
 def build_explore_feedback(result, *, preserved_ids: list[str] | None = None,
                            property_ids: str = "keep",
-                           index: dict[str, str] | None = None) -> dict[str, Any]:
-    """Disclosure-safe verification feedback (no contract goal, ever)."""
+                           index: dict[str, str] | None = None,
+                           include_concir_loc: bool = False) -> dict[str, Any]:
+    """Disclosure-safe verification feedback (no contract goal, ever).
+
+    ``include_concir_loc`` adds the raw ConcIR location to diagnostics/steps; it
+    is only opened for ``nomap`` (the other modes keep the 9dfaefe field sets).
+    """
     payload = result.payload or {}
     index = index if index is not None else {}
     # `detail` is sanitized (preserved goals are replaced) by the shared helper.
@@ -342,29 +366,35 @@ def build_explore_feedback(result, *, preserved_ids: list[str] | None = None,
     show, show_text = _register_and_show(ids, property_ids, index)
     for entry in failed:
         entry["id"] = show(entry["id"])
+        entry["detail"] = show_text(entry["detail"])
     diagnostics = []
     for d in raw_diagnostics:
-        diagnostics.append({
+        item = {
             "property": show(d.get("code") or d.get("property")),
             "outcome": d.get("severity"),
             "message": show_text(d.get("message")),
             "skel": d.get("skel"),
-            "concir_loc": (d.get("skel") or {}).get("loc"),
             "unmapped": d.get("unmapped"),
-        })
+        }
+        if include_concir_loc:
+            item["concir_loc"] = (d.get("skel") or {}).get("loc")
+        diagnostics.append(item)
     counterexamples = []
     for ce in raw_counterexamples:
+        steps = []
+        for s in ce.get("steps", []):
+            step = {"step": s.get("step"), "thread": s.get("thread"),
+                    "function": s.get("function"),
+                    "line": (s.get("skel") or {}).get("line"),
+                    "statement": s.get("statement")}
+            if include_concir_loc:
+                step["concir_loc"] = (s.get("skel") or {}).get("loc")
+            steps.append(step)
         counterexamples.append({
             "property": show(ce.get("property")),
             "reqs": ce.get("reqs"),
-            "steps": [
-                {"step": s.get("step"), "thread": s.get("thread"),
-                 "function": s.get("function"), "line": (s.get("skel") or {}).get("line"),
-                 "concir_loc": (s.get("skel") or {}).get("loc"),
-                 "statement": s.get("statement")}
-                for s in ce.get("steps", [])
-            ],
-            "final_note": ce.get("final_note"),
+            "steps": steps,
+            "final_note": show_text(ce.get("final_note")),
         })
     return {
         "stage": "explore",
@@ -423,13 +453,15 @@ def build_cir_feedback(result, *, contract: dict | None = None,
     raw_counterexamples = payload.get("diagnostics", []) or []
     ids = ([p.get("id") for p in failed]
            + [d.get("property") for d in raw_counterexamples])
-    show, show_text = _register_and_show(ids, property_ids, index)
-    for entry in failed:
-        entry["id"] = show(entry["id"])
+    # Fill reqs from the contract with the ORIGINAL ids, before they are opaque.
     reqs = _contract_reqs(contract)
     for entry in failed:
         if entry.get("reqs") is None and entry.get("id") in reqs:
             entry["reqs"] = reqs[entry["id"]]
+    show, show_text = _register_and_show(ids, property_ids, index)
+    for entry in failed:
+        entry["id"] = show(entry["id"])
+        entry["detail"] = show_text(entry["detail"])
 
     counterexamples = []
     for d in raw_counterexamples:

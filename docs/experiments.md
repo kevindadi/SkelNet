@@ -190,6 +190,13 @@ run directories can be compared in one call.
   previous version and repeats the stage with a format-retry note. The final
   Rust is the latest version (even if it does not compile) and is scored by the
   oracle.
+- **Compiler unavailable / timeout (shared with round 4).** If `cargo` cannot
+  run (`unavailable`), the compile times out (`timed_out`), or cargo exits
+  non-zero without any compiler error, the Rust stage stops immediately with no
+  further LLM call: the attempt records `compile: "unavailable"`/`"timeout"`,
+  `rust_compiled=null`, and the cell error is `compile_unavailable`/
+  `compile_timeout`. The latest Rust version is still scored by the oracle.
+  Only a real compiler error triggers `rust_fix`.
 - **`check_ok`.** SKEL: `check` was semantically valid on any round. CIR: the
   explorer returned a semantic result that is neither `INVALID` nor
   `UNSUPPORTED`.

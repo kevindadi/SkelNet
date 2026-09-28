@@ -168,3 +168,60 @@ def test_cir_candidate_written_verbatim(tmp_path):
     written = (tmp_path / "candidate_1.cir.json").read_text(encoding="utf-8")
     assert written == extract_cir(aliased)
     assert backend.seen == extract_cir(aliased)
+
+
+# ── M7/M8: opaque ids on real backend output ─────────────────────────
+def _contract_strings() -> list[str]:
+    contract = _contract()
+    strings = [p["id"] for p in contract.get("properties") or [] if p.get("id")]
+    strings += [p["description"] for p in contract.get("preserved") or []
+                if p.get("description")]
+    return strings
+
+
+def _assert_no_contract_strings(feedback: dict) -> None:
+    text = render_feedback(feedback)
+    for marker in _contract_strings():
+        assert marker not in text, marker
+
+
+@rust_tools
+def test_opaque_hides_ids_buggy_skeleton(tmp_path):
+    from test_feedback_disclosure import BUGGY
+    skel = tmp_path / "buggy.skel"
+    skel.write_text(BUGGY, encoding="utf-8")
+    verify = Backend().verify(skel, CONTRACT_PATH)
+    fb = build_explore_feedback(verify, property_ids="opaque")
+    _assert_no_contract_strings(fb)
+    assert (fb["failed_properties"][0]["id"]
+            == fb["diagnostics"][0]["property"]
+            == fb["counterexamples"][0]["property"])
+
+
+@rust_tools
+def test_opaque_hides_description_in_message(tmp_path):
+    from test_feedback_disclosure import PARTIAL
+    skel = tmp_path / "partial.skel"
+    skel.write_text(PARTIAL, encoding="utf-8")
+    verify = Backend().verify(skel, CONTRACT_PATH)
+    fb = build_explore_feedback(verify, property_ids="opaque")
+    _assert_no_contract_strings(fb)
+
+
+@rust_tools
+def test_opaque_cir_fills_reqs(tmp_path):
+    from test_feedback_disclosure import BUGGY as _buggy_skel  # noqa: F401
+    program = json.loads(
+        (repo_root() / "benchmarks/tasks" / TASK / "gold.cir.json").read_text())
+    for module in program["modules"]:
+        for fn in module["functions"]:
+            if fn["name"] == "t2":
+                fn["body"] = [s for s in fn["body"] if s.get("resource") != "main::b"]
+    cir = tmp_path / "partial.cir.json"
+    cir.write_text(json.dumps(program), encoding="utf-8")
+    verify = Backend().verify_cir(cir, CONTRACT_PATH)
+    fb = build_cir_feedback(verify, contract=_contract(), property_ids="opaque")
+    _assert_no_contract_strings(fb)
+    entry = fb["failed_properties"][0]
+    assert entry["id"] == "P1"
+    assert entry["reqs"] == ["R2", "R3"]

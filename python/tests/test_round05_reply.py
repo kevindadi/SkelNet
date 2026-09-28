@@ -68,6 +68,28 @@ def test_classify_empty_is_other():
     assert classify_rust_reply("").kind == "other"
 
 
+# ── M3: non-rust fenced blocks are not programs ──────────────────────
+def test_non_rust_fence_is_other():
+    assert classify_rust_reply(
+        "```skel\nskeleton x;\nfn main() { }\n```").kind == "other"
+    assert classify_rust_reply(
+        '```json\n{"fn main": true}\n```').kind == "other"
+
+
+def test_untagged_bare_and_rust_fences_are_programs():
+    assert classify_rust_reply(
+        "```\nfn main() {}\n```").kind == "program"
+    assert classify_rust_reply("fn main() {}").kind == "program"
+    assert classify_rust_reply("```rust\nfn main() {}\n```").kind == "program"
+
+
+def test_rust_fence_after_skel_fence_wins():
+    reply = classify_rust_reply(
+        "```skel\nskeleton x;\nfn main() { }\n```\n```rust\nfn main() { }\n```")
+    assert reply.kind == "program"
+    assert reply.source == "fn main() { }"
+
+
 # ── user prompt ──────────────────────────────────────────────────────
 def test_compile_fix_user_prompt_structure():
     prompt = prompts.rust_compile_fix_user_prompt(
@@ -137,3 +159,29 @@ def test_prompt_asset_record_has_new_assets():
     record = prompts.prompt_asset_record()
     assert prompts.RUST_FROM_SKEL_V2_ASSET in record
     assert prompts.RUST_FROM_CIR_V3_ASSET in record
+
+
+# ── M4: retry_note is opt-in and byte-identical when absent ──────────
+def test_rust_user_prompts_unchanged_without_retry_note():
+    assert prompts.rust_from_skel_user_prompt("r", "s") == (
+        "Write a single-file std-only Rust program implementing the skeleton "
+        "below. Use the skeleton's resource and function names as Rust "
+        "identifiers, `lock m {}` as a guard scope, `permit` as a `Permit`, "
+        "`post`/`take` via `concir_sync`, and keep `// @Rn` comments.\n\n"
+        "<domain_requirements>\nr\n</domain_requirements>\n\n"
+        "<skeleton>\ns\n</skeleton>\n\nOutput only one ```rust code block.")
+    assert prompts.rust_from_cir_user_prompt("r", "c") == (
+        "Write a single-file std-only Rust program implementing the ConcIR "
+        "program below. Use the program's resource and function names as "
+        "Rust identifiers, `mutex_lock`/`mutex_unlock` as a guard scope, "
+        "semaphore acquire/release via `concir_sync`, and keep `// @cir <sid>` "
+        "comments.\n\n"
+        "<domain_requirements>\nr\n</domain_requirements>\n\n"
+        "<concir>\nc\n</concir>\n\nOutput only one ```rust code block.")
+
+
+def test_retry_note_is_inserted_before_the_output_line():
+    note = "Reply again with exactly one ```rust code block."
+    text = prompts.rust_from_skel_user_prompt("r", "s", retry_note=note)
+    assert note in text
+    assert text.index(note) < text.index("Output only one ```rust code block.")
