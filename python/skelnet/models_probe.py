@@ -81,6 +81,9 @@ def probe_run(out_dir: Path | str, *, client_factory: Callable | None = None,
 
 def _build_probe_client(spec, params, out_dir):
     from .channels import build_client, key_for
+    from .env import load_dotenv
+    # The real probe (repository owner only) reads keys from the local .env.
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=True)
     channel = CHANNELS[spec.channel]
     api_key = key_for(spec, dict(os.environ), channel.api_key_env)
     return build_client(spec, params, budget=_NullBudget(), evidence_dir=out_dir,
