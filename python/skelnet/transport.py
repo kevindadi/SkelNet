@@ -8,7 +8,7 @@ back, substitutes a model, or routes through ``auto``.
 Transports:
 
 - ``direct-api`` — the provider's own OpenAI-compatible endpoint (DeepSeek,
-  DashScope/Qwen). Never routed through Cursor or OpenCode.
+  DashScope/Qwen, Moonshot/Kimi). Never routed through Cursor or OpenCode.
 - ``cursor`` — Cursor agent sessions only (Composer). Requires ``cursor_sdk``.
 - ``opencode`` — the OpenCode Go gateway, used for the remaining models.
 
@@ -110,10 +110,13 @@ class ModelSpec:
     status: str = "available"        # available | blocked | unknown
     blocked_reason: str | None = None
     discovered: bool = False         # model_id observed in a live model list
-    # Parameter policy (R2). `thinking` is the requested switch; GPT/Kimi use
-    # reasoning_effort="medium"; `supports_seed` gates per-cell seeds (Responses
-    # never send a seed).
-    thinking: bool = False
+    # Parameter policy (R2, updated R2d). `thinking` is the requested switch; a
+    # string value records a mode the provider always applies (Kimi's
+    # ``kimi-k3`` always reasons, so it is ``"always"`` and no ``thinking`` key
+    # is ever sent). Reasoning effort is provider-specific: GPT 6 uses
+    # ``reasoning_effort="medium"``, Kimi ``"high"``. `supports_seed` gates
+    # per-cell seeds (Responses never send a seed).
+    thinking: bool | str = False
     reasoning_effort: str | None = None
     max_output_tokens: int = 32768
     max_output_tokens_cap: int = 65536
@@ -142,17 +145,19 @@ CHANNELS: dict[str, Channel] = {
         name="opencode-go", transport="opencode", provider="opencode",
         api_key_env="OPENCODE_API_KEY",
         base_url="https://opencode.ai/zen/go/v1", surface="chat"),
-    # Reserved direct endpoints (not used in R2 experiments).
+    # Reserved direct endpoint (not used in R2 experiments).
     "openai-direct": Channel(
         name="openai-direct", transport="direct-api", provider="openai",
         api_key_env="OPENAI_API_KEY", base_url="https://api.openai.com/v1",
         surface="responses",
         notes="Reserved; blocked in R2 (no key/transport decision yet)."),
+    # Enabled in R2d: Kimi moves off the OpenCode gateway onto the owner's
+    # Moonshot key (China platform, Chat Completions).
     "moonshot-direct": Channel(
         name="moonshot-direct", transport="direct-api", provider="moonshot",
         api_key_env="MOONSHOT_API_KEY", base_url="https://api.moonshot.cn/v1",
         surface="chat",
-        notes="Reserved; blocked in R2 (no key/transport decision yet)."),
+        notes="Moonshot direct; used by Kimi (kimi-k3) from R2d."),
 }
 
 
@@ -201,10 +206,17 @@ def build_registry() -> list[ModelSpec]:
                   discovered="qwen3.8-flash" in DISCOVERED_MODELS["dashscope-direct"],
                   thinking=True, reasoning_effort=None, supports_seed=False,
                   stream=False),
-        ModelSpec("Kimi", "moonshot", "opencode-go", "kimi-k3", role="compare",
-                  aliases=("kimi-k2.7-code",),
-                  discovered="kimi-k3" in DISCOVERED_MODELS["opencode-go"],
-                  thinking=True, reasoning_effort="medium", supports_seed=True),
+        # Kimi now runs on the owner's Moonshot key (China platform, Chat
+        # Completions), not the OpenCode gateway. ``kimi-k3`` always reasons and
+        # ``thinking`` must never appear in the request; strength is the
+        # top-level ``reasoning_effort`` ("high"), a deliberate difference from
+        # GPT. ``supports_seed`` is False: the Moonshot docs do not document a
+        # seed parameter for ``kimi-k3``. The OpenCode ``kimi-k2.7-code`` alias
+        # is dropped so it can no longer route to the old channel.
+        ModelSpec("Kimi", "moonshot", "moonshot-direct", "kimi-k3",
+                  role="compare",
+                  thinking="always", reasoning_effort="high",
+                  supports_seed=False, stream=False),
         ModelSpec("GPT 6 Luna", "openai", "opencode-go", "gpt-6-luna",
                   role="compare", surface="responses",
                   discovered="gpt-6-luna" in DISCOVERED_MODELS["opencode-go"],
@@ -226,9 +238,6 @@ def build_registry() -> list[ModelSpec]:
         ModelSpec("Mimo", "xiaomi", "opencode-go", "mimo-v2.5", role="compare",
                   discovered="mimo-v2.5" in DISCOVERED_MODELS["opencode-go"]),
         ModelSpec("OpenAI direct", "openai", "openai-direct", None,
-                  role="diagnostic", status="blocked",
-                  blocked_reason="Reserved channel; no transport decision in R2."),
-        ModelSpec("Moonshot direct", "moonshot", "moonshot-direct", None,
                   role="diagnostic", status="blocked",
                   blocked_reason="Reserved channel; no transport decision in R2."),
     ]

@@ -15,7 +15,7 @@ RUST = "```rust\nfn main() {}\n```"
 
 MODELS = {
     "GPT 6 Luna": ("OPENCODE_API_KEY", "responses"),
-    "Kimi": ("OPENCODE_API_KEY", "chat"),
+    "Kimi": ("MOONSHOT_API_KEY", "chat"),
     "DeepSeek Flash": ("DEEPSEEK_API_KEY", "chat"),
     "Qwen": ("DASHSCOPE_API_KEY", "chat"),
 }

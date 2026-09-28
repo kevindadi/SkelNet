@@ -69,13 +69,17 @@ def test_build_client_thinking_switches(tmp_path):
 
 
 def test_kimi_reasoning_effort_and_gpt_reasoning(tmp_path):
+    # Kimi is on the Moonshot direct channel (R2d): top-level reasoning_effort
+    # "high", no thinking key, no temperature.
     kimi = _spec("Kimi")
     sdk = FakeSDK(chat_handler=lambda k: chat_response("OK"))
-    client = OpenCodeGoClient(api_key="x", base_url="http://x", model=kimi.model_id,
-                              budget=_Budget(), evidence_dir=tmp_path,
-                              params=params_for_model(kimi), sdk_client=sdk)
+    client = channels.build_client(kimi, params_for_model(kimi), budget=_Budget(),
+                                   evidence_dir=tmp_path, api_key="x", sdk_client=sdk)
     client.complete("s", "u")
-    assert sdk.chat.completions.calls[0]["reasoning_effort"] == "medium"
+    call = sdk.chat.completions.calls[0]
+    assert call["reasoning_effort"] == "high"
+    assert "thinking" not in call
+    assert "temperature" not in call
 
     gpt = _spec("GPT 6 Luna")
     sdk2 = FakeSDK(responses_handler=lambda k: responses_response("OK"))
@@ -91,14 +95,24 @@ def test_kimi_reasoning_effort_and_gpt_reasoning(tmp_path):
 
 
 def test_seed_rules(tmp_path):
-    kimi = _spec("Kimi")
+    # DeepSeek supports per-cell seeds.
+    ds = _spec("DeepSeek Flash")
     sdk = FakeSDK(chat_handler=lambda k: chat_response("OK"))
-    client = OpenCodeGoClient(api_key="x", base_url="http://x", model=kimi.model_id,
-                              budget=_Budget(), evidence_dir=tmp_path,
-                              params=params_for_model(kimi), sdk_client=sdk)
+    client = channels.build_client(ds, params_for_model(ds), budget=_Budget(),
+                                   evidence_dir=tmp_path, api_key="x", sdk_client=sdk)
     client.set_cell("task", 0)
     client.complete("s", "u")
     assert sdk.chat.completions.calls[0]["seed"] == seed_for("task", 0)
+
+    # Kimi (Moonshot) has no documented seed parameter: none is sent.
+    kimi = _spec("Kimi")
+    sdk_kimi = FakeSDK(chat_handler=lambda k: chat_response("OK"))
+    client_kimi = channels.build_client(kimi, params_for_model(kimi), budget=_Budget(),
+                                        evidence_dir=tmp_path, api_key="x",
+                                        sdk_client=sdk_kimi)
+    client_kimi.set_cell("task", 0)
+    client_kimi.complete("s", "u")
+    assert "seed" not in sdk_kimi.chat.completions.calls[0]
 
     # Responses never send a seed.
     gpt = _spec("GPT 6 Luna")
