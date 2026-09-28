@@ -48,5 +48,10 @@
       }
     ]
   },
-  "contract": "semaphore/acquire_twice_no_release/contract.json"
+  "contract": "semaphore/acquire_twice_no_release/contract.json",
+  "terminal_v2": "DONE w1=2 w2=1",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

@@ -51,5 +51,10 @@
       }
     ]
   },
-  "contract": "semaphore/throttle_n_permits/contract.json"
+  "contract": "semaphore/throttle_n_permits/contract.json",
+  "terminal_v2": "DONE w1=1 w2=1 w3=1",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

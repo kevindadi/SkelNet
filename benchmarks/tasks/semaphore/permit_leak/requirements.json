@@ -48,5 +48,9 @@
       }
     ]
   },
-  "contract": "semaphore/permit_leak/contract.json"
+  "contract": "semaphore/permit_leak/contract.json",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }
