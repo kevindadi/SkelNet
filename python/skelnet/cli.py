@@ -24,6 +24,7 @@ from .params import params_for_model, seed_for
 from .pipeline import (dumps, run_cir_cell, run_g0_cell, run_skel_cell)
 from .providers import CandidateResponse
 from .requirements_render import RequirementsMissing, render_requirements
+from .rusttools.runner import ToolRunner
 from .schema import validate_cell
 from .transport import (BudgetExceeded, TransportError, build_registry,
                         resolve_model)
@@ -228,6 +229,7 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
                                                 runner=oracle_runner)
     provider = _build_provider(args, audit, out, spec, run_params, ledger,
                                client_factory=client_factory)
+    compile_tools = ToolRunner(runner=oracle_runner)
     summary: dict = {"run_id": out.name, "arm": args.arm, "model": args.model,
                      "budget": budget, "cells": []}
     for task_dir in tasks:
@@ -266,13 +268,23 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
                                          contract_path=contract, provider=provider,
                                          backend=backend, oracle=task_oracle,
                                          workdir=workdir, rounds=args.rounds,
-                                         replicate=rep, rust_mode=args.rust_mode)
+                                         replicate=rep, rust_mode=args.rust_mode,
+                                         call_budget=run_params.call_budget,
+                                         rust_when_unverified=run_params.rust_when_unverified,
+                                         feedback_mode=run_params.feedback_mode,
+                                         property_ids=run_params.property_ids,
+                                         tools=compile_tools)
                 elif args.arm == "CIR":
                     cell = run_cir_cell(task=task, requirements=requirements,
                                         contract_path=contract, provider=provider,
                                         backend=backend, oracle=task_oracle,
                                         workdir=workdir, rounds=args.rounds,
-                                        replicate=rep, rust_mode=args.rust_mode)
+                                        replicate=rep, rust_mode=args.rust_mode,
+                                        call_budget=run_params.call_budget,
+                                        rust_when_unverified=run_params.rust_when_unverified,
+                                        feedback_mode=run_params.feedback_mode,
+                                        property_ids=run_params.property_ids,
+                                        tools=compile_tools)
                 else:
                     raise SystemExit(f"unknown arm {args.arm!r}")
                 _write_artifacts(workdir, cell)

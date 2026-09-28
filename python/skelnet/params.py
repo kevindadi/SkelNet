@@ -38,6 +38,10 @@ class RunParams:
     call_budget: int = DEFAULT_CALL_BUDGET
     token_budget: int = DEFAULT_TOKEN_BUDGET
     hint: str = "h0"
+    # SKEL/CIR method knobs (round 5). Other arms reject non-default values.
+    feedback_mode: str = "full"
+    rust_when_unverified: str = "last"
+    property_ids: str = "keep"
     # Resolved from the model registry.
     thinking: bool = True
     reasoning_effort: str | None = None
