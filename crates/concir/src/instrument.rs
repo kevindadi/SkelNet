@@ -13,6 +13,11 @@
 //! `Condvar` (the primitives of the lock-order/condvar families) and reports
 //! everything it cannot cover (RwLock, barriers, atomics, macro bodies,
 //! generics) as a limitation instead of silently dropping it.
+//! Thread creation is collected across expressions, parseable macro arguments,
+//! loops and functions. Ordinary and imported `spawn` calls and lexically bound
+//! scoped spawns are traced; Builder and unknown spawn methods remain unsupported.
+//! Names prefer a unique worker call, then a direct handle binding, then the
+//! first worker call, and finally file order. Loop sites retain one resource.
 
 use std::collections::BTreeMap;
 
@@ -89,6 +94,30 @@ where
     let n = NEXT_TAG.fetch_add(1, Ordering::SeqCst);
     let tag = format!("t{}", n);
     std::thread::spawn(move || {
+        TAG.with(|t| *t.borrow_mut() = Some(tag));
+        f()
+    })
+}
+
+/// Preserve std's scoped borrowing, implicit joins and closure return value.
+pub fn scope<'env, F, T>(f: F) -> T
+where
+    F: for<'scope> FnOnce(&'scope std::thread::Scope<'scope, 'env>) -> T,
+{
+    std::thread::scope(f)
+}
+
+pub fn scope_spawn<'scope, 'env, F, T>(
+    s: &'scope std::thread::Scope<'scope, 'env>, name: &'static str, f: F,
+) -> std::thread::ScopedJoinHandle<'scope, T>
+where
+    F: FnOnce() -> T + Send + 'scope,
+    T: Send + 'scope,
+{
+    record("spawn", name);
+    let n = NEXT_TAG.fetch_add(1, Ordering::SeqCst);
+    let tag = format!("t{}", n);
+    s.spawn(move || {
         TAG.with(|t| *t.borrow_mut() = Some(tag));
         f()
     })
@@ -248,6 +277,14 @@ pub struct Resource {
     /// Spawn: whether the closure body has exactly one non-builtin call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unique_entry: Option<bool>,
+    /// One syntactic site can execute repeatedly (including iterator closures).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub in_loop: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name_source: Option<String>,
+    /// Direct handle binding, even when the unique worker name takes precedence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binding: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -323,6 +360,9 @@ struct SpawnHit {
     unique: bool,
     open_brace: usize,
     callee_name: Option<String>,
+    binding: Option<String>,
+    receiver: Option<String>,
+    in_loop: bool,
 }
 
 /// The first plain function called inside a spawned closure, used to name the
@@ -334,6 +374,8 @@ struct FirstCall {
 const BUILTIN_CALLS: &[&str] = &[
     "spawn", "scope", "drop", "Arc", "Box", "Some", "Ok", "Err", "None",
     "println", "print", "format", "Vec", "String", "vec", "panic",
+    "clone", "new", "default", "from", "into", "with_capacity", "take",
+    "replace", "swap", "unwrap", "expect",
 ];
 
 impl<'ast> Visit<'ast> for FirstCall {
@@ -413,21 +455,360 @@ fn spawn_unique(args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>) -> boo
     args.first().map(closure_call_count) == Some(1)
 }
 
+/// Only names resolved to std imports or an active scope parameter are special.
+/// Cloning the small lexical environment at block/closure boundaries prevents
+/// a local import or a shadowed scope parameter from leaking into siblings.
+#[derive(Clone, Copy, PartialEq)]
+enum ThreadName {
+    Spawn,
+    Scope,
+    ScopeParam,
+    Other,
+}
+
+struct SpawnCollector {
+    starts: Vec<usize>,
+    names: BTreeMap<String, ThreadName>,
+    bindings: BTreeMap<usize, String>,
+    hits: BTreeMap<usize, SpawnHit>,
+    edits: Vec<Edit>,
+    loop_depth: usize,
+    limitations: Vec<String>,
+}
+
+fn use_leaves(tree: &syn::UseTree, prefix: &str, out: &mut Vec<(String, String)>) {
+    match tree {
+        syn::UseTree::Path(p) => use_leaves(&p.tree, &format!("{prefix}{}::", p.ident), out),
+        syn::UseTree::Group(g) => {
+            for t in &g.items { use_leaves(t, prefix, out); }
+        }
+        syn::UseTree::Name(n) => out.push((format!("{prefix}{}", n.ident), n.ident.to_string())),
+        syn::UseTree::Rename(n) => out.push((format!("{prefix}{}", n.ident), n.rename.to_string())),
+        syn::UseTree::Glob(_) => out.push((format!("{prefix}*"), "*".into())),
+    }
+}
+
+fn plain_expr(expr: &Expr) -> &Expr {
+    match expr {
+        Expr::Paren(p) => plain_expr(&p.expr),
+        Expr::Group(g) => plain_expr(&g.expr),
+        _ => expr,
+    }
+}
+
+impl SpawnCollector {
+    fn new(starts: Vec<usize>) -> Self {
+        Self { starts, names: BTreeMap::new(), bindings: BTreeMap::new(),
+               hits: BTreeMap::new(), edits: Vec::new(), loop_depth: 0,
+               limitations: Vec::new() }
+    }
+
+    fn offset(&self, span: proc_macro2::Span) -> usize {
+        lc_offset(&self.starts, span.start())
+    }
+
+    fn import(&mut self, item: &syn::ItemUse) {
+        let mut leaves = Vec::new();
+        use_leaves(&item.tree, "", &mut leaves);
+        for (path, local) in leaves {
+            let kind = match path.as_str() {
+                "std::thread::spawn" => ThreadName::Spawn,
+                "std::thread::scope" => ThreadName::Scope,
+                _ => ThreadName::Other,
+            };
+            self.names.insert(local, kind);
+        }
+    }
+
+    fn items(&mut self, items: &[syn::Item]) {
+        // Rust use/item declarations are visible throughout their block.
+        for item in items {
+            match item {
+                syn::Item::Use(u) => self.import(u),
+                syn::Item::Fn(f) => { self.names.insert(f.sig.ident.to_string(), ThreadName::Other); }
+                _ => {}
+            }
+        }
+    }
+
+    fn bind_pat(&mut self, pat: &Pat, kind: ThreadName) {
+        struct Idents(Vec<String>);
+        impl<'ast> Visit<'ast> for Idents {
+            fn visit_pat_ident(&mut self, p: &'ast syn::PatIdent) {
+                self.0.push(p.ident.to_string());
+                syn::visit::visit_pat_ident(self, p);
+            }
+        }
+        let mut ids = Idents(Vec::new());
+        ids.visit_pat(pat);
+        for id in ids.0 { self.names.insert(id, kind); }
+    }
+
+    fn thread_call(&self, expr: &Expr, kind: ThreadName) -> bool {
+        let Expr::Path(p) = plain_expr(expr) else { return false };
+        let segs: Vec<_> = p.path.segments.iter().map(|s| s.ident.to_string()).collect();
+        let member = if kind == ThreadName::Spawn { "spawn" } else { "scope" };
+        match segs.as_slice() {
+            [name] => self.names.get(name) == Some(&kind),
+            [module, name] => module == "thread" && name == member,
+            [root, module, name] => root == "std" && module == "thread" && name == member,
+            _ => false,
+        }
+    }
+
+    fn scope_receiver(&self, expr: &Expr) -> Option<String> {
+        let Expr::Path(p) = plain_expr(expr) else { return None };
+        let id = p.path.get_ident()?.to_string();
+        (self.names.get(&id) == Some(&ThreadName::ScopeParam)).then_some(id)
+    }
+
+    fn hit(&mut self, start: usize, end: usize, open: usize,
+           args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>, receiver: Option<String>) {
+        self.hits.entry(start).or_insert_with(|| SpawnHit {
+            callee_start: start, callee_end: end, open_brace: open,
+            unique: spawn_unique(args), callee_name: spawn_callee(args),
+            binding: self.bindings.get(&start).cloned(), receiver,
+            in_loop: self.loop_depth > 0,
+        });
+    }
+
+    fn closure(&mut self, c: &syn::ExprClosure, scope_param: bool) {
+        let saved = self.names.clone();
+        for pat in &c.inputs {
+            self.bind_pat(pat, if scope_param { ThreadName::ScopeParam } else { ThreadName::Other });
+        }
+        self.visit_expr(&c.body);
+        self.names = saved;
+    }
+
+    fn emit(&mut self, edits: &mut Vec<Edit>, resources: &mut Vec<Resource>) {
+        edits.append(&mut self.edits);
+        // BTreeMap both deduplicates sites and fixes fallback names to file order.
+        for (index, hit) in self.hits.values().enumerate() {
+            let (display, source) = if hit.unique && hit.callee_name.is_some() {
+                (hit.callee_name.clone().unwrap(), "callee")
+            } else if let Some(binding) = &hit.binding {
+                (binding.clone(), "binding")
+            } else if let Some(callee) = &hit.callee_name {
+                (callee.clone(), "first_call")
+            } else {
+                (format!("spawn{index}"), "index")
+            };
+            let name = format!("{display}#{}", hit.callee_start);
+            let (callee, prefix) = match &hit.receiver {
+                Some(receiver) => ("crate::cir_trace::scope_spawn", format!("{receiver}, \"{name}\", ")),
+                None => ("crate::cir_trace::spawn", format!("\"{name}\", ")),
+            };
+            edits.push(Edit { start: hit.callee_start, end: hit.callee_end, text: callee.into() });
+            edits.push(Edit { start: hit.open_brace, end: hit.open_brace, text: prefix });
+            resources.push(Resource {
+                name, kind: "Spawn".into(), display: Some(display),
+                site: Some(hit.callee_start.to_string()), entry: hit.callee_name.clone(),
+                unique_entry: Some(hit.unique), binding: hit.binding.clone(),
+                name_source: Some(source.into()), in_loop: hit.in_loop.then_some(true),
+            });
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for SpawnCollector {
+    fn visit_file(&mut self, file: &'ast File) {
+        self.items(&file.items);
+        syn::visit::visit_file(self, file);
+    }
+
+    fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+        if let Some((_, items)) = &node.content {
+            let saved = std::mem::take(&mut self.names);
+            self.items(items);
+            for item in items { self.visit_item(item); }
+            self.names = saved;
+        }
+    }
+
+    fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
+        let saved = self.names.clone();
+        let depth = std::mem::replace(&mut self.loop_depth, 0);
+        self.names.retain(|_, kind| *kind != ThreadName::ScopeParam);
+        for arg in &node.sig.inputs {
+            if let syn::FnArg::Typed(t) = arg { self.bind_pat(&t.pat, ThreadName::Other); }
+        }
+        self.visit_block(&node.block);
+        self.names = saved;
+        self.loop_depth = depth;
+    }
+
+    fn visit_block(&mut self, block: &'ast syn::Block) {
+        let saved = self.names.clone();
+        for stmt in &block.stmts {
+            if let Stmt::Item(item) = stmt { self.items(std::slice::from_ref(item)); }
+        }
+        syn::visit::visit_block(self, block);
+        self.names = saved;
+    }
+
+    fn visit_local(&mut self, local: &'ast syn::Local) {
+        if let Some(init) = &local.init {
+            if let Pat::Ident(id) = &local.pat {
+                let expr = plain_expr(&init.expr);
+                self.bindings.insert(self.offset(expr.span()), id.ident.to_string());
+            }
+            self.visit_expr(&init.expr);
+            if let Some((_, expr)) = &init.diverge { self.visit_expr(expr); }
+        }
+        self.bind_pat(&local.pat, ThreadName::Other);
+    }
+
+    fn visit_item_use(&mut self, node: &'ast syn::ItemUse) {
+        let mut leaves = Vec::new();
+        use_leaves(&node.tree, "", &mut leaves);
+        // Even an unused `use std::thread::scope;` matches Python's conservative
+        // residual check. Import the equivalent forwarding helper instead.
+        if leaves.iter().any(|(path, _)| path == "std::thread::scope") {
+            let paths: Vec<_> = leaves.into_iter().map(|(path, name)| {
+                let (path, name) = if let Some(parent) = path.strip_suffix("::self") {
+                    (parent.to_string(), if name == "self" { parent.rsplit("::").next().unwrap().to_string() } else { name })
+                } else { (path, name) };
+                let path = if path == "std::thread::scope" { "crate::cir_trace::scope".into() } else { path };
+                if path.rsplit("::").next() == Some(name.as_str()) { path }
+                else { format!("{path} as {name}") }
+            }).collect();
+            self.edits.push(Edit {
+                start: self.offset(node.tree.span()),
+                end: lc_offset(&self.starts, node.tree.span().end()),
+                text: format!("{{{}}}", paths.join(", ")),
+            });
+        }
+    }
+
+    fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+        if self.thread_call(&node.func, ThreadName::Spawn) {
+            self.hit(self.offset(node.func.span()), lc_offset(&self.starts, node.func.span().end()),
+                     self.offset(node.paren_token.span.open()) + 1, &node.args, None);
+        } else if self.thread_call(&node.func, ThreadName::Scope) {
+            if let Some(Expr::Closure(c)) = node.args.first().map(plain_expr) {
+                if c.inputs.len() == 1 && matches!(c.inputs.first(), Some(Pat::Ident(_))) {
+                    let before = self.limitations.len();
+                    self.closure(c, true);
+                    // Python's existing residual check does not recognize
+                    // `.spawn_scoped`. Keep its enclosing std scope visible.
+                    let unsupported = self.limitations[before..].iter()
+                        .any(|note| note.contains("spawn_scoped"));
+                    self.edits.push(Edit {
+                        start: self.offset(node.func.span()),
+                        end: lc_offset(&self.starts, node.func.span().end()),
+                        text: if unsupported { "std::thread::scope" } else { "crate::cir_trace::scope" }.into(),
+                    });
+                    return;
+                }
+            }
+            self.limitations.push("thread::scope requires an inline closure with a named parameter".into());
+            self.edits.push(Edit {
+                start: self.offset(node.func.span()),
+                end: lc_offset(&self.starts, node.func.span().end()),
+                text: "std::thread::scope".into(),
+            });
+        }
+        syn::visit::visit_expr_call(self, node);
+    }
+
+    fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
+        if node.method == "spawn" {
+            if let Some(receiver) = self.scope_receiver(&node.receiver) {
+                self.hit(self.offset(node.receiver.span()), lc_offset(&self.starts, node.method.span().end()),
+                         self.offset(node.paren_token.span.open()) + 1, &node.args, Some(receiver));
+            } else {
+                self.limitations.push("spawn method receiver is not a recognized scope parameter (Builder is unsupported)".into());
+            }
+        }
+        if node.method == "spawn_scoped" {
+            self.limitations.push("Builder spawn_scoped is not instrumented".into());
+        }
+        self.visit_expr(&node.receiver);
+        let repeated = matches!(node.method.to_string().as_str(),
+            "map" | "for_each" | "flat_map" | "filter_map" | "filter" | "fold" | "try_fold"
+            | "try_for_each" | "scan" | "inspect" | "find" | "find_map" | "any" | "all"
+            | "position" | "rposition" | "map_while" | "take_while" | "skip_while" | "reduce");
+        for arg in &node.args {
+            let depth = self.loop_depth;
+            if repeated && matches!(plain_expr(arg), Expr::Closure(_)) { self.loop_depth += 1; }
+            self.visit_expr(arg);
+            self.loop_depth = depth;
+        }
+    }
+
+    fn visit_expr_closure(&mut self, node: &'ast syn::ExprClosure) { self.closure(node, false); }
+
+    fn visit_expr_for_loop(&mut self, node: &'ast syn::ExprForLoop) {
+        self.visit_expr(&node.expr);
+        let saved = self.names.clone();
+        self.bind_pat(&node.pat, ThreadName::Other);
+        self.loop_depth += 1;
+        self.visit_block(&node.body);
+        self.loop_depth -= 1;
+        self.names = saved;
+    }
+
+    fn visit_expr_while(&mut self, node: &'ast syn::ExprWhile) {
+        let saved = self.names.clone();
+        self.loop_depth += 1;
+        syn::visit::visit_expr_while(self, node);
+        self.loop_depth -= 1;
+        self.names = saved;
+    }
+
+    fn visit_expr_let(&mut self, node: &'ast syn::ExprLet) {
+        self.visit_expr(&node.expr);
+        self.bind_pat(&node.pat, ThreadName::Other);
+    }
+
+    fn visit_expr_if(&mut self, node: &'ast syn::ExprIf) {
+        let saved = self.names.clone();
+        self.visit_expr(&node.cond);
+        self.visit_block(&node.then_branch);
+        self.names = saved.clone();
+        if let Some((_, branch)) = &node.else_branch { self.visit_expr(branch); }
+        self.names = saved;
+    }
+
+    fn visit_expr_loop(&mut self, node: &'ast syn::ExprLoop) {
+        self.loop_depth += 1;
+        syn::visit::visit_expr_loop(self, node);
+        self.loop_depth -= 1;
+    }
+
+    fn visit_arm(&mut self, node: &'ast syn::Arm) {
+        let saved = self.names.clone();
+        self.bind_pat(&node.pat, ThreadName::Other);
+        syn::visit::visit_arm(self, node);
+        self.names = saved;
+    }
+
+    fn visit_macro(&mut self, node: &'ast syn::Macro) {
+        use syn::parse::Parser;
+        // Parsing the original tokens retains source spans, including nested
+        // macros. Never stringify/reparse: that would corrupt edit offsets.
+        let list = syn::punctuated::Punctuated::<Expr, syn::Token![,]>::parse_terminated;
+        if let Ok(args) = list.parse2(node.tokens.clone()) {
+            for expr in &args { self.visit_expr(expr); }
+        } else if let Ok(stmts) = syn::Block::parse_within.parse2(node.tokens.clone()) {
+            let saved = self.names.clone();
+            for stmt in &stmts { self.visit_stmt(stmt); }
+            self.names = saved;
+        } else {
+            self.limitations.push(format!("unparsed macro body: {}", node.path.segments.last().unwrap().ident));
+        }
+    }
+}
+
 struct CtorCollector {
     starts: Vec<usize>,
     hits: Vec<CtorHit>,
-    spawns: Vec<SpawnHit>,
     skip_semaphore: bool,
     /// Nested `let` bindings are named by their own `Namer` visit. Collecting
-    /// them again from an enclosing initializer double-rewrites `thread::spawn`.
+    /// them again from an enclosing initializer would duplicate constructor edits.
     closure_depth: usize,
     current_field: Option<String>,
-}
-
-fn is_thread_spawn(path: &syn::Path) -> bool {
-    let segs: Vec<String> = path.segments.iter().map(|s| s.ident.to_string()).collect();
-    segs.last().map(String::as_str) == Some("spawn")
-        && segs.iter().any(|s| s == "thread")
 }
 
 impl<'ast> Visit<'ast> for CtorCollector {
@@ -457,17 +838,7 @@ impl<'ast> Visit<'ast> for CtorCollector {
 
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
         if let Expr::Path(p) = &*node.func {
-            if is_thread_spawn(&p.path) {
-                let open = lc_offset(&self.starts, node.paren_token.span.open().start()) + 1;
-                let callee_name = spawn_callee(&node.args);
-                self.spawns.push(SpawnHit {
-                    callee_start: lc_offset(&self.starts, p.path.span().start()),
-                    callee_end: lc_offset(&self.starts, p.path.span().end()),
-                    open_brace: open,
-                    callee_name,
-                    unique: spawn_unique(&node.args),
-                });
-            } else if let Some(kind) = ctor_kind(&p.path) {
+            if let Some(kind) = ctor_kind(&p.path) {
                 if kind == "Semaphore" && self.skip_semaphore {
                     syn::visit::visit_expr_call(self, node);
                     return;
@@ -586,51 +957,18 @@ impl Namer {
         let mut collector = CtorCollector {
             starts: self.starts.clone(),
             hits: Vec::new(),
-            spawns: Vec::new(),
             skip_semaphore: self.skip_semaphore,
             closure_depth: 0,
             current_field: None,
         };
         collector.visit_expr(&init.expr);
-        if collector.hits.is_empty() && collector.spawns.is_empty() {
+        if collector.hits.is_empty() {
             return;
         }
         let base = match &local.pat {
             Pat::Ident(i) => i.ident.to_string(),
             _ => "res".to_string(),
         };
-        let spawn_total = collector.spawns.len();
-        for (index, hit) in collector.spawns.into_iter().enumerate() {
-            let display = hit.callee_name.clone().unwrap_or_else(|| {
-                if base != "res" && spawn_total == 1 {
-                    base.clone()
-                } else if base != "res" {
-                    format!("{base}_{index}")
-                } else {
-                    format!("spawn{index}")
-                }
-            });
-            let name = format!("{display}#{}", hit.callee_start);
-            self.edits.push(Edit {
-                start: hit.callee_start,
-                end: hit.callee_end,
-                text: "cir_trace::spawn".to_string(),
-            });
-            self.edits.push(Edit {
-                start: hit.open_brace,
-                end: hit.open_brace,
-                text: format!("\"{name}\", "),
-            });
-            self.resources.push(Resource {
-                name,
-                kind: "Spawn".to_string(),
-                display: Some(display),
-                site: Some(hit.callee_start.to_string()),
-                entry: hit.callee_name.clone(),
-                unique_entry: Some(hit.unique),
-                ..Default::default()
-            });
-        }
         let mut counters: BTreeMap<&'static str, usize> = BTreeMap::new();
         for hit in collector.hits {
             let k = counters.entry(hit.kind).or_insert(0);
@@ -675,7 +1013,6 @@ impl<'ast> Visit<'ast> for Namer {
         let mut collector = CtorCollector {
             starts: self.starts.clone(),
             hits: Vec::new(),
-            spawns: Vec::new(),
             skip_semaphore: self.skip_semaphore,
             closure_depth: 0,
             current_field: None,
@@ -838,7 +1175,7 @@ fn limitations_of(src: &str) -> Vec<String> {
         ("Barrier", "Barrier is not instrumented"),
         ("Once", "Once is not instrumented"),
         ("atomic", "atomics are not instrumented (no value events)"),
-        ("thread::scope", "thread::scope spawns have no stable thread identity; scope events are absent"),
+        ("thread::scope", "thread::scope could not be fully instrumented"),
         ("async ", "async/await is not supported"),
         ("select!", "select is not supported"),
     ] {
@@ -925,6 +1262,9 @@ pub fn wrap(src: &str) -> Result<Wrapped, String> {
                             resources: Vec::new(), skip_semaphore,
                             wrappers: channels.wrappers.clone() };
     namer.visit_file(&file);
+    let mut spawns = SpawnCollector::new(starts.clone());
+    spawns.visit_file(&file);
+    spawns.emit(&mut namer.edits, &mut namer.resources);
     namer.edits.extend(channels.edits);
     namer.resources.extend(channels.resources);
     {
@@ -974,11 +1314,13 @@ pub fn wrap(src: &str) -> Result<Wrapped, String> {
     // Then rewrite imports on the annotated text (offset-independent).
     annotated = rewrite_imports(&annotated);
 
+    let mut limitations = limitations_of(&annotated);
+    limitations.extend(spawns.limitations);
     Ok(Wrapped {
         annotated,
         runtime: RUNTIME.to_string(),
         resources: namer.resources,
-        limitations: limitations_of(src),
+        limitations,
         harness_notes,
     })
 }
