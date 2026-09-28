@@ -89,7 +89,8 @@ def _opencode_truncate_then_succeed(tmp_path, monkeypatch, model, surface, name)
             chat_response(RUST, finish_reason="stop", usage=second_usage),
         ]))
     patch_build_client(monkeypatch, sdk)
-    env = write_env(tmp_path, OPENCODE_API_KEY="k")
+    key_env = "MOONSHOT_API_KEY" if model == "Kimi" else "OPENCODE_API_KEY"
+    env = write_env(tmp_path, **{key_env: "k"})
     out = tmp_path / name
     args = run_args("G0", out, model=model, env_file=str(env),
                     budget_file=str(tmp_path / "budget.json"))

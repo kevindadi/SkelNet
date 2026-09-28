@@ -34,12 +34,20 @@ concatenated `system_sha256`.
 
 ## Model parameters
 
-The four experimental models are GPT 6 Luna (`gpt-6-luna`, OpenCode Responses),
-Kimi (`kimi-k3`, OpenCode Chat), DeepSeek Flash (`deepseek-flash`, direct) and
-Qwen (`qwen3.8-flash`, DashScope direct). All four run with thinking enabled;
-GPT and Kimi use `reasoning_effort="medium"`; no temperature is sent
+The four experimental models are GPT 6 Luna (`gpt-6-luna`, OpenCode Responses,
+`OPENCODE_API_KEY`, reasoning effort `medium`), Kimi (`kimi-k3`, Moonshot direct
+Chat Completions, `MOONSHOT_API_KEY`, reasoning effort `high`), DeepSeek Flash
+(`deepseek-flash`, direct) and Qwen (`qwen3.8-flash`, DashScope direct). Kimi no
+longer runs through the OpenCode gateway: it uses the owner's own Moonshot key
+against `https://api.moonshot.cn/v1`. `kimi-k3` always reasons, so no `thinking`
+key is sent; its strength is the request's top-level `reasoning_effort`. That
+Kimi's effort differs from GPT's is the owner's decision, not a provider
+requirement. DeepSeek and Qwen are unchanged.
+
+All four run with thinking enabled; no temperature is sent
 (`provider_default`); each cell is capped at 5 calls / 200k tokens; one output
-is capped at 32768 tokens (retry cap 65536).
+is capped at 32768 tokens (retry cap 65536). Kimi's `reasoning_content` is
+recorded separately and never merged into the reply text.
 
 `RunParams` (in the MANIFEST as `run_params`) fixes the temperature policy,
 seed policy, per-cell call/token budgets, max output tokens and hint.
