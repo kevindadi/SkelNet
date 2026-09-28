@@ -1141,6 +1141,8 @@ def build_parser() -> argparse.ArgumentParser:
     rep = sub.add_parser("report", help="one table over runs")
     rep.add_argument("run_dirs", nargs="+")
     rep.set_defaults(func=cmd_report)
+    from .bench import register as _register_bench
+    _register_bench(sub)
     return parser
 
 
