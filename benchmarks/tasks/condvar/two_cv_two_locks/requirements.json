@@ -66,5 +66,31 @@
   "hint_variants": [
     "h0",
     "h1"
-  ]
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 3,
+    "thread_funcs": [
+      "main::notifier",
+      "main::w1",
+      "main::w2"
+    ],
+    "sync_resources": 5,
+    "unused_resources": [],
+    "mechanisms": [
+      "Condvar",
+      "Semaphore"
+    ],
+    "mechanism_count": 2,
+    "parameterized": false,
+    "states": 109,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": null,
+    "nearest_tier": "L1",
+    "violations": [
+      "sync_resources<=2 and mechanisms<=1"
+    ]
+  }
 }

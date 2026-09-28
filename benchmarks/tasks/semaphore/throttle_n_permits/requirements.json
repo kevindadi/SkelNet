@@ -56,5 +56,28 @@
   "hint_variants": [
     "h0",
     "h1"
-  ]
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 3,
+    "thread_funcs": [
+      "main::w1",
+      "main::w2",
+      "main::w3"
+    ],
+    "sync_resources": 1,
+    "unused_resources": [],
+    "mechanisms": [
+      "Semaphore"
+    ],
+    "mechanism_count": 1,
+    "parameterized": false,
+    "states": 92,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L1",
+    "nearest_tier": "L1",
+    "violations": []
+  }
 }
