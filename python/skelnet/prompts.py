@@ -40,6 +40,7 @@ ASSETS = (
 STAGE_GENERATE = "generate"
 STAGE_FEEDBACK = "feedback"
 STAGE_RUST = "rust"
+STAGE_RUST_FIX = "rust_fix"
 
 # Fixed separator used when concatenating an ordered template tuple.
 PROMPT_SEPARATOR = "\n\n---\n\n"
@@ -48,11 +49,22 @@ PROMPT_ROUTES: dict[tuple[str, str], tuple[str, ...]] = {
     ("SKEL", STAGE_GENERATE): (SKEL_GENERATION_ASSET,),
     ("SKEL", STAGE_FEEDBACK): (SKEL_GENERATION_ASSET, SKEL_FEEDBACK_ASSET),
     ("SKEL", STAGE_RUST): (RUST_FROM_SKEL_ASSET, RUST_RUNTIME_API_ASSET),
+    ("SKEL", STAGE_RUST_FIX): (RUST_COMPILE_FIX_ASSET, RUST_RUNTIME_API_ASSET),
     ("CIR", STAGE_GENERATE): (CIR_GENERATION_ASSET,),
     ("CIR", STAGE_FEEDBACK): (CIR_GENERATION_ASSET, CIR_FEEDBACK_ASSET),
     ("CIR", STAGE_RUST): (RUST_FROM_CIR_ASSET, RUST_RUNTIME_API_ASSET),
+    ("CIR", STAGE_RUST_FIX): (RUST_COMPILE_FIX_ASSET, RUST_RUNTIME_API_ASSET),
     ("G0", STAGE_GENERATE): (RUST_GENERATION_V2_ASSET, RUST_RUNTIME_API_ASSET),
 }
+
+# Appended to the feedback of a Rust-stage retry when the model did not return a
+# usable program. REFINE-style arms may additionally answer NO_ISSUES.
+FORMAT_RETRY_NOTE = (
+    "Your previous reply did not contain a complete program inside a single "
+    "```rust code block. Reply again with exactly one ```rust code block "
+    "containing the whole program (or, if the program has no issues, the exact "
+    "word NO_ISSUES)."
+)
 
 
 def route(arm: str, stage: str) -> tuple[str, ...]:
@@ -155,6 +167,45 @@ def rust_from_cir_user_prompt(requirements: str, cir: str) -> str:
         "<concir>\n" + cir.strip() + "\n</concir>\n\n"
         "Output only one ```rust code block."
     )
+
+
+def rust_compile_fix_user_prompt(requirements: str, program: str, diagnostics: str,
+                                 *, design: str | None = None,
+                                 design_kind: str | None = None) -> str:
+    """User prompt for a Rust-stage compile retry (all arms)."""
+    parts = [
+        "The Rust program below does not compile. Fix it so `cargo build` "
+        "succeeds, keeping the required behaviour.",
+        "",
+        "<domain_requirements>",
+        requirements.strip(),
+        "</domain_requirements>",
+        "",
+        "<previous_program>",
+        program.strip(),
+        "</previous_program>",
+        "",
+        "<rustc_diagnostics>",
+        diagnostics.strip(),
+        "</rustc_diagnostics>",
+    ]
+    if design:
+        tag = "concir" if design_kind == "cir" else "skeleton"
+        parts += ["", f"<{tag}>", design.strip(), f"</{tag}>"]
+    parts += ["", "Output only one ```rust code block."]
+    return "\n".join(parts)
+
+
+def present_property_id(pid: str, policy: str, index: dict[str, str]) -> str:
+    """Map a property id to what the model sees (``keep`` or opaque ``P<n>``).
+
+    ``index`` is owned by the caller and keeps one cell's mapping stable.
+    """
+    if policy == "keep":
+        return pid
+    if pid not in index:
+        index[pid] = f"P{len(index) + 1}"
+    return index[pid]
 
 
 # ── disclosure sanitisation (shared by the SKEL and CIR feedback builders) ──

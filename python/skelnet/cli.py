@@ -593,12 +593,20 @@ def _stage_for(arm: str, request) -> str:
         return prompts.STAGE_GENERATE
     if request.stage == "rust":
         return prompts.STAGE_RUST
+    if request.stage == "rust_fix":
+        return prompts.STAGE_RUST_FIX
     if request.feedback:
         return prompts.STAGE_FEEDBACK
     return prompts.STAGE_GENERATE
 
 
 def _user_prompt_for(arm: str, stage: str, request) -> str:
+    if stage == prompts.STAGE_RUST_FIX:
+        design = request.previous_candidate if arm in ("SKEL", "CIR") else None
+        design_kind = {"SKEL": "skel", "CIR": "cir"}.get(arm)
+        return prompts.rust_compile_fix_user_prompt(
+            request.requirements, request.current_program or "",
+            request.feedback or "", design=design, design_kind=design_kind)
     if stage == prompts.STAGE_RUST:
         if arm == "CIR":
             return prompts.rust_from_cir_user_prompt(

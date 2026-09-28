@@ -14,6 +14,7 @@ verification evidence is recorded separately. No real LLM is called in tests.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -72,6 +73,31 @@ def _has_parse_error(check: Any) -> bool:
         if str(d.get("code", "")) in ("S001", "S002", "S003"):
             return True
     return False
+
+
+@dataclass
+class RustReply:
+    """Classification of a Rust-stage model reply."""
+
+    kind: str  # "program" | "no_issues" | "other"
+    source: str | None = None
+
+
+def classify_rust_reply(text: str, *, allow_no_issues: bool = False) -> RustReply:
+    """Classify a Rust reply: a program, an explicit ``NO_ISSUES``, or other.
+
+    ``allow_no_issues`` is only set by arms whose Rust stage may legitimately
+    return "no issues"; the reply must reduce to exactly ``NOISSUES`` after
+    dropping every non-letter character (so ``NO_ISSUES``/``No issues.`` match).
+    """
+    if allow_no_issues:
+        letters = re.sub(r"[^A-Za-z]", "", text or "")
+        if letters.upper() == "NOISSUES":
+            return RustReply(kind="no_issues")
+    source = extract_rust(text or "")
+    if source and "fn main" in source:
+        return RustReply(kind="program", source=source)
+    return RustReply(kind="other")
 
 
 def _skel_verify(backend, path: Path, contract_path: Path) -> Any:
