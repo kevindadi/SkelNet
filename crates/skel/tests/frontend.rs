@@ -254,6 +254,36 @@ fn s108_type_positive() {
     assert!(!codes(VALID_MIXED).contains(&"S108".to_string()));
 }
 
+// ── S110 compute footprint must be local ─────────────────────────────
+#[test]
+fn s110_compute_shared_write_negative() {
+    let src = "skeleton t;\nmutex m;\nshared acc: Int = 0 guarded_by m;\nfn main() { compute \"x\" writes(acc); }\n";
+    let errs = check_errors(src);
+    let e = errs.iter().find(|e| e.code == "S110").expect("S110");
+    assert!(e.is_error());
+    assert!(e.hint.is_some(), "S110 must carry a hint");
+}
+
+#[test]
+fn s110_compute_mutex_read_negative() {
+    let src = "skeleton t;\nmutex m;\nfn main() { compute \"x\" reads(m); }\n";
+    assert!(codes(src).contains(&"S110".to_string()));
+}
+
+#[test]
+fn s110_compute_local_footprint_positive() {
+    let src = "skeleton t;\nfn main() { let v = 1; compute \"x\" reads(v); }\n";
+    assert!(!codes(src).contains(&"S110".to_string()));
+}
+
+#[test]
+fn s110_undefined_compute_name_is_still_s101() {
+    let src = "skeleton t;\nfn main() { compute \"x\" reads(nope); }\n";
+    let c = codes(src);
+    assert!(c.contains(&"S101".to_string()));
+    assert!(!c.contains(&"S110".to_string()));
+}
+
 // ── S109 bad tag ─────────────────────────────────────────────────────
 #[test]
 fn s109_bad_tag_negative() {

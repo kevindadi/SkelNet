@@ -716,15 +716,15 @@ impl<'a> FnLower<'a> {
                 writes,
                 ..
             } => {
-                // The plan maps `compute` to ConcIR `seq_hole`, but ConcIR
-                // a35dc86 classifies `seq_hole` as UNSUPPORTED in the precise
-                // backend, so no skeleton containing a compute hole could ever
-                // be verified. ConcIR's supported, semantics-neutral construct
-                // is `nop`; we emit that and keep the hole's description and
-                // footprint on the source-map entry so codegen/adhere can still
-                // identify it. See REFACTOR_REPORT P3.
+                // `compute` is the sequential-computation hole filled in by the
+                // Rust stage; it has no concurrent effect, so it lowers to the
+                // semantics-neutral ConcIR `nop`. The front-end rejects compute
+                // footprints that name a shared resource (S110), so a compute
+                // hole can only read/write locals. `nop` is therefore a sound
+                // abstraction for synchronization semantics; the cost is that a
+                // compute hole's effect on local data is invisible in the model.
                 let _ = (*self.seq, &desc, &reads, &writes);
-                self.push(Op::Nop, "seq_hole", s.span, None, &reqs);
+                self.push(Op::Nop, "compute", s.span, None, &reqs);
             }
             StmtCore::Let {
                 name,
