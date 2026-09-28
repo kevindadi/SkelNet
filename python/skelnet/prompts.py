@@ -313,9 +313,10 @@ def build_check_feedback(result, *, property_ids: str = "keep",
     }
 
 
-def _normalize_id(pid: Any) -> Any:
-    """Drop a backend ``property:`` prefix so one property has one number."""
-    if isinstance(pid, str) and pid.startswith("property:"):
+def _normalize_id(pid: Any, property_ids: str) -> Any:
+    """Drop a backend ``property:`` prefix, only when ids are made opaque."""
+    if (property_ids == "opaque" and isinstance(pid, str)
+            and pid.startswith("property:")):
         return pid[len("property:"):]
     return pid
 
@@ -323,10 +324,12 @@ def _normalize_id(pid: Any) -> Any:
 def _register_and_show(ids, property_ids: str, index: dict[str, str]):
     for pid in ids:
         if pid:
-            present_property_id(_normalize_id(pid), property_ids, index)
+            present_property_id(_normalize_id(pid, property_ids), property_ids, index)
 
     def show(pid):
-        return present_property_id(_normalize_id(pid), property_ids, index) if pid else pid
+        if not pid:
+            return pid
+        return present_property_id(_normalize_id(pid, property_ids), property_ids, index)
 
     def show_text(text):
         if property_ids == "keep" or not text:

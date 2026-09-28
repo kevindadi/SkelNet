@@ -67,7 +67,15 @@ def _relativize(text: str, workdir: Path) -> str:
     """Rewrite every absolute path in a diagnostic to a relative form."""
     if not text:
         return text
-    for base in {str(workdir), str(workdir.resolve()), str(repo_root())}:
+    # Fixed order: the workdir (resolved and original, longer first), then the
+    # repository root. A set here would leak the task path depending on the
+    # hash seed, because the repo root is an ancestor of the workdir.
+    wd_forms = sorted({str(workdir.resolve()), str(workdir)}, key=len, reverse=True)
+    bases = list(wd_forms)
+    root = str(repo_root())
+    if root not in bases:
+        bases.append(root)
+    for base in bases:
         text = text.replace(base + "/", "").replace(base, ".")
     sysroot = _sysroot()
     if sysroot:
