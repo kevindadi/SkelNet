@@ -1,6 +1,6 @@
-//! Calibration fixture: correct abba whose spawns live in `handles.push(...)`.
-//! The instrumenter only rewrites `let`-initializer spawns, so O4 must report
-//! `instrument_unsupported` rather than a thread-count `design_loss`.
+//! Calibration fixture: both workers are now fully instrumented.
+//! Anonymous worker names leave t1/t2 completion properties not_observed;
+//! both lock-holding properties pass and two threads are recorded.
 
 use std::sync::{Arc, Mutex};
 use std::thread;

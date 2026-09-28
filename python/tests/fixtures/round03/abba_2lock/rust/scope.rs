@@ -1,6 +1,6 @@
-//! Calibration fixture: correct abba written with `std::thread::scope`.
-//! The instrumenter does not rewrite `s.spawn(..)`, so O4 must report
-//! `instrument_unsupported` rather than a thread-count `design_loss`.
+//! Calibration fixture: both workers are now fully instrumented.
+//! Anonymous worker names leave t1/t2 completion properties not_observed;
+//! both lock-holding properties pass and two threads are recorded.
 
 use std::sync::{Arc, Mutex};
 use std::thread;
