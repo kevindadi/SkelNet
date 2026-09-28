@@ -32,10 +32,35 @@ Both feedback builders (`build_explore_feedback` for SKEL and
 - any other `detail` containing `holds_all(`, `completed(`,
   `function_completed` or `goal` is replaced with a neutral text.
 
-The property **id** is kept unchanged for now (e.g.
-`preserved: main::t1 holds [main::a, main::b] at once`); whether ids may remain
-is **pending a decision**. `test_feedback_disclosure.py` asserts the rendered
-feedback has no `goal`, `function_completed`, `holds_all`, or `completed(`.
+The property **id** is kept unchanged by default (`--property-ids keep`). With
+`--property-ids opaque` every occurrence of a property id (in
+`failed_properties[].id`, `preserved_unmet[].id`, `counterexamples[].property`
+and SKEL `diagnostics[].property`/`message`) is replaced by a stable `P<n>`
+within the cell. `test_feedback_disclosure.py` asserts the rendered feedback has
+no `goal`, `function_completed`, `holds_all`, or `completed(` in every mode.
+
+## Feedback modes
+
+`--feedback-mode` trims the verification-stage feedback (the check stage is
+never trimmed):
+
+- `full` (default): unchanged.
+- `outcome_only`: only `stage`, `outcome`, `complete` and the failed property
+  ids (no details, counterexamples or diagnostics).
+- `nocex`: drop `counterexamples`, keep the rest.
+- `nomap`: drop the mapped DSL positions (`line`/`col`/`skel`/`statement`) and
+  keep only the raw ConcIR location (`concir_loc`, e.g. `main::main::s1`). CIR
+  feedback is already ConcIR-positioned, so `nomap` equals `full` there.
+
+## CIR fairness
+
+- `failed_properties[].reqs` is filled from the contract's `req` field (by
+  property id, including the `preserved: <description>` form); no other contract
+  field (`goal`, `kind`, `bounds`, …) ever enters the feedback.
+- `repair_hints` are never provided to CIR (SKEL has no equivalent), so the two
+  arms see the same information.
+- CIR candidates are **not normalised**: the bytes written to
+  `candidate_<k>.cir.json` are exactly the extracted reply.
 
 ## `--json` schema
 

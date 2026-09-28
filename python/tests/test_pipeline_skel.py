@@ -4,6 +4,11 @@ from skelnet.backend import Backend, repo_root
 from skelnet.oracle import FakeOracle
 from skelnet.pipeline import run_skel_cell
 from skelnet.providers import ScriptedProvider
+from skelnet.rusttools.compile import CompileResult
+
+
+def _ok_compile(tools, workdir, source, **kwargs):
+    return CompileResult(ok=True)
 
 BUGGY = """```skel
 skeleton abba_bug;
@@ -40,9 +45,9 @@ def test_skel_arm_revises_then_accepts(tmp_path):
     result = run_skel_cell(
         task="lock-order/abba_2lock", requirements="two workers, two locks",
         contract_path=contract, provider=provider, backend=Backend(),
-        oracle=oracle, workdir=tmp_path, rounds=4)
+        oracle=oracle, workdir=tmp_path, rounds=4, compile_fn=_ok_compile)
     assert result.accepted, result.history
-    assert [h["outcome"] for h in result.history] == ["FAIL", "PASS"]
+    assert [h["outcome"] for h in result.history if "outcome" in h] == ["FAIL", "PASS"]
     assert result.evidence_sufficient
     assert result.oracle.functional_ok
     assert len(provider.calls) == 3  # two skeleton attempts + one Rust call
