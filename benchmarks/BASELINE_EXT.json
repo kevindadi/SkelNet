@@ -1,0 +1,22 @@
+{
+  "schema_version": "skelnet-baseline-ext-v1",
+  "source": {
+    "note": "Tasks added after the frozen BASELINE; outcome / complete / per-property outcomes of `skelnet verify gold.skel contract.json`."
+  },
+  "tasks": [
+    {
+      "task": "condvar/two_cv_two_locks",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "deadlock",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 109,
+      "baseline_deviation": false
+    }
+  ]
+}

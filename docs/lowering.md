@@ -50,7 +50,7 @@ produces JSON and never panics. The lowerer does no optimisation.
 | `break;` / `continue;` | `goto` exit / `goto` head |
 | `return e;` | `return {value: e}` |
 | `extern fn f();` | function `f`, empty body |
-| `compute "d" reads(..) writes(..);` | **`nop`** (see below), source-map construct `seq_hole` |
+| `compute "d" reads(..) writes(..);` | `nop`, source-map construct `compute` (see below) |
 
 Local variables: each `let` produces a `locals` entry with `modeled: true`;
 the type is the explicit annotation or inferred from the rvalue (`load`/`cas`
@@ -59,12 +59,18 @@ use the atomic base, `recv` the channel base, bounded `Int` widens to `Int`).
 
 ### `compute` → `nop` (deliberate deviation)
 
-§5.2 of the plan maps `compute` to ConcIR `seq_hole`, but ConcIR `a35dc86`
-classifies `seq_hole` as UNSUPPORTED in the precise backend, so no skeleton
-containing a compute hole could verify. `nop` is ConcIR's supported,
-semantics-neutral construct. The source-map entry still uses
-`construct: "seq_hole"` so codegen/adhere can identify the hole. See
-`docs/REFACTOR_REPORT.md` and `benchmarks/DEVIATIONS.json`.
+A `compute "d"` hole is the sequential computation the Rust stage fills in; it
+has no concurrent effect, so it lowers to ConcIR's supported, semantics-neutral
+`nop` (the plan's `seq_hole` is UNSUPPORTED in ConcIR `a35dc86`, so emitting it
+would make every skeleton containing a hole unverifiable). The DSL front-end
+rejects any `compute` footprint that names a shared resource (`S110`), so a
+hole's `reads`/`writes` can only mention locals. `nop` is therefore a sound
+abstraction for synchronization semantics; the cost is that a hole's effect on
+local data is invisible in the model.
+
+The source-map entry keeps the hole visible as `construct: "compute"`; the
+description and footprint themselves are not carried into the map. See
+`benchmarks/DEVIATIONS.json`.
 
 ## Early exits (§5.3)
 
@@ -94,6 +100,6 @@ and `block_span` = the owning block.
 
 `construct` values: `lock_enter, lock_exit, permit_enter, permit_exit,
 implicit_release_on_exit, branch_if, branch_while, loop_back, break, continue,
-implicit_return, return`, the operation names from the mapping table, `function`,
-and `resource`. `reqs` = the statement's own tags ∪ all enclosing block tags ∪
-the function tags.
+implicit_return, return, compute`, the operation names from the mapping table,
+`function`, and `resource`. `reqs` = the statement's own tags ∪ all enclosing
+block tags ∪ the function tags.

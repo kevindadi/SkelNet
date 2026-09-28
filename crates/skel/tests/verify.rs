@@ -190,6 +190,34 @@ fn mapping_table_covers_each_row() {
 }
 
 #[test]
+fn compute_lowers_to_nop_and_maps_as_compute() {
+    let src = r#"
+skeleton c;
+mutex m;
+fn main() {
+    let v = 1;
+    lock m { compute "update both records" reads(v) writes(v); }
+}
+"#;
+    let (program, map) = lower_source(src);
+    let kinds: Vec<String> = all_ops(&program)
+        .iter()
+        .map(|s| s["kind"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(
+        kinds.iter().filter(|k| *k == "nop").count(),
+        1,
+        "compute must lower to exactly one nop: {kinds:?}"
+    );
+    let stmts = map["stmts"].as_array().unwrap();
+    let holes: Vec<&serde_json::Value> = stmts
+        .iter()
+        .filter(|s| s["construct"] == "compute")
+        .collect();
+    assert_eq!(holes.len(), 1, "expected one `compute` construct: {stmts:?}");
+}
+
+#[test]
 fn early_exit_releases_inside_out_and_maps() {
     let src = r#"
 skeleton t;

@@ -16,6 +16,7 @@
 | S107 | error | `.join()` on a non-spawn handle |
 | S108 | error | literal/type mismatch, bounded `Int` initializer out of range, bad arity |
 | S109 | error | invalid tag (not `R<n>`) |
+| S110 | error | `compute` `reads`/`writes` names a shared resource (only local variables are allowed) |
 | S201 | warning | requirement id has no `@R` annotation (only with `--reqs`) |
 | S202 | warning | `@R<n>` references an unknown requirement id (only with `--reqs`) |
 

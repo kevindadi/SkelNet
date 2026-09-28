@@ -9,6 +9,9 @@ backend.
 - Locks are **lexically scoped**: `lock m { ... }` releases `m` on block exit,
   including `return`/`break`/`continue`. There is no `unlock`.
 - A `condvar` is bound to exactly one mutex at declaration.
+- A `compute "d" reads(..) writes(..);` hole is a sequential computation with no
+  concurrent effect; its `reads`/`writes` footprints may name only local
+  variables, never shared resources (`S110`).
 - provides/requires are computed by lowering; they are never written by hand.
 - The entry point is fixed at `main::main`.
 
@@ -106,6 +109,7 @@ expressions, without Struct).
 | S107 | `.join()` on a non-spawn handle |
 | S108 | literal/type mismatch, bounded `Int` initializer out of range, bad arity |
 | S109 | invalid tag (not `R<n>`) |
+| S110 | `compute` footprint names a shared resource; only local variables are allowed |
 | S201 (warning) | a requirement id has no `@R` annotation (`--reqs`) |
 | S202 (warning) | `@R<n>` references an unknown requirement id (`--reqs`) |
 

@@ -472,46 +472,82 @@
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/notify_one_multi_waiter_wrong_pick/spec.md"
     },
     {
-      "task": "condvar/same_cv_different_locks",
-      "file": "REQUIREMENTS.md",
-      "sha256": "1cac2dd59814f62ed282bfb5100b4cd5d60c124ddc78820d2e96f0d00e8f8348",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/same_cv_different_locks/generation_input/REQUIREMENTS.md"
-    },
-    {
-      "task": "condvar/same_cv_different_locks",
+      "task": "boundary/same_cv_different_locks",
       "file": "contract.json",
       "sha256": "17d0da5b27d2d13855208429fcbfde01394319604875aa11fb9e8a7d2e13409c",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/same_cv_different_locks/contract.json"
     },
     {
-      "task": "condvar/same_cv_different_locks",
+      "task": "boundary/same_cv_different_locks",
+      "file": "direct.skel",
+      "sha256": "0220b5709758adb9b83bbe509273b34262601ee4d4759a9f7ee13c3a8016364a",
+      "source": "R6 (D9): direct translation of condvar/same_cv_different_locks (one condvar, two locks)"
+    },
+    {
+      "task": "boundary/same_cv_different_locks",
       "file": "gold.cir.json",
       "sha256": "d1d6e7c95adedec669bd0903bdacabf176b2c0f217e3569d8640ff19c27f6156",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/same_cv_different_locks/correct.cir.json"
     },
     {
-      "task": "condvar/same_cv_different_locks",
-      "file": "gold.skel",
-      "sha256": "85f4996f87fbcba4d6a2e2890074edbc1f116372d76e9a90a6ee5348635a6d96",
-      "source": "new (SkelNet)"
-    },
-    {
-      "task": "condvar/same_cv_different_locks",
+      "task": "boundary/same_cv_different_locks",
       "file": "ground_truth.json",
       "sha256": "eec119bdb09d125a91a023fba840cdfd77409019207c808546d5a4f38d659704",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/same_cv_different_locks/ground_truth.json"
     },
     {
-      "task": "condvar/same_cv_different_locks",
+      "task": "boundary/same_cv_different_locks",
       "file": "requirements.json",
-      "sha256": "9b773668cda6ac5e17e2d8be8ee4c3f67b5b4bacfef87abbd24a0f1000518290",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/same_cv_different_locks/generation_input/requirements.json"
+      "sha256": "60ffd3f3b3c0c3797f516636bed054ab8cb533b7ef94199c5888919b91d4d34b",
+      "source": "R6 (D9): copied from condvar/same_cv_different_locks with task/contract paths updated"
     },
     {
-      "task": "condvar/same_cv_different_locks",
+      "task": "boundary/same_cv_different_locks",
       "file": "spec.md",
       "sha256": "0c88c1b3a5fa936e5c3672f81b74129e26663061058af24f3a260961c8c78fce",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/same_cv_different_locks/spec.md"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "REQUIREMENTS.md",
+      "sha256": "d2fbdd7ca27c0b4f95312525bf11c25b7aaa5c1888ed0359f826e436c3d9fd6e",
+      "source": "R6 (D9): copied from condvar/same_cv_different_locks"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "contract.json",
+      "sha256": "17d0da5b27d2d13855208429fcbfde01394319604875aa11fb9e8a7d2e13409c",
+      "source": "R6 (D9): copied from condvar/same_cv_different_locks"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "gold.cir.json",
+      "sha256": "de5ac38eb262a36a32cf7e26ce71bd153a1f8a4659b5a94c7f246f8c8a48ed2d",
+      "source": "R6 (D9): skelnet lower gold.skel"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "gold.skel",
+      "sha256": "f3997b72dd388c4f64075ac99b6b46d43293ada0257312f5eb6db908b8993922",
+      "source": "R6 (D9): copied from condvar/same_cv_different_locks"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "ground_truth.json",
+      "sha256": "d37d514bcc650783216e2f158b50087462dc688126940270f1f6d59854ac97fc",
+      "source": "R6 (D9): copied from condvar/same_cv_different_locks"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "requirements.json",
+      "sha256": "a1494332cfa7eed9281d6900b0b28dc829a4e6382b6235feb069c9f22a4a66f6",
+      "source": "R6 (D9): copied from condvar/same_cv_different_locks"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "spec.md",
+      "sha256": "7ce3c57e6ce5d2e5283d693261fc5e472fe3ddc423d18fceccb2247fb89e93bd",
+      "source": "R6 (D9): copied from condvar/same_cv_different_locks"
     },
     {
       "task": "lock-order/abba_2lock",
