@@ -336,8 +336,8 @@ def test_v8_without_layers_skips_the_category_check(tmp_path):
 
     result = _check(root, "fam/task", "V8", oracle=True,
                     oracle_factory=lambda task_dir, terminal: Oracle())
-    assert result["status"] == "pass"
-    assert "skipped" in result["reason"]
+    assert result["status"] == "fail"
+    assert "no layers" in result["reason"]
 
 
 def test_v9_hashes_and_requires_rust_records(tmp_path):
@@ -368,6 +368,17 @@ def test_v7_cargo_run_matches_the_terminal_line(tmp_path):
     (task / "rust" / "fixed.rs").write_text(_fixed('println!("NOPE");'), encoding="utf-8")
     failed = _check(root, "fam/task", "V7", run=True)
     assert failed["status"] == "fail"
+    (task / "requirements.json").write_text(
+        json.dumps(_reqs(terminal="DONE x=1")) + "\n", encoding="utf-8")
+    (task / "rust" / "fixed.rs").write_text(
+        'fn main() { let x = 1; println!("DONE x={} ", x); }\n', encoding="utf-8")
+    spaced = _check(root, "fam/task", "V7", run=True)
+    assert spaced["status"] == "fail" and "DONE x=1 " in spaced["reason"]
+    (task / "rust" / "fixed.rs").write_text(
+        'fn main() { let x = 1; println!("DONE x={}", x); std::process::exit(1); }\n',
+        encoding="utf-8")
+    exited = _check(root, "fam/task", "V7", run=True)
+    assert exited["status"] == "fail" and "exit" in exited["reason"]
 
 
 def test_cli_main_validate_json(tmp_path, capsys):
@@ -381,6 +392,244 @@ def test_cli_main_validate_json(tmp_path, capsys):
     assert [row["id"] for row in payload["tasks"][0]["checks"]] == ["V1", "V2"]
 
 
+def test_v2_rejects_a_non_list_hint_and_a_missing_hint_file(tmp_path):
+    root = tmp_path / "repo"
+    task = make_task(root)
+    data = _reqs(hint_variants=5)
+    (task / "requirements.json").write_text(json.dumps(data), encoding="utf-8")
+    failed = _check(root, "fam/task", "V2")
+    assert failed["status"] == "fail"
+    assert "TypeError" not in failed["reason"]
+    assert "hint_variants" in failed["reason"]
+    data = _reqs(hint_variants=["h1"])
+    (task / "requirements.json").write_text(json.dumps(data), encoding="utf-8")
+    (task / "REQUIREMENTS.h1.md").unlink()
+    missing = _check(root, "fam/task", "V2")
+    assert missing["status"] == "fail" and "REQUIREMENTS.h1.md" in missing["reason"]
+
+
+def test_v3_entities_marker_terminal_v2_and_task_path(tmp_path):
+    root = tmp_path / "repo"
+    task = make_task(root)
+    h1 = _h1().replace("- Roles: t1.", "- Roles: other.")
+    (task / "REQUIREMENTS.h1.md").write_text(h1, encoding="utf-8")
+    assert "Entities" in _check(root, "fam/task", "V3")["reason"]
+    (task / "REQUIREMENTS.h1.md").write_text(_h1() + "still [U]\n", encoding="utf-8")
+    # Keep the entities section identical; the marker sits after it only if a
+    # later heading closes the section. Put [U] in the requirement sentence.
+    (task / "REQUIREMENTS.h1.md").write_text(
+        _h1().replace("Do the work.", "Do the work. [U]"), encoding="utf-8")
+    assert "[U]" in _check(root, "fam/task", "V3")["reason"]
+    data = _reqs(terminal="DONE done=1", terminal_v2="DONE value=2")
+    (task / "requirements.json").write_text(json.dumps(data), encoding="utf-8")
+    (task / "REQUIREMENTS.h1.md").write_text(_h1("DONE done=1"), encoding="utf-8")
+    (task / "REQUIREMENTS.md").write_text(_h0("DONE done=1"), encoding="utf-8")
+    quoted = _check(root, "fam/task", "V3")
+    assert quoted["status"] == "fail" and "terminal" in quoted["reason"]
+    (task / "REQUIREMENTS.h1.md").write_text(
+        _h1("DONE value=2").replace("Do the work.", "Do the work in fam/task."),
+        encoding="utf-8")
+    assert "fam/task" in _check(root, "fam/task", "V3")["reason"]
+
+
+def test_v4_complete_and_property_mismatches(tmp_path):
+    root = tmp_path / "repo"
+    make_task(root)
+    _baseline(root, complete=False)
+    complete = _check(root, "fam/task", "V4")
+    assert complete["status"] == "fail" and "complete" in complete["reason"]
+    _baseline(root, properties=[{"id": "other", "outcome": "PASS"}])
+    assert "missing" in _check(root, "fam/task", "V4")["reason"]
+    _baseline(root, properties=[{"id": "no-deadlock", "outcome": "PASS"},
+                                {"id": "extra", "outcome": "PASS"}])
+    assert "extra" in _check(root, "fam/task", "V4")["reason"]
+    _baseline(root, properties=[{"id": "no-deadlock", "outcome": "FAIL"}])
+    assert "changed" in _check(root, "fam/task", "V4")["reason"]
+
+
+def test_tool_error_text_is_not_a_missing_binary(tmp_path):
+    from skelnet.bench import ToolUnavailable
+    root = tmp_path / "repo"
+    make_task(root)
+    _baseline(root)
+
+    class Plain:
+        def verify_skel(self, skel, contract):
+            return None, "entry function `main::main` was not found"
+
+        def explore(self, *args):
+            return None, "entry function `main::main` was not found"
+
+        def check_skel(self, skel):
+            return 1, [], None
+
+        def lower_json(self, skel):
+            return None, "entry function `main::main` was not found"
+
+    failed = _check(root, "fam/task", "V4", tools=Plain())
+    assert failed["status"] == "fail" and "not found" in failed["reason"]
+
+    class Missing:
+        def verify_skel(self, skel, contract):
+            return None, ToolUnavailable("skelnet binary is not available")
+
+        def explore(self, *args):
+            return None, ToolUnavailable("concir-backend binary is not available")
+
+        def check_skel(self, skel):
+            return None, [], ToolUnavailable("skelnet binary is not available")
+
+        def lower_json(self, skel):
+            return None, ToolUnavailable("skelnet binary is not available")
+
+    assert _check(root, "fam/task", "V4", tools=Missing())["status"] == "skip"
+
+
+def test_injected_tool_exception_is_a_failed_check(tmp_path):
+    root = tmp_path / "repo"
+    make_task(root)
+    _baseline(root)
+
+    class Boom:
+        def verify_skel(self, skel, contract):
+            raise RuntimeError("boom")
+
+    failed = _check(root, "fam/task", "V4", tools=Boom())
+    assert failed["status"] == "fail" and failed["reason"].startswith("RuntimeError:")
+
+
+def test_v6_format_shapes_and_split_prints(tmp_path):
+    root = tmp_path / "repo"
+    task = make_task(root, files={
+        "requirements.json": json.dumps(_reqs(terminal="DONE t1=1 t2=1")) + "\n",
+        "REQUIREMENTS.md": _h0("DONE t1=1 t2=1"),
+        "REQUIREMENTS.h1.md": _h1("DONE t1=1 t2=1"),
+    })
+    passing = [
+        'println!("DONE t1={:?} t2={:?}", a, b);',
+        'println!("DONE t1={0} t2={1}", a, b);',
+        'println!("DONE t1={a:>1} t2={b:?}");',
+        'writeln!(std::io::stdout(), "DONE t1={} t2={}", a, b);',
+        'let line = format!("DONE t1={} t2={}", a, b); println!("{}", line);',
+        'let line = format!("DONE t1={} t2={}", a, b); println!("{line}");',
+        '// "DONE t1=1 t2=1"\n    println!("DONE t1={} t2={}", a, b);',
+    ]
+    for body in passing:
+        (task / "rust" / "fixed.rs").write_text(
+            f"fn main() {{ let (a, b) = (1, 1); {body} }}\n", encoding="utf-8")
+        assert _check(root, "fam/task", "V6")["status"] == "pass", body
+    # A correct println! is also present, so this fails only because `\n` decodes
+    # to a newline and the literal line equals the terminal.
+    (task / "rust" / "fixed.rs").write_text(
+        'fn main() { let (a, b) = (1, 1);\n'
+        '    print!("DONE t1=1 t2=1\\n");\n'
+        '    println!("DONE t1={} t2={}", a, b);\n'
+        '}\n', encoding="utf-8")
+    assert _check(root, "fam/task", "V6")["status"] == "fail"
+    (task / "rust" / "fixed.rs").write_text(
+        'fn main() {\n'
+        '    // println!("DONE t1=1 t2=1");\n'
+        '    let r = 1;\n'
+        '    print!("DONE ");\n'
+        '    println!("t1=1 t2=1");\n'
+        '    println!("round {}", r);\n'
+        '}\n', encoding="utf-8")
+    assert _check(root, "fam/task", "V6")["status"] == "fail"
+
+
+def test_v8_schema_layer_and_default_factory(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    task = make_task(root)
+    expect_path = task / "rust" / "expect.json"
+    expect = json.loads(expect_path.read_text(encoding="utf-8"))
+    del expect["buggy.rs"]
+    expect_path.write_text(json.dumps(expect), encoding="utf-8")
+    assert "missing" in _check(root, "fam/task", "V8", oracle=True)["reason"]
+
+    def restore(spec):
+        expect_path.write_text(json.dumps({
+            "schema_version": "skelnet-rust-expect-v1",
+            "fixed.rs": {"functional": True},
+            "buggy.rs": spec,
+        }), encoding="utf-8")
+
+    restore({"functional": False, "layer": "O1", "category": "deadlock"})
+    assert "not valid" in _check(root, "fam/task", "V8", oracle=True)["reason"]
+
+    restore({"functional": False, "layer": "O3", "category": "deadlock"})
+
+    def factory(task_dir, terminal, category="deadlock", status="fail"):
+        class Oracle:
+            def evaluate(self, source, workdir):
+                ok = "println!(\"{}\", 0)" not in source
+                return type("R", (), {
+                    "functional_ok": ok,
+                    "layers": {"O3": type("L", (), {"status": status, "category": category})()},
+                })()
+        return Oracle()
+
+    hang = _check(root, "fam/task", "V8", oracle=True,
+                  oracle_factory=lambda task_dir, terminal: factory(
+                      task_dir, terminal, category="hang"))
+    assert hang["status"] == "fail" and "hang" in hang["reason"]
+    passed_layer = _check(root, "fam/task", "V8", oracle=True,
+                          oracle_factory=lambda task_dir, terminal: factory(
+                              task_dir, terminal, status="pass"))
+    assert passed_layer["status"] == "fail" and "status=pass" in passed_layer["reason"]
+
+    seen = {}
+
+    def recording(task_dir, terminal):
+        seen["task_dir"] = task_dir
+        seen["terminal"] = terminal
+        return factory(task_dir, terminal)
+
+    monkeypatch.setattr("skelnet.cli.default_oracle_factory",
+                        lambda timeout: recording)
+    result = _check(root, "fam/task", "V8", oracle=True)
+    assert result["status"] == "pass"
+    assert seen["task_dir"] == task
+    from skelnet import cli
+    assert seen["terminal"] == cli.read_terminal(task)
+
+
+def test_v9_missing_record_and_missing_file(tmp_path):
+    root = tmp_path / "repo"
+    task = make_task(root)
+    _manifest(root, task, "fam/task")
+    rows = json.loads((root / "benchmarks" / "MANIFEST.json").read_text(encoding="utf-8"))
+    rows["files"] = [row for row in rows["files"] if row["file"] != "rust/buggy.rs"]
+    (root / "benchmarks" / "MANIFEST.json").write_text(json.dumps(rows), encoding="utf-8")
+    assert "MANIFEST missing" in _check(root, "fam/task", "V9")["reason"]
+    rows["files"].append({"task": "fam/task", "file": "rust/missing.rs", "sha256": "abc"})
+    (root / "benchmarks" / "MANIFEST.json").write_text(json.dumps(rows), encoding="utf-8")
+    assert "missing rust/missing.rs" in _check(root, "fam/task", "V9")["reason"]
+
+
+def test_cli_task_patterns_and_zero_matches(tmp_path, capsys):
+    root = tmp_path / "repo"
+    make_task(root, "boundary/edge", boundary=True)
+    make_task(root, "condvar/cv")
+    make_task(root, "fam/task")
+    rc = cli.main(["bench", "validate", "--root", str(root), "--tasks",
+                   "boundary/*,condvar/*", "--checks", "V1", "--json"])
+    out = capsys.readouterr().out
+    payload = json.loads(out)
+    assert rc in (0, 1)
+    assert {row["task"] for row in payload["tasks"]} == {"boundary/edge", "condvar/cv"}
+    rc = cli.main(["bench", "validate", "--root", str(root), "--tasks", "nomatch", "--json"])
+    captured = capsys.readouterr()
+    assert rc == 2 and "nomatch" in captured.err and captured.out.strip() == ""
+    rc = cli.main(["bench", "validate", "--root", str(root), "--tasks",
+                   "fam/*,nomatch", "--json"])
+    captured = capsys.readouterr()
+    assert rc == 2 and "nomatch" in captured.err and captured.out.strip() == ""
+    rc = cli.main(["bench", "tiers", "--root", str(root), "--tasks", "nomatch", "--write"])
+    captured = capsys.readouterr()
+    assert rc == 2 and "nomatch" in captured.err
+    assert not (root / "benchmarks" / "TIERS.md").exists()
+
+
 def test_default_checks_skip_run_and_oracle(tmp_path):
     root = tmp_path / "repo"
     make_task(root)
@@ -390,3 +639,86 @@ def test_default_checks_skip_run_and_oracle(tmp_path):
     by_id = {row["id"]: row["status"] for row in report["tasks"][0]["checks"]}
     assert by_id["V7"] == "skip" and by_id["V8"] == "skip"
     assert by_id["V1"] == "pass" and by_id["V4"] == "pass"
+
+
+def _binaries_available() -> bool:
+    try:
+        from skelnet.backend import Backend
+        Backend()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _copy_tasks(tmp_path, rels: list[str]) -> Path:
+    import shutil
+    from skelnet.backend import repo_root
+    root = tmp_path / "repo"
+    bench = root / "benchmarks"
+    bench.mkdir(parents=True)
+    origin = repo_root() / "benchmarks"
+    for name in ("BASELINE.json", "DEVIATIONS.json", "MANIFEST.json", "BASELINE_EXT.json"):
+        if (origin / name).is_file():
+            shutil.copy(origin / name, bench / name)
+    for rel in rels:
+        shutil.copytree(origin / "tasks" / rel, bench / "tasks" / rel)
+    return root
+
+
+@pytest.mark.skipif(not _binaries_available(),
+                    reason="skelnet or concir-backend binary is not available")
+def test_real_frontend_error_does_not_abort_the_run(tmp_path):
+    root = _copy_tasks(tmp_path, ["lock-order/abba_2lock"])
+    broken = root / "benchmarks" / "tasks" / "lock-order" / "broken"
+    import shutil
+    shutil.copytree(root / "benchmarks" / "tasks" / "lock-order" / "abba_2lock", broken)
+    (broken / "gold.skel").write_text(
+        "skeleton broken;\nfn main() { lock zz { } }\n", encoding="utf-8")
+    base = json.loads((root / "benchmarks" / "BASELINE.json").read_text(encoding="utf-8"))
+    abba = next(row for row in base["tasks"] if row["task"] == "lock-order/abba_2lock")
+    base["tasks"].append({**abba, "task": "lock-order/broken"})
+    (root / "benchmarks" / "BASELINE.json").write_text(json.dumps(base), encoding="utf-8")
+    report = validate_repo(root, "lock-order/*", checks=("V4",))
+    by_task = {row["task"]: row["checks"][0] for row in report["tasks"]}
+    assert by_task["lock-order/broken"]["status"] == "fail"
+    assert "S101" in by_task["lock-order/broken"]["reason"]
+    assert by_task["lock-order/abba_2lock"]["status"] == "pass"
+
+
+@pytest.mark.skipif(not _binaries_available(),
+                    reason="skelnet or concir-backend binary is not available")
+def test_real_missing_main_is_a_v4_failure(tmp_path):
+    root = _copy_tasks(tmp_path, ["lock-order/abba_2lock"])
+    skel = root / "benchmarks" / "tasks" / "lock-order" / "abba_2lock" / "gold.skel"
+    skel.write_text("skeleton abba_2lock;\nmutex a;\nmutex b;\nfn t1() {}\n", encoding="utf-8")
+    result = validate_repo(root, "lock-order/abba_2lock", checks=("V4",))
+    row = result["tasks"][0]["checks"][0]
+    assert row["status"] == "fail"
+    assert "not found" in row["reason"] or "frontend" in row["reason"]
+
+
+@pytest.mark.skipif(not _binaries_available(),
+                    reason="skelnet or concir-backend binary is not available")
+def test_real_abba_v4_and_changed_property(tmp_path):
+    root = _copy_tasks(tmp_path, ["lock-order/abba_2lock"])
+    assert validate_repo(root, "lock-order/abba_2lock", checks=("V4",))["tasks"][0]["checks"][0]["status"] == "pass"
+    base = json.loads((root / "benchmarks" / "BASELINE.json").read_text(encoding="utf-8"))
+    for row in base["tasks"]:
+        if row["task"] == "lock-order/abba_2lock":
+            row["properties"][0]["outcome"] = "FAIL"
+    (root / "benchmarks" / "BASELINE.json").write_text(json.dumps(base), encoding="utf-8")
+    failed = validate_repo(root, "lock-order/abba_2lock", checks=("V4",))["tasks"][0]["checks"][0]
+    assert failed["status"] == "fail"
+
+
+@pytest.mark.skipif(not _binaries_available(),
+                    reason="skelnet or concir-backend binary is not available")
+def test_real_lowered_cir_matches_until_a_field_changes(tmp_path):
+    root = _copy_tasks(tmp_path, ["condvar/two_cv_two_locks"])
+    passed = validate_repo(root, "condvar/two_cv_two_locks", checks=("V5",))["tasks"][0]["checks"][0]
+    assert passed["status"] == "pass", passed
+    cir = root / "benchmarks" / "tasks" / "condvar" / "two_cv_two_locks" / "gold.cir.json"
+    data = json.loads(cir.read_text(encoding="utf-8"))
+    data["program"] = "tampered"
+    cir.write_text(json.dumps(data), encoding="utf-8")
+    assert validate_repo(root, "condvar/two_cv_two_locks", checks=("V5",))["tasks"][0]["checks"][0]["status"] == "fail"

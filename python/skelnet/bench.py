@@ -12,6 +12,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Callable
@@ -20,6 +21,19 @@ from .backend import Backend, repo_root, sha256_file
 
 CHECKS = ("V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9")
 SYNC_TYPES = ("Mutex", "Condvar", "Semaphore", "Channel", "Atomic")
+_PRINT_MACROS = ("println", "print", "writeln", "write")
+_REF_FIELDS = ("resource", "condvar", "lock", "channel", "mutex", "semaphore")
+_LAYER_CATEGORIES = {
+    "O1": {"no_build", "policy_violation"},
+    "O2": {"hang", "crash", "wrong_output", "no_output"},
+    "O3": {"deadlock", "panic", "thread_leak", "ub"},
+    "O4": {"monitor_fail", "not_observed", "unmapped", "design_loss"},
+}
+_TIERS = ("L1", "L2", "L3")
+
+
+class ToolUnavailable(str):
+    """Binary is missing. Only this type is a skip; any other error is a fail."""
 _MAIN_FILES = (
     "spec.md", "requirements.json", "REQUIREMENTS.md", "REQUIREMENTS.h1.md",
     "contract.json", "gold.skel", "gold.cir.json", "ground_truth.json",
@@ -62,19 +76,60 @@ def _common(parser) -> None:
 
 def cmd_validate(args) -> int:
     root = Path(args.root) if args.root else repo_root()
+    tasks, unmatched = _select_patterns(root, args.tasks)
+    if unmatched or not tasks:
+        _report_unmatched(unmatched, args.tasks)
+        return 2
     checks = _parse_checks(args.checks)
     report = validate_repo(
         root, args.tasks, checks=checks, run=bool(args.run),
-        oracle=bool(args.oracle), strict=bool(args.strict))
+        oracle=bool(args.oracle), strict=bool(args.strict), tasks=tasks)
     _emit(report, json_out=bool(args.json), kind="validate")
     return 1 if any(c["status"] == "fail" for task in report["tasks"] for c in task["checks"]) else 0
 
 
 def cmd_tiers(args) -> int:
     root = Path(args.root) if args.root else repo_root()
-    report = tier_repo(root, args.tasks, write=bool(args.write))
+    tasks, unmatched = _select_patterns(root, args.tasks)
+    if unmatched or not tasks:
+        _report_unmatched(unmatched, args.tasks)
+        return 2
+    report = tier_repo(root, args.tasks, write=bool(args.write), tasks=tasks)
     _emit(report, json_out=bool(args.json), kind="tiers")
     return 0
+
+
+def _report_unmatched(unmatched: list[str], pattern: str) -> None:
+    names = unmatched or [str(pattern)]
+    print("unmatched task patterns: " + ", ".join(names), file=sys.stderr)
+
+
+def _select_patterns(root: Path, pattern: str | None) -> tuple[list[Path], list[str]]:
+    """Comma-separated patterns. ``all`` is unchanged.
+
+    Returns selected task directories in directory order, and the patterns
+    that matched nothing. An empty repository makes ``all`` unmatched.
+    """
+    from . import cli
+    text = "all" if pattern in (None, "") else str(pattern)
+    universe = cli._select_tasks(root, "all")
+    if text == "all":
+        return (universe, []) if universe else ([], ["all"])
+    parts = [part.strip() for part in text.split(",") if part.strip()]
+    if not parts:
+        return [], [text]
+    order = {task: index for index, task in enumerate(universe)}
+    chosen: dict[Path, int] = {}
+    unmatched: list[str] = []
+    for part in parts:
+        hits = cli._select_tasks(root, part)
+        if not hits:
+            unmatched.append(part)
+            continue
+        for task in hits:
+            chosen.setdefault(task, order.get(task, 10**9))
+    ordered = [task for task, _index in sorted(chosen.items(), key=lambda item: item[1])]
+    return ordered, unmatched
 
 
 def _parse_checks(text: str | None) -> tuple[str, ...]:
@@ -100,11 +155,12 @@ def _emit(report: dict, *, json_out: bool, kind: str) -> None:
 def validate_repo(root: Path | str, pattern: str = "all", *,
                   checks: tuple[str, ...] = CHECKS, run: bool = False,
                   oracle: bool = False, strict: bool = False,
-                  tools=None, oracle_factory: Callable | None = None) -> dict:
+                  tools=None, oracle_factory: Callable | None = None,
+                  tasks: list[Path] | None = None) -> dict:
     """Run the selected checks. ``tools`` and ``oracle_factory`` are test hooks."""
-    from . import cli
     root = Path(root)
-    tasks = cli._select_tasks(root, pattern)
+    if tasks is None:
+        tasks, _unmatched = _select_patterns(root, pattern)
     tools = tools if tools is not None else RealTools()
     rows = []
     for task_dir in tasks:
@@ -129,6 +185,15 @@ def validate_repo(root: Path | str, pattern: str = "all", *,
 
 
 def _run_check(name, root, task_dir, rel, *, strict, tools, oracle_factory) -> dict:
+    try:
+        return _dispatch_check(
+            name, root, task_dir, rel, strict=strict, tools=tools,
+            oracle_factory=oracle_factory)
+    except Exception as exc:
+        return _row(name, "fail", f"{type(exc).__name__}: {exc}")
+
+
+def _dispatch_check(name, root, task_dir, rel, *, strict, tools, oracle_factory) -> dict:
     fn = {
         "V1": _v1, "V2": _v2, "V3": _v3, "V4": _v4, "V5": _v5,
         "V6": _v6, "V7": _v7, "V8": _v8, "V9": _v9,
@@ -144,6 +209,15 @@ def _run_check(name, root, task_dir, rel, *, strict, tools, oracle_factory) -> d
     if name == "V6":
         return fn(root, task_dir, rel)
     return fn(task_dir, rel) if name in ("V3", "V7") else fn(task_dir)
+
+
+def _as_tool_row(name: str, payload, error) -> dict | None:
+    """Turn a tool error into a check row. Unavailable skips; anything else fails."""
+    if error is None or payload is not None:
+        return None
+    if isinstance(error, ToolUnavailable):
+        return _row(name, "skip", str(error))
+    return _row(name, "fail", str(error))
 
 
 def _row(name: str, status: str, reason: str) -> dict:
@@ -205,11 +279,16 @@ def _v2(task_dir: Path, *, strict: bool = False) -> dict:
             return _row("V2", "fail", "terminal DONE done=1 requires terminal_v2")
         if other == terminal:
             return _row("V2", "fail", "terminal_v2 must differ from terminal")
+    params = data.get("protocol_params", None)
+    if "protocol_params" in data:
+        params_error = _protocol_params_error(params)
+        if params_error:
+            return _row("V2", "fail", params_error)
     hints = data.get("hint_variants")
     if hints is not None:
-        names = list(hints) if isinstance(hints, dict) else list(hints)
         if not isinstance(hints, (dict, list)):
             return _row("V2", "fail", "hint_variants must be a list or object")
+        names = list(hints)
         for hint in names:
             filename = _HINT_FILES.get(str(hint))
             if filename is None:
@@ -283,10 +362,9 @@ def _v4(root: Path, task_dir: Path, rel: str, *, tools) -> dict:
     if not skel.is_file() or not contract.is_file():
         return _row("V4", "fail", "gold.skel and contract.json are required")
     payload, error = tools.verify_skel(skel, contract)
-    if error and payload is None:
-        if "not found" in error or "No such file" in error:
-            return _row("V4", "skip", error)
-        return _row("V4", "fail", error)
+    row = _as_tool_row("V4", payload, error)
+    if row is not None:
+        return row
     return _compare_baseline("V4", entry, payload)
 
 
@@ -301,10 +379,9 @@ def _v4_boundary(task_dir: Path, entry: dict | None, tools) -> dict:
             return _row("V4", "fail", "no BASELINE entry for gold.cir.json")
         contract = task_dir / "contract.json"
         payload, error = tools.explore(cir, contract if contract.is_file() else None)
-        if error and payload is None:
-            if "not found" in error or "No such file" in error:
-                return _row("V4", "skip", error)
-            return _row("V4", "fail", error)
+        row = _as_tool_row("V4", payload, error)
+        if row is not None:
+            return row
         compared = _compare_baseline("V4", entry, payload)
         if compared["status"] != "pass":
             return compared
@@ -312,9 +389,9 @@ def _v4_boundary(task_dir: Path, entry: dict | None, tools) -> dict:
     if direct.is_file():
         code, codes, error = tools.check_skel(direct)
         if error:
-            if "not found" in error or "No such file" in error:
-                return _row("V4", "skip", error)
-            return _row("V4", "fail", error)
+            if isinstance(error, ToolUnavailable):
+                return _row("V4", "skip", str(error))
+            return _row("V4", "fail", str(error))
         if code != 1:
             return _row("V4", "fail", f"direct.skel check exited {code}, expected 1")
         shown = ", ".join(codes) if codes else "(no code)"
@@ -351,10 +428,9 @@ def _v5(root: Path, task_dir: Path, rel: str, *, tools) -> dict:
     if not skel.is_file() or not cir.is_file():
         return _row("V5", "fail", "gold.skel and gold.cir.json are required")
     lowered, error = tools.lower_json(skel)
-    if error and lowered is None:
-        if "not found" in error or "No such file" in error:
-            return _row("V5", "skip", error)
-        return _row("V5", "fail", error)
+    row = _as_tool_row("V5", lowered, error)
+    if row is not None:
+        return row
     try:
         committed = _read_json(cir)
     except json.JSONDecodeError as exc:
@@ -380,18 +456,18 @@ def _v6(root: Path, task_dir: Path, rel: str) -> dict:
     if not terminal:
         return _row("V6", "fail", "task has no terminal line")
     source = fixed.read_text(encoding="utf-8")
-    literals = _string_literals(source)
-    if any(literal == terminal for literal in literals):
+    if any(line.strip() == terminal for line in _literal_lines(source)):
         return _row("V6", "fail", "expected terminal line appears as a string literal")
-    prints = _print_formats(source)
-    if not any(_has_placeholder(fmt) for fmt in prints):
-        return _row("V6", "fail", "no println!/print! with a format argument")
-    return _row("V6", "pass", "terminal line is computed, not a literal")
+    formats = _print_formats(source)
+    if not any(_format_matches_terminal(fmt, terminal) for fmt in formats):
+        return _row("V6", "fail", "no print macro formats the whole terminal line")
+    return _row("V6", "pass", "a print macro formats the terminal line")
 
 
 def _v7(task_dir: Path, rel: str) -> dict:
     from . import cli
     from .oracle import CONCIR_SYNC_CRATE, cargo_toml, repo_toolchain_channel
+    from .rusttools.stress import last_nonempty_line
     fixed = task_dir / "rust" / "fixed.rs"
     if not fixed.is_file():
         return _row("V7", "fail", "rust/fixed.rs is missing")
@@ -428,9 +504,11 @@ def _v7(task_dir: Path, rel: str) -> dict:
         return _row("V7", "fail", "timed out")
     except OSError as exc:
         return _row("V7", "fail", str(exc))
+    if "panicked" in (run.stderr or ""):
+        return _row("V7", "fail", "panicked")
     if run.returncode != 0:
         return _row("V7", "fail", f"exit {run.returncode}")
-    last = _last_nonempty(run.stdout)
+    last = last_nonempty_line(run.stdout or "")
     if last != terminal:
         return _row("V7", "fail", f"last line {last!r} != {terminal!r}")
     # Touch the crate path so a missing runtime is obvious in the reason above.
@@ -448,38 +526,34 @@ def _v8(root: Path, task_dir: Path, rel: str, *, oracle_factory=None) -> dict:
     if not buggy:
         return _row("V8", "fail", "no rust/buggy*.rs")
     terminal = cli.read_terminal(task_dir)
+    programs = [fixed, *buggy]
+    schema_error = _expect_schema_error(task_dir, programs)
+    if schema_error:
+        return _row("V8", "fail", schema_error)
     factory = oracle_factory or cli.default_oracle_factory(timeout=120.0)
     try:
         oracle = factory(task_dir, terminal)
     except Exception as exc:  # a missing tool surfaces as an oracle result, not this
         return _row("V8", "fail", str(exc))
-    expect = {}
-    expect_path = task_dir / "rust" / "expect.json"
-    if expect_path.is_file():
-        try:
-            expect = _read_json(expect_path)
-        except json.JSONDecodeError as exc:
-            return _row("V8", "fail", f"expect.json is not JSON: {exc}")
+    expect = _read_json(task_dir / "rust" / "expect.json")
     notes = []
-    layer_skipped = False
-    programs = [(fixed, True)] + [(path, False) for path in buggy]
-    for path, want_ok in programs:
+    for path in programs:
         source = path.read_text(encoding="utf-8")
         try:
             with tempfile.TemporaryDirectory(prefix="skelnet-bench-oracle-") as tmp:
                 result = oracle.evaluate(source, Path(tmp))
         except Exception as exc:
             return _row("V8", "fail", f"{path.name}: {exc}")
+        want_ok = path.name == "fixed.rs"
         got = getattr(result, "functional_ok", None)
         if got is not want_ok:
             return _row("V8", "fail", f"{path.name} functional_ok={got}, expected {want_ok}")
         spec = expect.get(path.name) if isinstance(expect, dict) else None
-        layers = getattr(result, "layers", None)
         if not isinstance(spec, dict) or "layer" not in spec:
             continue
+        layers = getattr(result, "layers", None)
         if not layers:
-            layer_skipped = True
-            continue
+            return _row("V8", "fail", f"{path.name} result has no layers")
         layer_name = spec.get("layer")
         layer = layers.get(layer_name) if isinstance(layers, dict) else None
         if layer is None:
@@ -494,9 +568,52 @@ def _v8(root: Path, task_dir: Path, rel: str, *, oracle_factory=None) -> dict:
                         f"{path.name} {layer_name} status={status} category={category}, "
                         f"expected fail/{spec.get('category')}")
         notes.append(f"{path.name} {layer_name}/{category}")
-    if layer_skipped:
-        notes.append("layer check skipped (no layers)")
     return _row("V8", "pass", "; ".join(notes) or "functional_ok matches")
+
+
+def _expect_schema_error(task_dir: Path, programs: list[Path]) -> str | None:
+    path = task_dir / "rust" / "expect.json"
+    if not path.is_file():
+        return "expect.json is missing"
+    try:
+        data = _read_json(path)
+    except json.JSONDecodeError as exc:
+        return f"expect.json is not JSON: {exc}"
+    if not isinstance(data, dict):
+        return "expect.json must be an object"
+    if data.get("schema_version") != "skelnet-rust-expect-v1":
+        return "schema_version must be skelnet-rust-expect-v1"
+    names = {item.name for item in programs}
+    keys = {key for key in data if key != "schema_version"}
+    if keys != names:
+        missing = sorted(names - keys)
+        extra = sorted(keys - names)
+        return f"expect.json entries missing={missing} extra={extra}"
+    fixed = data.get("fixed.rs")
+    if not isinstance(fixed, dict) or fixed.get("functional") is not True:
+        return "fixed.rs functional must be true"
+    for name in sorted(names - {"fixed.rs"}):
+        spec = data.get(name)
+        if not isinstance(spec, dict) or spec.get("functional") is not False:
+            return f"{name} functional must be false"
+        layer = spec.get("layer")
+        category = spec.get("category")
+        if layer not in _LAYER_CATEGORIES:
+            return f"{name} layer must be one of O1, O2, O3, O4"
+        if category not in _LAYER_CATEGORIES[layer]:
+            return f"{name} category {category} is not valid for {layer}"
+    return None
+
+
+def _protocol_params_error(value: Any) -> str | None:
+    if not isinstance(value, dict) or not value:
+        return "protocol_params must be an object of integers >= 2"
+    for key, item in value.items():
+        if not isinstance(key, str) or not key:
+            return "protocol_params keys must be names"
+        if not isinstance(item, int) or isinstance(item, bool) or item < 2:
+            return "protocol_params values must be integers >= 2"
+    return None
 
 
 def _v9(root: Path, task_dir: Path, rel: str) -> dict:
@@ -535,29 +652,54 @@ def _v9(root: Path, task_dir: Path, rel: str) -> dict:
 
 
 def tier_repo(root: Path | str, pattern: str = "all", *, write: bool = False,
-              tools=None) -> dict:
+              tools=None, tasks: list[Path] | None = None) -> dict:
     """Compute tiers for main tasks. Boundary tasks are omitted."""
-    from . import cli
     root = Path(root)
+    if tasks is None:
+        tasks, _unmatched = _select_patterns(root, pattern)
     tools = tools if tools is not None else RealTools()
-    ext = set(_load_tasks(root / "benchmarks" / "BASELINE_EXT.json"))
+    baseline_ids = set(_load_tasks(root / "benchmarks" / "BASELINE.json"))
     rows = []
-    for task_dir in cli._select_tasks(root, pattern):
+    for task_dir in tasks:
         rel = str(task_dir.relative_to(root / "benchmarks" / "tasks"))
         if _is_boundary(rel):
             continue
-        rows.append(_tier_one(root, task_dir, rel, ext=ext, tools=tools, write=write))
+        try:
+            rows.append(_tier_one(root, task_dir, rel, baseline_ids=baseline_ids,
+                                  tools=tools, write=write))
+        except Exception as exc:
+            rows.append({
+                "task": rel,
+                "metrics": {"computed_tier": None, "nearest_tier": None, "violations": []},
+                "computed_tier": None,
+                "nearest_tier": None,
+                "declared_tier": "unclassified",
+                "tier_source": "unclassified",
+                "violations": [f"{type(exc).__name__}: {exc}"],
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+    report = _tier_report(rows)
     if write:
-        _write_tiers_md(root, rows)
-    counts: dict[str, int] = {}
+        _write_tiers_md(root, report)
+    return report
+
+
+def _tier_report(rows: list[dict]) -> dict:
+    declared_counts: dict[str, int] = {}
+    computed_counts: dict[str, int] = {}
     for row in rows:
-        counts[row["declared_tier"]] = counts.get(row["declared_tier"], 0) + 1
-    mismatches = [row for row in rows if row["computed_tier"] != row["declared_tier"]]
-    return {"tasks": rows, "counts": counts,
-            "mismatches": [row["task"] for row in mismatches]}
+        declared_counts[row["declared_tier"]] = declared_counts.get(row["declared_tier"], 0) + 1
+        computed = row["computed_tier"] or "unclassified"
+        computed_counts[computed] = computed_counts.get(computed, 0) + 1
+    mismatches = [row["task"] for row in rows if row["computed_tier"] != row["declared_tier"]]
+    nearest = [row["task"] for row in rows if row.get("tier_source") == "nearest"]
+    legacy_outside = [row["task"] for row in rows if row.get("legacy_outside_baseline")]
+    return {"tasks": rows, "counts": declared_counts, "computed_counts": computed_counts,
+            "mismatches": mismatches, "nearest": nearest,
+            "legacy_outside_baseline": legacy_outside}
 
 
-def _tier_one(root, task_dir, rel, *, ext, tools, write: bool) -> dict:
+def _tier_one(root, task_dir, rel, *, baseline_ids, tools, write: bool) -> dict:
     cir_path = task_dir / "gold.cir.json"
     cir = {}
     if cir_path.is_file():
@@ -565,58 +707,146 @@ def _tier_one(root, task_dir, rel, *, ext, tools, write: bool) -> dict:
             cir = _read_json(cir_path)
         except json.JSONDecodeError:
             cir = {}
-    metrics = metrics_from_cir(cir if isinstance(cir, dict) else {})
-    states, source, note = _state_count(root, task_dir, rel, tools)
+    reqs = {}
+    req_path = task_dir / "requirements.json"
+    if req_path.is_file():
+        try:
+            loaded = _read_json(req_path)
+            if isinstance(loaded, dict):
+                reqs = loaded
+        except json.JSONDecodeError:
+            reqs = {}
+    parameterized = _protocol_params_error(reqs["protocol_params"]) is None if (
+        "protocol_params" in reqs) else False
+    metrics = metrics_from_cir(cir if isinstance(cir, dict) else {},
+                               parameterized=parameterized)
+    states, source, note, complete = _state_count(root, task_dir, rel, tools)
     metrics["states"] = states
     metrics["states_source"] = source
+    metrics["states_complete"] = complete
     if note:
         metrics["states_note"] = note
-    computed, violations = classify_tier(
+    computed, nearest, violations = classify_tier(
         metrics["threads"], metrics["sync_resources"], metrics["mechanism_count"],
-        states, metrics["parameterized"])
-    if rel in ext:
+        states, parameterized, states_complete=complete)
+    legacy, declared_legacy = _legacy_declaration(rel, baseline_ids, reqs)
+    if legacy:
+        declared, tier_source = declared_legacy, "legacy"
+    elif computed:
         declared, tier_source = computed, "computed"
+    elif nearest and len(violations) == 1 and not any(item.startswith("states") for item in violations):
+        declared, tier_source = nearest, "nearest"
     else:
-        declared, tier_source = "L1", "legacy"
+        declared, tier_source = "unclassified", "unclassified"
+    metrics["computed_tier"] = computed
+    metrics["nearest_tier"] = nearest
+    metrics["violations"] = violations
     if write:
-        _write_requirement_tier(task_dir, declared, tier_source, metrics)
+        _write_requirement_tier(task_dir, declared, tier_source, metrics, legacy=legacy)
     return {"task": rel, "metrics": metrics, "computed_tier": computed,
-            "declared_tier": declared, "tier_source": tier_source,
-            "violations": violations}
+            "nearest_tier": nearest, "declared_tier": declared,
+            "tier_source": tier_source, "violations": violations,
+            "legacy_outside_baseline": legacy and rel not in baseline_ids}
 
 
-def metrics_from_cir(cir: dict) -> dict:
-    """Thread, resource, and mechanism counts from a gold ConcIR document."""
-    threads: set[str] = set()
-    resources: list[dict] = []
-    for node in _walk(cir):
-        if not isinstance(node, dict):
+def _legacy_declaration(rel: str, baseline_ids: set[str], reqs: dict) -> tuple[bool, str]:
+    """Baseline tasks, and explicit legacy declarations, keep a fixed tier."""
+    explicit = reqs.get("tier_source") == "legacy" and reqs.get("tier") in _TIERS
+    if rel in baseline_ids or explicit:
+        if explicit:
+            return True, str(reqs["tier"])
+        return True, "L1"
+    return False, ""
+
+
+def metrics_from_cir(cir: dict, *, parameterized: bool = False) -> dict:
+    """Thread and resource counts from a gold ConcIR document.
+
+    Each ``spawn`` node and each entry of ``scope.funcs`` is one thread, even
+    when the function name repeats. ``main`` is not counted. A spawn that sits
+    in a loop is still one node, so the concurrency of that loop is 1.
+    ``parameterized`` is not inferred from the CIR; the caller supplies it.
+    """
+    spawned: list[str] = []
+    declared: list[tuple[str, str, str]] = []
+    references: set[str] = set()
+    paired_locks: set[str] = set()
+    for module in cir.get("modules") or []:
+        if not isinstance(module, dict):
             continue
-        kind = node.get("kind")
-        if kind == "spawn" and isinstance(node.get("func"), str):
-            threads.add(node["func"])
-        elif kind == "scope":
-            for func in node.get("funcs") or []:
-                if isinstance(func, str):
-                    threads.add(func)
-        elif (node.get("type") in SYNC_TYPES and isinstance(node.get("name"), str)
-              and "sid" not in node):
-            resources.append(node)
-    mechanisms = sorted({res["type"] for res in resources})
-    parameterized = any(_parameterized(res) for res in resources)
-    return {"threads": len(threads), "sync_resources": len(resources),
-            "mechanisms": mechanisms, "mechanism_count": len(mechanisms),
+        mod = str(module.get("name") or "")
+        for resource in module.get("resources") or []:
+            if not isinstance(resource, dict):
+                continue
+            name = resource.get("name")
+            typ = resource.get("type")
+            if isinstance(name, str) and typ in SYNC_TYPES and "sid" not in resource:
+                declared.append((mod, name, typ))
+        for node in _walk(module):
+            if not isinstance(node, dict) or "kind" not in node:
+                continue
+            kind = node.get("kind")
+            if kind == "spawn" and isinstance(node.get("func"), str):
+                if not _is_main(node["func"]):
+                    spawned.append(node["func"])
+            elif kind == "scope":
+                for func in node.get("funcs") or []:
+                    if isinstance(func, str) and not _is_main(func):
+                        spawned.append(func)
+            if kind == "condvar_wait" and isinstance(node.get("lock"), str):
+                paired_locks.add(node["lock"])
+            for field in _REF_FIELDS:
+                value = node.get(field)
+                if isinstance(value, str):
+                    references.add(value)
+    used = []
+    unused = []
+    for mod, name, typ in declared:
+        if _resource_used(mod, name, references):
+            used.append((mod, name, typ))
+        else:
+            unused.append(f"{mod}::{name}" if mod else name)
+    mechanisms = _mechanisms(used, paired_locks)
+    return {"threads": len(spawned),
+            "thread_funcs": sorted(set(spawned)),
+            "sync_resources": len(used),
+            "unused_resources": unused,
+            "mechanisms": mechanisms,
+            "mechanism_count": len(mechanisms),
             "parameterized": parameterized}
 
 
-def _parameterized(resource: dict) -> bool:
-    count = resource.get("count")
-    if isinstance(count, int) and count != 1:
+def _is_main(func: str) -> bool:
+    return func == "main" or func.endswith("::main")
+
+
+def _resource_used(module: str, name: str, references: set[str]) -> bool:
+    aliases = {name}
+    if module:
+        aliases.add(f"{module}::{name}")
+    if name in references or f"{module}::{name}" in references:
         return True
-    for key in ("capacity", "bound"):
-        if isinstance(resource.get(key), int):
-            return True
-    return False
+    return any(ref == name or ref.endswith(f"::{name}") for ref in references)
+
+
+def _mechanisms(used: list[tuple[str, str, str]], paired_locks: set[str]) -> list[str]:
+    """Condvar plus the mutex it waits on is one mechanism."""
+    found: set[str] = set()
+    has_unpaired_mutex = False
+    has_condvar = False
+    for module, name, typ in used:
+        if typ == "Condvar":
+            has_condvar = True
+        elif typ == "Mutex":
+            if not any(_resource_used(module, name, {lock}) for lock in paired_locks):
+                has_unpaired_mutex = True
+        else:
+            found.add(typ)
+    if has_condvar:
+        found.add("Condvar")
+    if has_unpaired_mutex:
+        found.add("Mutex")
+    return sorted(found)
 
 
 def _walk(node: Any):
@@ -630,43 +860,58 @@ def _walk(node: Any):
 
 
 def classify_tier(threads: int, sync_resources: int, mechanism_count: int,
-                  states: int | None, parameterized: bool) -> tuple[str, list[str]]:
-    """Lowest tier whose conditions all hold, else ``unclassified``."""
-    def states_in(low: int, high: int) -> bool:
-        return states is not None and low <= states <= high
+                  states: int | None, parameterized: bool, *,
+                  states_complete: bool = True) -> tuple[str | None, str, list[str]]:
+    """Lowest fully matching tier, the nearest tier, and that tier's violations.
+
+    A missing or incomplete state count fails every state condition. ``nearest``
+    is the tier with the fewest violations; ties take the lower tier.
+    """
+    def state_ok(predicate) -> bool:
+        return states_complete and states is not None and predicate
 
     ladders = (
         ("L1", [
-            ("threads<=3", threads <= 3),
-            ("sync_resources<=2", sync_resources <= 2),
-            ("mechanisms==1", mechanism_count == 1),
-            ("states<=300", states is not None and states <= 300),
+            ("threads in 0..3", 0 <= threads <= 3),
+            ("sync_resources<=2 and mechanisms<=1",
+             sync_resources <= 2 and mechanism_count <= 1),
+            ("states<=300", state_ok(states is not None and states <= 300)),
         ]),
         ("L2", [
             ("threads in 3..4", 3 <= threads <= 4),
-            ("mechanisms==2", mechanism_count == 2),
-            ("states in 300..5000", states_in(300, 5000)),
+            ("mechanisms>=2 or sync_resources>=3",
+             mechanism_count >= 2 or sync_resources >= 3),
+            ("states in 300..5000", state_ok(states is not None and 300 <= states <= 5000)),
         ]),
         ("L3", [
             ("threads in 4..6", 4 <= threads <= 6),
-            ("mechanisms>=3 or parameterized", mechanism_count >= 3 or parameterized),
-            ("states in 5000..100000", states_in(5000, 100_000)),
+            ("mechanisms>=3 or protocol_params", mechanism_count >= 3 or parameterized),
+            ("states in 5000..100000",
+             state_ok(states is not None and 5000 <= states <= 100_000)),
         ]),
     )
-    failed: list[str] = []
-    for name, conds in ladders:
+    computed = None
+    nearest = "L1"
+    nearest_bad: list[str] = []
+    best = None
+    for index, (name, conds) in enumerate(ladders):
         bad = [label for label, ok in conds if not ok]
-        if not bad:
-            return name, []
-        failed.extend(f"{name}:{label}" for label in bad)
-    if states is None:
-        failed.append("states unavailable")
-    return "unclassified", failed
+        if not bad and computed is None:
+            computed = name
+        rank = (len(bad), index)
+        if best is None or rank < best:
+            best = rank
+            nearest = name
+            nearest_bad = bad
+    return computed, nearest, nearest_bad
 
 
-def _state_count(root: Path, task_dir: Path, rel: str, tools) -> tuple[int | None, str, str]:
+def _state_count(root: Path, task_dir: Path, rel: str, tools
+                 ) -> tuple[int | None, str, str, bool]:
+    """Return states, source, note, and whether the count is complete."""
     skel = task_dir / "gold.skel"
     contract = task_dir / "contract.json"
+    error = None
     if skel.is_file():
         lowered, error = tools.lower_json(skel)
         if lowered is not None:
@@ -675,9 +920,18 @@ def _state_count(root: Path, task_dir: Path, rel: str, tools) -> tuple[int | Non
                 cir_path.write_text(json.dumps(lowered), encoding="utf-8")
                 payload, explore_error = tools.explore(
                     cir_path, contract if contract.is_file() else None)
-            if isinstance(payload, dict) and isinstance(payload.get("states_explored"), int):
-                return payload["states_explored"], "explore", ""
-            error = explore_error or error
+            if isinstance(explore_error, ToolUnavailable):
+                error = explore_error
+            elif isinstance(payload, dict) and payload.get("complete") is True and isinstance(
+                    payload.get("states_explored"), int):
+                return payload["states_explored"], "explore", "", True
+            elif isinstance(payload, dict):
+                limit = payload.get("states_explored")
+                note = f"incomplete ({limit})" if limit is not None else "incomplete"
+                count = limit if isinstance(limit, int) else None
+                return count, "explore", note, False
+            else:
+                error = explore_error or error
     else:
         error = "gold.skel is missing"
     entry = _baseline_entry(root, rel, _deviations(root))
@@ -685,29 +939,31 @@ def _state_count(root: Path, task_dir: Path, rel: str, tools) -> tuple[int | Non
         note = "fell back to states_explored_reference"
         if error:
             note = f"{note} ({error})"
-        return entry["states_explored_reference"], "baseline", note
-    return None, "unavailable", error or "no state count"
+        return entry["states_explored_reference"], "baseline", note, True
+    return None, "unavailable", str(error) if error else "no state count", False
 
 
-def _write_requirement_tier(task_dir: Path, tier: str, source: str, metrics: dict) -> None:
+def _write_requirement_tier(task_dir: Path, tier: str, source: str, metrics: dict, *,
+                            legacy: bool) -> None:
     path = task_dir / "requirements.json"
     if not path.is_file():
         return
     data = _read_json(path)
     if not isinstance(data, dict):
         return
-    for key in ("tier", "tier_source", "tier_metrics"):
-        data.pop(key, None)
-    data["tier"] = tier
-    data["tier_source"] = source
+    data.pop("tier_metrics", None)
+    if not legacy:
+        data.pop("tier", None)
+        data.pop("tier_source", None)
+        data["tier"] = tier
+        data["tier_source"] = source
     data["tier_metrics"] = metrics
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def _write_tiers_md(root: Path, rows: list[dict]) -> None:
+def _write_tiers_md(root: Path, report: dict) -> None:
     path = root / "benchmarks" / "TIERS.md"
-    path.write_text(_tiers_markdown({"tasks": rows, "counts": {},
-                                    "mismatches": []}), encoding="utf-8")
+    path.write_text(_tiers_markdown(report), encoding="utf-8")
 
 
 def _validate_markdown(report: dict) -> str:
@@ -721,35 +977,36 @@ def _validate_markdown(report: dict) -> str:
 
 
 def _tiers_markdown(report: dict) -> str:
-    lines = ["| task | threads | sync | mechanisms | states | computed | declared | source |",
-             "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    lines = ["| task | threads | sync | mechanisms | states | computed | nearest | violations | declared | source |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for row in report["tasks"]:
-        metrics = row["metrics"]
+        metrics = row.get("metrics") or {}
         mechs = ",".join(metrics.get("mechanisms") or [])
+        violations = ", ".join(row.get("violations") or [])
         lines.append(
             f"| {row['task']} | {metrics.get('threads')} | {metrics.get('sync_resources')} | "
-            f"{mechs} | {metrics.get('states')} | {row['computed_tier']} | "
-            f"{row['declared_tier']} | {row['tier_source']} |")
-    counts = report.get("counts") or {}
-    if not counts:
-        counts = {}
-        for row in report["tasks"]:
-            counts[row["declared_tier"]] = counts.get(row["declared_tier"], 0) + 1
+            f"{mechs} | {metrics.get('states')} | {row.get('computed_tier')} | "
+            f"{row.get('nearest_tier')} | {violations} | {row['declared_tier']} | "
+            f"{row['tier_source']} |")
     lines.append("")
-    lines.append("## counts")
+    lines.append("## declared counts")
     for name in ("L1", "L2", "L3", "unclassified"):
-        if name in counts:
-            lines.append(f"- {name}: {counts[name]}")
-    mismatches = report.get("mismatches")
-    if mismatches is None:
-        mismatches = [row["task"] for row in report["tasks"]
-                      if row["computed_tier"] != row["declared_tier"]]
+        count = (report.get("counts") or {}).get(name)
+        if count:
+            lines.append(f"- {name}: {count}")
+    lines.append("")
+    lines.append("## computed counts")
+    for name in ("L1", "L2", "L3", "unclassified"):
+        count = (report.get("computed_counts") or {}).get(name)
+        if count:
+            lines.append(f"- {name}: {count}")
+    mismatches = report.get("mismatches") or []
     lines.append("")
     lines.append("## declared != computed")
+    by_task = {row["task"]: row for row in report["tasks"]}
     if not mismatches:
         lines.append("- (none)")
     else:
-        by_task = {row["task"]: row for row in report["tasks"]}
         for task in mismatches:
             row = by_task.get(task)
             if row is None:
@@ -757,6 +1014,23 @@ def _tiers_markdown(report: dict) -> str:
             else:
                 lines.append(
                     f"- {task}: declared {row['declared_tier']}, computed {row['computed_tier']}")
+    lines.append("")
+    lines.append("## tier_source nearest")
+    nearest = report.get("nearest") or []
+    if not nearest:
+        lines.append("- (none)")
+    else:
+        for task in nearest:
+            row = by_task.get(task) or {}
+            lines.append(f"- {task}: {', '.join(row.get('violations') or [])}")
+    outside = report.get("legacy_outside_baseline") or []
+    lines.append("")
+    lines.append("## legacy outside BASELINE.json")
+    if not outside:
+        lines.append("- (none)")
+    else:
+        for task in outside:
+            lines.append(f"- {task}")
     return "\n".join(lines) + "\n"
 
 
@@ -821,78 +1095,220 @@ def _allowlist(root: Path) -> dict:
     return doc if isinstance(doc, dict) else {}
 
 
-def _string_literals(source: str) -> list[str]:
-    out: list[str] = []
-    index = 0
-    length = len(source)
-    while index < length:
-        if source.startswith("//", index):
-            newline = source.find("\n", index)
-            index = length if newline < 0 else newline + 1
-            continue
-        if source.startswith("/*", index):
-            end = source.find("*/", index + 2)
-            index = length if end < 0 else end + 2
-            continue
-        if source[index] != '"':
-            index += 1
-            continue
-        chars: list[str] = []
-        index += 1
-        while index < length:
-            char = source[index]
-            if char == "\\":
-                if index + 1 < length:
-                    chars.append(source[index + 1])
-                index += 2
-                continue
-            if char == '"':
-                index += 1
-                break
-            chars.append(char)
-            index += 1
-        out.append("".join(chars))
-    return out
+def _literal_lines(source: str) -> list[str]:
+    lines: list[str] = []
+    for kind, text in _scan(source):
+        if kind == "string":
+            lines.extend(text.split("\n"))
+    return lines
 
 
 def _print_formats(source: str) -> list[str]:
-    formats = []
-    for match in re.finditer(r"\b(?:println|print)!\s*\(", source):
-        literal = _first_string(source[match.end():])
-        if literal is not None:
-            formats.append(literal)
+    """Format strings of println!/print!/writeln!/write!, ignoring comments."""
+    tokens = list(_scan(source))
+    formats: list[str] = []
+    index = 0
+    while index < len(tokens):
+        kind, text = tokens[index]
+        if (kind == "ident" and text in _PRINT_MACROS and index + 1 < len(tokens)
+                and tokens[index + 1] == ("punct", "!")):
+            cursor = index + 2
+            if cursor < len(tokens) and tokens[cursor] == ("punct", "("):
+                depth = 0
+                first = None
+                while cursor < len(tokens):
+                    token = tokens[cursor]
+                    if token == ("punct", "("):
+                        depth += 1
+                    elif token == ("punct", ")"):
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    elif token[0] == "string" and first is None:
+                        first = token[1]
+                    cursor += 1
+                if first is not None:
+                    formats.append(first)
+                index = cursor
+                continue
+        index += 1
     return formats
 
 
-def _first_string(text: str) -> str | None:
-    literals = _string_literals(text)
-    return literals[0] if literals else None
+def _scan(source: str):
+    """Tokens outside comments: idents, punctuation, and decoded strings."""
+    index = 0
+    length = len(source)
+    while index < length:
+        char = source[index]
+        if char.isspace():
+            index += 1
+            continue
+        if char == "/" and index + 1 < length and source[index + 1] == "/":
+            newline = source.find("\n", index)
+            index = length if newline < 0 else newline + 1
+            continue
+        if char == "/" and index + 1 < length and source[index + 1] == "*":
+            end = source.find("*/", index + 2)
+            index = length if end < 0 else end + 2
+            continue
+        if char == "r" and _raw_string_at(source, index):
+            decoded, index = _read_raw_string(source, index)
+            yield ("string", decoded)
+            continue
+        if char == '"':
+            decoded, index = _read_cooked_string(source, index)
+            yield ("string", decoded)
+            continue
+        if char == "'":
+            index = _skip_char_literal(source, index)
+            continue
+        if char.isalpha() or char == "_":
+            end = index + 1
+            while end < length and (source[end].isalnum() or source[end] == "_"):
+                end += 1
+            yield ("ident", source[index:end])
+            index = end
+            continue
+        yield ("punct", char)
+        index += 1
+
+
+def _raw_string_at(source: str, index: int) -> bool:
+    if source[index] != "r":
+        return False
+    cursor = index + 1
+    while cursor < len(source) and source[cursor] == "#":
+        cursor += 1
+    return cursor < len(source) and source[cursor] == '"'
+
+
+def _read_raw_string(source: str, index: int) -> tuple[str, int]:
+    cursor = index + 1
+    hashes = 0
+    while cursor < len(source) and source[cursor] == "#":
+        hashes += 1
+        cursor += 1
+    if cursor >= len(source) or source[cursor] != '"':
+        return "", index + 1
+    cursor += 1
+    closer = '"' + ("#" * hashes)
+    end = source.find(closer, cursor)
+    if end < 0:
+        return source[cursor:], len(source)
+    return source[cursor:end], end + len(closer)
+
+
+def _read_cooked_string(source: str, index: int) -> tuple[str, int]:
+    chars: list[str] = []
+    cursor = index + 1
+    length = len(source)
+    while cursor < length:
+        char = source[cursor]
+        if char == "\\":
+            decoded, cursor = _decode_escape(source, cursor)
+            chars.append(decoded)
+            continue
+        if char == '"':
+            return "".join(chars), cursor + 1
+        chars.append(char)
+        cursor += 1
+    return "".join(chars), length
+
+
+def _decode_escape(source: str, index: int) -> tuple[str, int]:
+    if index + 1 >= len(source):
+        return "\\", index + 1
+    name = source[index + 1]
+    simple = {"n": "\n", "t": "\t", "\\": "\\", '"': '"', "'": "'", "0": "\0", "r": "\r"}
+    if name in simple:
+        return simple[name], index + 2
+    if name == "u" and index + 2 < len(source) and source[index + 2] == "{":
+        end = source.find("}", index + 3)
+        if end > index + 3:
+            try:
+                return chr(int(source[index + 3:end], 16)), end + 1
+            except ValueError:
+                pass
+    return name, index + 2
+
+
+def _skip_char_literal(source: str, index: int) -> int:
+    cursor = index + 1
+    length = len(source)
+    while cursor < length:
+        if source[cursor] == "\\":
+            cursor += 2
+            continue
+        if source[cursor] == "'":
+            return cursor + 1
+        cursor += 1
+    return length
+
+
+def _is_format_hole(inner: str) -> bool:
+    argument, _sep, _rest = inner.partition(":")
+    return argument == "" or argument.isdigit() or argument.isidentifier()
 
 
 def _has_placeholder(fmt: str) -> bool:
     index = 0
     while index < len(fmt):
-        if fmt[index] != "{":
-            index += 1
-            continue
-        if index + 1 < len(fmt) and fmt[index + 1] == "{":
+        if fmt[index] == "{" and index + 1 < len(fmt) and fmt[index + 1] == "{":
             index += 2
             continue
-        end = fmt.find("}", index + 1)
-        if end < 0:
-            return False
-        inner = fmt[index + 1:end]
-        if inner == "" or inner.isidentifier():
-            return True
-        index = end + 1
+        if fmt[index] == "}" and index + 1 < len(fmt) and fmt[index + 1] == "}":
+            index += 2
+            continue
+        if fmt[index] == "{":
+            end = fmt.find("}", index + 1)
+            if end < 0:
+                return False
+            if _is_format_hole(fmt[index + 1:end]):
+                return True
+            index = end + 1
+            continue
+        index += 1
     return False
 
 
-def _last_nonempty(text: str) -> str:
-    for line in reversed((text or "").splitlines()):
-        if line.strip():
-            return line.strip()
-    return ""
+def _format_matches_terminal(fmt: str, terminal: str) -> bool:
+    """True when placeholders can cover the whole terminal line."""
+    if not _has_placeholder(fmt):
+        return False
+    parts: list[str] = []
+    index = 0
+    while index < len(fmt):
+        if fmt[index] == "{" and index + 1 < len(fmt) and fmt[index + 1] == "{":
+            parts.append(re.escape("{"))
+            index += 2
+            continue
+        if fmt[index] == "}" and index + 1 < len(fmt) and fmt[index + 1] == "}":
+            parts.append(re.escape("}"))
+            index += 2
+            continue
+        if fmt[index] == "{":
+            end = fmt.find("}", index + 1)
+            if end > index and _is_format_hole(fmt[index + 1:end]):
+                parts.append(".*")
+                index = end + 1
+                continue
+        parts.append(re.escape(fmt[index]))
+        index += 1
+    return re.fullmatch("".join(parts), terminal) is not None
+
+
+def _frontend_error_message(stdout: str) -> str | None:
+    try:
+        payload = json.loads(stdout or "")
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, list):
+        return None
+    codes = [str(item["code"]) for item in payload
+             if isinstance(item, dict) and item.get("code")]
+    shown = ", ".join(codes) if codes else "(no code)"
+    return f"frontend errors: {shown}"
 
 
 def _cargo_available() -> bool:
@@ -911,18 +1327,40 @@ class RealTools:
         except FileNotFoundError as exc:
             self._error = str(exc)
 
+    def _missing(self, what: str) -> ToolUnavailable:
+        return ToolUnavailable(self._error or f"{what} binary is not available")
+
     def verify_skel(self, skel: Path, contract: Path):
         if self._backend is None:
-            return None, self._error or "skelnet not found"
-        result = self._backend.verify(skel, contract)
+            return None, self._missing("skelnet")
+        try:
+            result = self._backend.verify(skel, contract)
+        except Exception as exc:
+            message = _frontend_error_message(self._verify_stdout(skel, contract))
+            if message:
+                return None, message
+            return None, f"{type(exc).__name__}: {exc}"
         if not isinstance(result.payload, dict):
+            message = _frontend_error_message(getattr(result, "stdout", "") or "")
+            if message:
+                return None, message
             return None, result.error or "skelnet verify produced no JSON"
         return result.payload, None
 
+    def _verify_stdout(self, skel: Path, contract: Path) -> str:
+        proc = subprocess.run(
+            [str(self._backend.skelnet), "verify", str(skel), str(contract),
+             "--engine", "petri", "--json"],
+            capture_output=True, text=True, timeout=self._backend.timeout)
+        return proc.stdout or ""
+
     def check_skel(self, skel: Path):
         if self._backend is None:
-            return None, [], self._error or "skelnet not found"
-        result = self._backend.check(skel)
+            return None, [], self._missing("skelnet")
+        try:
+            result = self._backend.check(skel)
+        except Exception as exc:
+            return None, [], f"{type(exc).__name__}: {exc}"
         payload = result.payload if isinstance(result.payload, dict) else {}
         codes = []
         for item in payload.get("diagnostics") or []:
@@ -932,7 +1370,7 @@ class RealTools:
 
     def lower_json(self, skel: Path):
         if self._backend is None:
-            return None, self._error or "skelnet not found"
+            return None, self._missing("skelnet")
         with tempfile.TemporaryDirectory(prefix="skelnet-bench-lower-") as tmp:
             dest = Path(tmp) / "lowered.cir.json"
             result = self._backend.lower(skel, dest)
@@ -945,7 +1383,7 @@ class RealTools:
 
     def explore(self, cir: Path, contract: Path | None):
         if self._backend is None:
-            return None, self._error or "concir-backend not found"
+            return None, self._missing("concir-backend")
         target = contract if contract is not None else cir
         # verify_cir always wants a contract path. An absent contract still has
         # to be a path the backend can skip; pass the cir path only when the
