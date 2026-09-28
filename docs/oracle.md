@@ -108,25 +108,36 @@ The wrapper instrumenter recognizes `thread::spawn` / `std::thread::spawn`
 in expression positions (including push arguments, returns, if/match branches,
 iterator closures, other function bodies, and macro arguments that `syn` can
 parse). Bare `spawn` calls require a visible `use std::thread::spawn` import
-(including grouped imports); a user function with that name is not a thread.
+(including grouped imports and `std::thread::*`); local functions, bindings and
+explicit imports can shadow a glob. A user function with that name is not a thread.
 It also forwards `thread::scope` / `std::thread::scope` and imported `scope`,
 and rewrites `.spawn` only on the lexical scope parameter. Nested scopes,
 closures capturing that parameter, borrowed captures and joined return values
 are supported. Each loop or iterator closure site has one Spawn resource with
 optional `in_loop: true`; each execution records a fresh spawn event and thread
-tag, while retaining the site's resource name.
+tag, while retaining the site's resource name. In an unparseable macro body,
+recognized bare imported `spawn(...)` / `scope(...)` tokens are qualified as
+`std::thread::spawn` / `std::thread::scope` and reported as limitations, so the
+existing residual check yields `instrument_unsupported` instead of a false failure.
 
-Spawn `display` names prefer the sole non-builtin function call in the closure,
-then a direct `let` handle binding, then the first non-builtin function call,
+Spawn `display` names prefer the function path passed as the entry (using its
+last segment), or the sole non-builtin function call in the closure,
+then a direct `let` handle binding (including type annotations), then the first non-builtin function call,
 then `spawn<k>` in file order starting at zero. Constructor/conversion/utility
 calls such as `Arc::clone`, `new`, `default`, `from`, `into`, `with_capacity`,
 `take`, `replace`, `swap`, `unwrap` and `expect` are not worker entries.
 `name` remains `<display>#<site>`; optional `name_source` records `callee`,
 `binding`, `first_call` or `index`, and optional `binding` retains the handle
-name even when a unique callee wins. Python mapping still uses the resource
+name even when a unique callee wins. A binding to a method-chain result such as
+`spawn(...).join()` is not a handle binding. Python mapping still uses the resource
 name; it does not treat `binding` as an alias. Builder names are not supported
 in this version (`Builder::spawn` and `Builder::spawn_scoped` are not rewritten).
 Unknown/custom spawn methods and unparseable macro bodies remain limitations.
+Nested std sync import groups are rewritten structurally. Wrapper types also
+support Mutex/Condvar Debug, Mutex Default, try_lock, into_inner, get_mut,
+is_poisoned, and Condvar wait_timeout/wait_timeout_while; successful try_lock
+records a lock, failed try_lock records nothing, and each timed wait records
+one condvar_wait with the existing event vocabulary.
 
 When the annotated program still contains a spawn form the instrumenter does not
 rewrite (`thread::spawn(`, a `.spawn(` method call, or `thread::scope`), the

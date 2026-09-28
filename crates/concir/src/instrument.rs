@@ -176,6 +176,36 @@ pub mod sync {
         }
     }
 
+    impl<T: std::fmt::Debug> std::fmt::Debug for Mutex<T> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            std::fmt::Debug::fmt(&self.inner, f)
+        }
+    }
+
+    impl<T: Default> Default for Mutex<T> {
+        fn default() -> Self { Self::new(T::default()) }
+    }
+
+    impl<T> Mutex<T> {
+        pub fn try_lock(&self) -> std::sync::TryLockResult<Guard<'_, T>> {
+            match self.inner.try_lock() {
+                Ok(g) => {
+                    record("mutex_lock", self.name);
+                    Ok(Guard { inner: Some(g), name: self.name, armed: true })
+                }
+                Err(std::sync::TryLockError::WouldBlock) => Err(std::sync::TryLockError::WouldBlock),
+                Err(std::sync::TryLockError::Poisoned(e)) => {
+                    // A failed try_lock emits no event, including on guard drop.
+                    let guard = Guard { inner: Some(e.into_inner()), name: self.name, armed: false };
+                    Err(std::sync::TryLockError::Poisoned(std::sync::PoisonError::new(guard)))
+                }
+            }
+        }
+        pub fn into_inner(self) -> LockResult<T> { self.inner.into_inner() }
+        pub fn get_mut(&mut self) -> LockResult<&mut T> { self.inner.get_mut() }
+        pub fn is_poisoned(&self) -> bool { self.inner.is_poisoned() }
+    }
+
     impl<'a, T> Deref for Guard<'a, T> {
         type Target = T;
         fn deref(&self) -> &T {
@@ -200,6 +230,49 @@ pub mod sync {
     pub struct Condvar {
         inner: StdCondvar,
         name: &'static str,
+    }
+
+    impl std::fmt::Debug for Condvar {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            std::fmt::Debug::fmt(&self.inner, f)
+        }
+    }
+
+    impl Condvar {
+        pub fn wait_timeout<'a, T>(&self, mut guard: Guard<'a, T>, dur: std::time::Duration)
+            -> LockResult<(Guard<'a, T>, std::sync::WaitTimeoutResult)>
+        {
+            let name = guard.name;
+            guard.armed = false;
+            let inner = guard.inner.take().expect("condvar guard consumed twice");
+            let result = self.inner.wait_timeout(inner, dur);
+            record("condvar_wait", self.name);
+            match result {
+                Ok((g, timed)) => Ok((Guard { inner: Some(g), name, armed: true }, timed)),
+                Err(e) => {
+                    let (g, timed) = e.into_inner();
+                    Err(std::sync::PoisonError::new((Guard { inner: Some(g), name, armed: true }, timed)))
+                }
+            }
+        }
+        pub fn wait_timeout_while<'a, T, F>(
+            &self, mut guard: Guard<'a, T>, dur: std::time::Duration, f: F,
+        ) -> LockResult<(Guard<'a, T>, std::sync::WaitTimeoutResult)>
+        where F: FnMut(&mut T) -> bool,
+        {
+            let name = guard.name;
+            guard.armed = false;
+            let inner = guard.inner.take().expect("condvar guard consumed twice");
+            let result = self.inner.wait_timeout_while(inner, dur, f);
+            record("condvar_wait", self.name);
+            match result {
+                Ok((g, timed)) => Ok((Guard { inner: Some(g), name, armed: true }, timed)),
+                Err(e) => {
+                    let (g, timed) = e.into_inner();
+                    Err(std::sync::PoisonError::new((Guard { inner: Some(g), name, armed: true }, timed)))
+                }
+            }
+        }
     }
 
     impl Default for Condvar {
@@ -448,11 +521,17 @@ fn closure_call_count(expr: &Expr) -> usize {
 /// the block form `spawn({ let x = ..; move || f(x) })`, so the thread entry is
 /// recovered structurally instead of from the handle name.
 fn spawn_callee(args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>) -> Option<String> {
-    args.first().and_then(closure_callee)
+    args.first().and_then(|expr| match plain_expr(expr) {
+        Expr::Path(p) => p.path.segments.last().map(|s| s.ident.to_string()),
+        other => closure_callee(other),
+    })
 }
 
 fn spawn_unique(args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>) -> bool {
-    args.first().map(closure_call_count) == Some(1)
+    args.first().is_some_and(|expr| match plain_expr(expr) {
+        Expr::Path(_) => true,
+        other => closure_call_count(other) == 1,
+    })
 }
 
 /// Only names resolved to std imports or an active scope parameter are special.
@@ -507,10 +586,18 @@ impl SpawnCollector {
         lc_offset(&self.starts, span.start())
     }
 
-    fn import(&mut self, item: &syn::ItemUse) {
+    fn import(&mut self, item: &syn::ItemUse, glob_only: bool) {
         let mut leaves = Vec::new();
         use_leaves(&item.tree, "", &mut leaves);
         for (path, local) in leaves {
+            if glob_only {
+                if path == "std::thread::*" {
+                    self.names.insert("spawn".into(), ThreadName::Spawn);
+                    self.names.insert("scope".into(), ThreadName::Scope);
+                }
+                continue;
+            }
+            if local == "*" { continue; }
             let kind = match path.as_str() {
                 "std::thread::spawn" => ThreadName::Spawn,
                 "std::thread::scope" => ThreadName::Scope,
@@ -520,11 +607,15 @@ impl SpawnCollector {
         }
     }
 
-    fn items(&mut self, items: &[syn::Item]) {
-        // Rust use/item declarations are visible throughout their block.
+    fn items<'a>(&mut self, items: impl Iterator<Item = &'a syn::Item> + Clone) {
+        // Explicit items/imports beat globs regardless of declaration order.
+        // All items are visible throughout their lexical block.
+        for item in items.clone() {
+            if let syn::Item::Use(u) = item { self.import(u, true); }
+        }
         for item in items {
             match item {
-                syn::Item::Use(u) => self.import(u),
+                syn::Item::Use(u) => self.import(u, false),
                 syn::Item::Fn(f) => { self.names.insert(f.sig.ident.to_string(), ThreadName::Other); }
                 _ => {}
             }
@@ -581,6 +672,33 @@ impl SpawnCollector {
         self.names = saved;
     }
 
+    fn qualify_unparsed_calls(&mut self, tokens: proc_macro2::TokenStream, macro_name: &str) {
+        use proc_macro2::{Delimiter, TokenTree};
+        let tokens: Vec<_> = tokens.into_iter().collect();
+        for (i, token) in tokens.iter().enumerate() {
+            if let TokenTree::Group(group) = token {
+                self.qualify_unparsed_calls(group.stream(), macro_name);
+            }
+            let TokenTree::Ident(ident) = token else { continue };
+            let Some(TokenTree::Group(args)) = tokens.get(i + 1) else { continue };
+            if args.delimiter() != Delimiter::Parenthesis { continue; }
+            // Do not qualify methods, already-qualified paths or metavariables.
+            if i > 0 && matches!(&tokens[i - 1], TokenTree::Punct(p)
+                if matches!(p.as_char(), '.' | ':' | '$')) { continue; }
+            let member = match self.names.get(&ident.to_string()) {
+                Some(ThreadName::Spawn) => "spawn",
+                Some(ThreadName::Scope) => "scope",
+                _ => continue,
+            };
+            self.edits.push(Edit {
+                start: self.offset(ident.span()),
+                end: lc_offset(&self.starts, ident.span().end()),
+                text: format!("std::thread::{member}"),
+            });
+            self.limitations.push(format!("unrewritten {member} in unparsed macro body: {macro_name}"));
+        }
+    }
+
     fn emit(&mut self, edits: &mut Vec<Edit>, resources: &mut Vec<Resource>) {
         edits.append(&mut self.edits);
         // BTreeMap both deduplicates sites and fixes fallback names to file order.
@@ -613,14 +731,14 @@ impl SpawnCollector {
 
 impl<'ast> Visit<'ast> for SpawnCollector {
     fn visit_file(&mut self, file: &'ast File) {
-        self.items(&file.items);
+        self.items(file.items.iter());
         syn::visit::visit_file(self, file);
     }
 
     fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
         if let Some((_, items)) = &node.content {
             let saved = std::mem::take(&mut self.names);
-            self.items(items);
+            self.items(items.iter());
             for item in items { self.visit_item(item); }
             self.names = saved;
         }
@@ -640,18 +758,31 @@ impl<'ast> Visit<'ast> for SpawnCollector {
 
     fn visit_block(&mut self, block: &'ast syn::Block) {
         let saved = self.names.clone();
-        for stmt in &block.stmts {
-            if let Stmt::Item(item) = stmt { self.items(std::slice::from_ref(item)); }
-        }
+        self.items(block.stmts.iter().filter_map(|stmt| match stmt {
+            Stmt::Item(item) => Some(item),
+            _ => None,
+        }));
         syn::visit::visit_block(self, block);
         self.names = saved;
     }
 
     fn visit_local(&mut self, local: &'ast syn::Local) {
         if let Some(init) = &local.init {
-            if let Pat::Ident(id) = &local.pat {
+            let mut pat = &local.pat;
+            while let Pat::Type(typed) = pat { pat = &typed.pat; }
+            if let Pat::Ident(id) = pat {
                 let expr = plain_expr(&init.expr);
-                self.bindings.insert(self.offset(expr.span()), id.ident.to_string());
+                // A join/thread/id chain has the same start offset as its
+                // receiver, but binds the chain's result, not a handle.
+                let direct_spawn = match expr {
+                    Expr::Call(call) => self.thread_call(&call.func, ThreadName::Spawn),
+                    Expr::MethodCall(call) => call.method == "spawn"
+                        && self.scope_receiver(&call.receiver).is_some(),
+                    _ => false,
+                };
+                if direct_spawn {
+                    self.bindings.insert(self.offset(expr.span()), id.ident.to_string());
+                }
             }
             self.visit_expr(&init.expr);
             if let Some((_, expr)) = &init.diverge { self.visit_expr(expr); }
@@ -793,10 +924,16 @@ impl<'ast> Visit<'ast> for SpawnCollector {
             for expr in &args { self.visit_expr(expr); }
         } else if let Ok(stmts) = syn::Block::parse_within.parse2(node.tokens.clone()) {
             let saved = self.names.clone();
+            self.items(stmts.iter().filter_map(|stmt| match stmt {
+                Stmt::Item(item) => Some(item),
+                _ => None,
+            }));
             for stmt in &stmts { self.visit_stmt(stmt); }
             self.names = saved;
         } else {
-            self.limitations.push(format!("unparsed macro body: {}", node.path.segments.last().unwrap().ident));
+            let name = node.path.segments.last().unwrap().ident.to_string();
+            self.limitations.push(format!("unparsed macro body: {name}"));
+            self.qualify_unparsed_calls(node.tokens.clone(), &name);
         }
     }
 }
@@ -1104,64 +1241,69 @@ fn scoped_sync_use(src_before: &str, names: &[&str]) -> String {
     format!("use crate::cir_trace::sync::{{{}}};", names.join(", "))
 }
 
+/// Prune std sync names from the use tree, retaining its grouping so legacy
+/// simple imports have the same spelling. Reintroduce wrappers in that scope.
+fn sync_use_tree(tree: &syn::UseTree, prefix: &str, wrapped: &mut Vec<String>) -> Option<String> {
+    match tree {
+        syn::UseTree::Path(p) => {
+            let next = format!("{prefix}{}::", p.ident);
+            sync_use_tree(&p.tree, &next, wrapped).map(|tail| format!("{}::{tail}", p.ident))
+        }
+        syn::UseTree::Group(g) => {
+            let kept: Vec<_> = g.items.iter().filter_map(|t| sync_use_tree(t, prefix, wrapped)).collect();
+            (!kept.is_empty()).then(|| format!("{{{}}}", kept.join(", ")))
+        }
+        syn::UseTree::Name(n) => {
+            if prefix == "std::sync::" && matches!(n.ident.to_string().as_str(), "Mutex" | "Condvar") {
+                wrapped.push(n.ident.to_string());
+                None
+            } else { Some(n.ident.to_string()) }
+        }
+        syn::UseTree::Rename(n) => {
+            let text = format!("{} as {}", n.ident, n.rename);
+            if prefix == "std::sync::" && matches!(n.ident.to_string().as_str(), "Mutex" | "Condvar") {
+                wrapped.push(text);
+                None
+            } else { Some(text) }
+        }
+        syn::UseTree::Glob(_) => Some("*".into()),
+    }
+}
+
 fn rewrite_imports(src: &str) -> String {
-    let mut result = String::new();
-    let mut rest = src;
-    loop {
-        let grouped = rest.find("use std::sync::{");
-        let single_m = rest.find("use std::sync::Mutex;");
-        let single_c = rest.find("use std::sync::Condvar;");
-        let next = [grouped, single_m, single_c].into_iter().flatten().min();
-        let Some(i) = next else {
-            result.push_str(rest);
-            break;
-        };
-        result.push_str(&rest[..i]);
-        let from = &rest[i..];
-        if from.starts_with("use std::sync::{") {
-            let after = &from["use std::sync::{".len()..];
-            if let Some(j) = after.find('}') {
-                let inner = &after[..j];
-                let rest2 = &after[j + 1..];
-                let semi = rest2.find(';').map(|k| k + 1).unwrap_or(0);
-                let mut kept = Vec::new();
-                let mut wrapped = Vec::new();
-                for item in inner.split(',').map(str::trim).filter(|s| !s.is_empty()) {
-                    if item == "Mutex" || item == "Condvar" {
-                        wrapped.push(item);
-                    } else {
-                        kept.push(item);
-                    }
+    struct Imports<'a> {
+        src: &'a str,
+        starts: Vec<usize>,
+        edits: Vec<Edit>,
+    }
+    impl<'ast> Visit<'ast> for Imports<'_> {
+        fn visit_item_use(&mut self, node: &'ast syn::ItemUse) {
+            let mut wrapped = Vec::new();
+            let kept = sync_use_tree(&node.tree, "", &mut wrapped);
+            if wrapped.is_empty() { return; }
+            let start = lc_offset(&self.starts, node.span().start());
+            let end = lc_offset(&self.starts, node.span().end());
+            let mut text = kept.map(|tree| format!("use {tree};")).unwrap_or_default();
+            let local = scoped_sync_use(&self.src[..start], &wrapped.iter().map(String::as_str).collect::<Vec<_>>());
+            text.push_str(&local);
+            // Root unaliased imports are already supplied by the header.
+            // Aliases need their own imports even at crate root.
+            if local.is_empty() {
+                let aliases: Vec<_> = wrapped.iter().filter(|name| name.contains(" as ")).collect();
+                if !aliases.is_empty() {
+                    text.push_str(&format!("use crate::cir_trace::sync::{{{}}};",
+                        aliases.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")));
                 }
-                if !kept.is_empty() {
-                    result.push_str(&format!("use std::sync::{{{}}};", kept.join(", ")));
-                }
-                let local = scoped_sync_use(&result, &wrapped);
-                if !local.is_empty() {
-                    result.push_str(&local);
-                }
-                rest = &rest2[semi..];
-                continue;
             }
+            self.edits.push(Edit { start, end, text });
         }
-        let mut consumed = false;
-        for name in ["Mutex", "Condvar"] {
-            let needle = format!("use std::sync::{name};");
-            if from.starts_with(&needle) {
-                let local = scoped_sync_use(&result, &[name]);
-                if !local.is_empty() {
-                    result.push_str(&local);
-                }
-                rest = &from[needle.len()..];
-                consumed = true;
-                break;
-            }
-        }
-        if consumed {
-            continue;
-        }
-        result.push_str(&from[..1]);
-        rest = &from[1..];
+    }
+    let mut result = src.to_string();
+    if let Ok(file) = syn::parse_file(src) {
+        let mut imports = Imports { src, starts: line_starts(src), edits: Vec::new() };
+        imports.visit_file(&file);
+        imports.edits.sort_by_key(|edit| std::cmp::Reverse(edit.start));
+        for edit in imports.edits { result.replace_range(edit.start..edit.end, &edit.text); }
     }
     result
         .replace("std::sync::Mutex", "cir_trace::sync::Mutex")
