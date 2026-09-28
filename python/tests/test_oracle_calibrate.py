@@ -167,17 +167,30 @@ def test_fixture_mutants_fail(tmp_path):
 
 
 @rust_tools
-def test_fixture_scope_and_push_are_instrument_unsupported(tmp_path):
+def test_fixture_scope_and_push_get_real_verdicts(tmp_path):
+    from skelnet.rusttools.monitor import residual_spawns
+
     terminal = cli.read_terminal(FIXTURE / "abba_2lock")
     for name in ("scope.rs", "push_spawn.rs"):
         source = (FIXTURE / "abba_2lock" / "rust" / name).read_text(encoding="utf-8")
         oracle = RustOracle(terminal=terminal, task_dir=FIXTURE / "abba_2lock",
                             stress_runs=2, monitor_runs=1)
         result = oracle.evaluate(source, tmp_path / name)
-        assert result.layers["O4"].status == "unsupported", name
-        assert result.layers["O4"].category == "instrument_unsupported", name
-        assert result.functional_ok is True, name
-        assert result.oracle_complete is False, name
+        o4 = result.layers["O4"]
+        assert (o4.status, o4.category) == ("fail", "not_observed"), o4.to_dict()
+        assert "instrument_unsupported" not in o4.data["categories"], name
+        assert o4.data["actual_threads"] == 2, name
+        inst = tmp_path / name / "o4" / "instrumented"
+        assert residual_spawns((inst / "annotated.rs").read_text()) == [], name
+        resources = json.loads((inst / "resources.json").read_text())["resources"]
+        spawns = [r for r in resources if r["kind"] == "Spawn"]
+        assert all(r["display"] == f"spawn{i}" for i, r in enumerate(spawns)), name
+        properties = o4.data["report"]["properties"]
+        holds = [p for p in properties if "holds" in p["id"]]
+        completes = [p for p in properties if "completes" in p["id"]]
+        assert len(holds) == len(completes) == 2, properties
+        assert all(p["status"] == "PASS_bounded" for p in holds), holds
+        assert all(p["status"] == "not_observed" for p in completes), completes
 
 
 @rust_tools

@@ -1,0 +1,65 @@
+{
+  "task": "lock-order/abba_2lock",
+  "requirements": [
+    "The design contains one main thread and two worker threads.",
+    "Both worker threads share the same two locks, and neither lock may be held by more than one worker at a time.",
+    "Each worker must hold both locks at the same time while it performs its critical work.",
+    "A worker that finds a lock busy must wait for it to become free and then continue.",
+    "It must never be possible for the two workers to leave each other waiting forever, each holding one lock and needing the other.",
+    "The main thread starts both workers and only finishes after both workers have finished.",
+    "Every worker must release each lock it holds before it finishes.",
+    "Every possible schedule or interleaving of the workers must terminate.",
+    "The program must print exactly the line `DONE t1=1 t2=1` and then exit."
+  ],
+  "unverifiable": [
+    9
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R4",
+        "R5",
+        "R7",
+        "R8"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R6",
+        "R8"
+      ],
+      [
+        "R1",
+        "R6",
+        "R8"
+      ],
+      [
+        "R2",
+        "R3"
+      ],
+      [
+        "R2",
+        "R3"
+      ]
+    ]
+  },
+  "terminal": "DONE t1=1 t2=1",
+  "entities": {
+    "roles": [
+      "t1",
+      "t2"
+    ],
+    "resources": [
+      {
+        "name": "a",
+        "kind": "lock"
+      },
+      {
+        "name": "b",
+        "kind": "lock"
+      }
+    ]
+  },
+  "contract": "lock-order/abba_2lock/contract.json"
+}
