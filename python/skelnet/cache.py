@@ -14,7 +14,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .transport import ReplayMiss
+from .transport import ReplayMiss, TransportError
+
+
+class FirstRoundMiss(TransportError):
+    """``--first-round require-cache`` missed call_index 1.
+
+    The inner client is not called. The message is ``first_round_miss`` so the
+    cell records that string and does not score a program that was never
+    generated.
+    """
 
 
 def cache_key(*, model_id: str, system: str, user: str, task: str | None,
@@ -102,12 +111,13 @@ class CachedClient:
     """Wrap a client; store responses and replay them offline."""
 
     def __init__(self, inner: Any, *, cache: ResponseCache, replay: ResponseCache | None,
-                 model_id: str, params: Any) -> None:
+                 model_id: str, params: Any, first_round: str = "auto") -> None:
         self.inner = inner
         self.cache = cache
         self.replay = replay
         self.model_id = model_id
         self.params = params
+        self.first_round = first_round
         self.cache_hit = False
         self.task_id: str | None = None
         self.replicate = 0
@@ -142,6 +152,8 @@ class CachedClient:
         if self.replay is not None:
             cached = self.replay.get(key)
             if cached is None:
+                if self.first_round == "require-cache" and self.call_index == 1:
+                    raise FirstRoundMiss("first_round_miss")
                 raise ReplayMiss("replay_miss")
             self.cache_hit = True
             return CachedOutcome(**cached)
@@ -149,6 +161,8 @@ class CachedClient:
         if cached is not None:
             self.cache_hit = True
             return CachedOutcome(**cached)
+        if self.first_round == "require-cache" and self.call_index == 1:
+            raise FirstRoundMiss("first_round_miss")
         self.cache_hit = False
         outcome = self.inner.complete(system, user)
         payload = {

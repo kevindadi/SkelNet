@@ -417,7 +417,9 @@ def _finish_cell(result: CellResult, *, arm: str, requirements: str,
 
 
 def run_g0_cell(*, task: str, requirements: str, provider: CandidateProvider,
-                oracle: Any, workdir: Path, replicate: int = 0) -> CellResult:
+                oracle: Any, workdir: Path, replicate: int = 0,
+                compile_fn=None, tools=None) -> CellResult:
+    """One-shot Rust. ``accepted`` is "this version compiles", not the oracle."""
     result = CellResult(arm="G0", task=task, replicate=replicate, rust_mode="llm")
     result.rounds_used = 1
     response = provider.propose(CandidateRequest(
@@ -428,10 +430,28 @@ def run_g0_cell(*, task: str, requirements: str, provider: CandidateProvider,
         return result
     result.candidate = extract_rust(response.text)
     result.parse_ok = bool(result.candidate)
-    result.check_ok = result.parse_ok
     result.rust = result.candidate
-    result.oracle = oracle.evaluate(result.rust, workdir)
-    result.accepted = bool(getattr(result.oracle, "functional_ok", False))
+    from .rusttools.compile import compile_rust
+    from .rusttools.runner import ToolRunner
+    if compile_fn is None:
+        compile_fn = compile_rust
+    if tools is None:
+        tools = ToolRunner()
+    compiled = compile_fn(tools, Path(workdir) / "compile" / "c1", result.rust or "")
+    if getattr(compiled, "unavailable", None):
+        result.check_ok = False
+        result.accepted = False
+        if not result.error:
+            result.error = "compile_unavailable"
+    elif getattr(compiled, "timed_out", False):
+        result.check_ok = False
+        result.accepted = False
+        if not result.error:
+            result.error = "compile_timeout"
+    else:
+        result.check_ok = bool(getattr(compiled, "ok", False))
+        result.accepted = result.check_ok
+    result.oracle = oracle.evaluate(result.rust or "", workdir)
     return result
 
 

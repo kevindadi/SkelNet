@@ -39,3 +39,6 @@ experiments/**/cache/
 .DS_Store
 .cursor
 .agents
+
+# Local lockbud checkout (scripts/setup_lockbud.sh)
+tools/lockbud/
