@@ -163,12 +163,15 @@ def test_unparsed_bare_scope_real_o4(tmp_path):
 
 
 @rust_tools
-@pytest.mark.parametrize("feature", ["nested_import", "debug_mutex", "debug_condvar", "once_set_unwrap", "default_mutex", "try_lock", "into_inner", "get_mut", "is_poisoned", "wait_timeout", "wait_timeout_while"])
+@pytest.mark.parametrize("feature", ["nested_import", "public_nested_import", "debug_mutex", "debug_condvar", "once_set_unwrap", "default_mutex", "try_lock", "into_inner", "get_mut", "is_poisoned", "wait_timeout", "wait_timeout_while"])
 def test_wrapper_api_real_o4(tmp_path, feature):
     source = INLINE
     expected = ("pass", None)
     if feature == "nested_import":
         source = source.replace("use std::sync::{Arc, Mutex};\nuse std::thread;", "use std::{sync::{Arc, Mutex}, thread};")
+    elif feature == "public_nested_import":
+        source = source.replace("use std::sync::{Arc, Mutex};", "use std::sync::Arc; mod locks { pub use std::{sync::Mutex}; }")
+        source = source.replace("Mutex::new(", "locks::Mutex::new(")
     elif feature == "debug_mutex":
         source = "#[derive(Debug)] struct S<T> { m: Mutex<T> }\n" + source
         source = source.replace("// PROBE", 'let _ = format!("{:?}", a);')

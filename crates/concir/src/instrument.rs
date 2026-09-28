@@ -1283,15 +1283,20 @@ fn rewrite_imports(src: &str) -> String {
             if wrapped.is_empty() { return; }
             let start = lc_offset(&self.starts, node.span().start());
             let end = lc_offset(&self.starts, node.span().end());
-            let mut text = kept.map(|tree| format!("use {tree};")).unwrap_or_default();
+            let use_start = lc_offset(&self.starts, node.use_token.span.start());
+            let prefix = &self.src[start..use_start]; // attributes and visibility
+            let mut text = kept.map(|tree| format!("{prefix}use {tree};")).unwrap_or_default();
             let local = scoped_sync_use(&self.src[..start], &wrapped.iter().map(String::as_str).collect::<Vec<_>>());
-            text.push_str(&local);
+            if !local.is_empty() {
+                text.push_str(prefix);
+                text.push_str(&local);
+            }
             // Root unaliased imports are already supplied by the header.
             // Aliases need their own imports even at crate root.
             if local.is_empty() {
                 let aliases: Vec<_> = wrapped.iter().filter(|name| name.contains(" as ")).collect();
                 if !aliases.is_empty() {
-                    text.push_str(&format!("use crate::cir_trace::sync::{{{}}};",
+                    text.push_str(&format!("{prefix}use crate::cir_trace::sync::{{{}}};",
                         aliases.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")));
                 }
             }

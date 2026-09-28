@@ -136,3 +136,9 @@ fn legacy_sync_import_spelling_is_preserved() {
     assert!(w.annotated.contains("use std::sync::{Arc};"));
     assert!(w.annotated.contains("mod m { use crate::cir_trace::sync::{Mutex}; }"));
 }
+
+#[test]
+fn nested_sync_import_preserves_visibility_and_attributes() {
+    let w = wrap("mod locks { #[allow(unused_imports)] pub use std::{sync::Mutex}; } fn main() { let a = locks::Mutex::new(()); }").unwrap();
+    assert!(w.annotated.contains("#[allow(unused_imports)] pub use crate::cir_trace::sync::{Mutex};"));
+}
