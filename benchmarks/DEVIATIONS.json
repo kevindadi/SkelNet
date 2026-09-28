@@ -9,7 +9,7 @@
       "baseline_outcome": "UNSUPPORTED",
       "baseline_reason": "condvar_multiple_locks: one condvar waited on with two mutexes",
       "dsl_gold_skel_outcome": "PASS",
-      "action": "The original structure is inexpressible in the DSL (a condvar is bound to one mutex; `lock m2 { cv.wait(); }` for a cv bound to m1 is S104). The original task was moved under `boundary/` as a negative example (direct.skel -> S104, gold.cir.json -> UNSUPPORTED), and the subset skeleton was promoted to the new task `condvar/two_cv_two_locks` (recorded in BASELINE_EXT.json; not claimed equivalent to the frozen baseline).",
+      "action": "The original structure is inexpressible in the DSL (a condvar is bound to one mutex; `lock m2 { cv.wait(); }` for a cv bound to m1 is S104). The original task was moved under `boundary/` as a negative example (direct.skel -> S104, gold.cir.json -> UNSUPPORTED), and the subset skeleton was promoted to the new task `condvar/two_cv_two_locks` (recorded in BASELINE_EXT.json; not claimed equivalent to the frozen baseline). Following the existing boundary convention, the boundary directory carries no REQUIREMENTS.md / REQUIREMENTS.h1.md so `cmd_run` keeps skipping it as a negative example.",
       "resolution": {
         "decision": "D9",
         "status": "resolved",

@@ -473,12 +473,6 @@
     },
     {
       "task": "boundary/same_cv_different_locks",
-      "file": "REQUIREMENTS.md",
-      "sha256": "1cac2dd59814f62ed282bfb5100b4cd5d60c124ddc78820d2e96f0d00e8f8348",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/same_cv_different_locks/generation_input/REQUIREMENTS.md"
-    },
-    {
-      "task": "boundary/same_cv_different_locks",
       "file": "contract.json",
       "sha256": "17d0da5b27d2d13855208429fcbfde01394319604875aa11fb9e8a7d2e13409c",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/same_cv_different_locks/contract.json"
