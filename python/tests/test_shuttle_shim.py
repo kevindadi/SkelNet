@@ -22,7 +22,12 @@ fn __skelnet_body() {
 }
 
 fn main() {
-    shuttle::check_pct(|| { __skelnet_body(); }, 2000, 3);
+    let mut __skelnet_pct_config = shuttle::Config::new();
+    __skelnet_pct_config.max_steps = shuttle::MaxSteps::ContinueAfter(10000);
+    shuttle::Runner::new(
+        shuttle::scheduler::PctScheduler::new(3, 2000),
+        __skelnet_pct_config,
+    ).run(|| { __skelnet_body(); });
     shuttle::check_random(|| { __skelnet_body(); }, 2000);
 }
 """
