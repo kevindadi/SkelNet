@@ -26,7 +26,7 @@ _REF_FIELDS = ("resource", "condvar", "lock", "channel", "mutex", "semaphore")
 _LAYER_CATEGORIES = {
     "O1": {"no_build", "policy_violation"},
     "O2": {"hang", "crash", "wrong_output", "no_output"},
-    "O3": {"deadlock", "panic", "thread_leak", "ub"},
+    "O3": {"deadlock", "panic", "thread_leak", "ub", "wrong_output", "livelock"},
     "O4": {"monitor_fail", "not_observed", "unmapped", "design_loss"},
 }
 _TIERS = ("L1", "L2", "L3")
