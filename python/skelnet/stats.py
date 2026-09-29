@@ -391,6 +391,9 @@ def obf_nominal_boundaries(looks, alpha: float = 0.05) -> list[float]:
         if i == 0:
             # The first analysis has no prior look: its nominal alpha is exactly
             # the spent alpha at t_1.
+            if increments[0] <= 0.0:
+                boundaries.append(0.0)
+                continue
             c = normal_ppf(1.0 - increments[0] / 2.0)
             boundaries.append(increments[0])
         else:
