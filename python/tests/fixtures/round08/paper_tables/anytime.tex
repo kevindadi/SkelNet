@@ -1,0 +1,12 @@
+% Placeholder for the anytime curve (cumulative ok-rate after b = 1..5 calls, one
+% line per arm, pooled over models). Replace the dashed guides with the data
+% from report.py once Stage 2 is done.
+\begin{tikzpicture}[font=\sffamily\scriptsize, x=12mm, y=24mm]
+  \draw[->] (0.6,0) -- (5.5,0) node[below left] {LLM calls spent $b$};
+  \draw[->] (0.6,0) -- (0.6,1.1) node[above right] {cumulative $\mathit{ok}$ rate};
+  \foreach \b in {1,...,5} \draw (\b,0) -- (\b,-0.03) node[below] {\b};
+  \foreach \y/\l in {0/0,0.5/50\%,1/100\%} \draw (0.6,\y) -- (0.55,\y) node[left] {\l};
+  \foreach \c/\n [count=\i] in {CPVBlue/SKEL, CPVTeal/CIR, gray/G0, gray!70/REFINE, gray!50/STATIC, CPVWarn/DYNAMIC, CPVWarn!60/DYNAMIC\_M}
+    \draw[\c, dashed] (1,0.1+0.03*\i) -- (5,0.3+0.05*\i) node[right] {\n};
+  \node[fill=PhBack, inner sep=2pt] at (3,0.9) {PH: data from report.py};
+\end{tikzpicture}

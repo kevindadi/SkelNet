@@ -36,14 +36,38 @@
     {
       "task": "atomic-data/atomic_lost_update",
       "file": "requirements.json",
-      "sha256": "26adb25d5dc4d65f66aabe000fd41f08f565366a74b56bc60913f5c184728937",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/atomic_lost_update/generation_input/requirements.json"
+      "sha256": "527f1a2ebdae7e0f27e04e1609e7bb36024b1cd9f0d94b65b186f036e3a7317d",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/atomic_lost_update/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "atomic-data/atomic_lost_update",
       "file": "spec.md",
       "sha256": "b883233c80fc39eb6f89d58427ebf0ceaefbfec0b5ab1b30096db802cd21d072",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/atomic_lost_update/spec.md"
+    },
+    {
+      "task": "atomic-data/atomic_lost_update",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "a5ca3dc35b358b504e4c42465866f094d751cba5990fb2f36950885e327a8438",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "atomic-data/atomic_lost_update",
+      "file": "rust/buggy.rs",
+      "sha256": "d0c796bde2969131998bf184617f053c9ac3569c25e9a68911caa15f8e410600",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "atomic-data/atomic_lost_update",
+      "file": "rust/expect.json",
+      "sha256": "968a5f44f72eed4cae848b6cb28f9f1d0d15db43b0a705497ded701e32fddb8a",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "atomic-data/atomic_lost_update",
+      "file": "rust/fixed.rs",
+      "sha256": "9ab8b8ad8c1ab99efa9222155a5b6d0637f0f974e02df8c117a9d44c6ab5f4ea",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "atomic-data/bounded_counter_invariant",
@@ -78,14 +102,38 @@
     {
       "task": "atomic-data/bounded_counter_invariant",
       "file": "requirements.json",
-      "sha256": "e8873c28a7a79356bd23576bebbd098dc26703afe471449afc5b8463cb439028",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/bounded_counter_invariant/generation_input/requirements.json"
+      "sha256": "ceb81404b34fc6e5c07fe6efc36015d9d415e3aead983ecc920e22ec3ec9c325",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/bounded_counter_invariant/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "atomic-data/bounded_counter_invariant",
       "file": "spec.md",
       "sha256": "b28e6ba9f032dbcf0511aa980249b3c644790e2ad0f42b9306a72fd862cea031",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/bounded_counter_invariant/spec.md"
+    },
+    {
+      "task": "atomic-data/bounded_counter_invariant",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "4a52f5009bea7e20632e1baba4577bbdf9129678ad798231954d0993cf57fc49",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "atomic-data/bounded_counter_invariant",
+      "file": "rust/buggy.rs",
+      "sha256": "5b1a937c697cb8b9a3aacdbad0f40e4b3ec817971e374c8f6794ca60defe39cb",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "atomic-data/bounded_counter_invariant",
+      "file": "rust/expect.json",
+      "sha256": "968a5f44f72eed4cae848b6cb28f9f1d0d15db43b0a705497ded701e32fddb8a",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "atomic-data/bounded_counter_invariant",
+      "file": "rust/fixed.rs",
+      "sha256": "b61d88238d15b30d0a3fafcbaf55db4614e8d653fb9a56468e12a4e9186450d0",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "atomic-data/counter_overflow_safety",
@@ -120,14 +168,38 @@
     {
       "task": "atomic-data/counter_overflow_safety",
       "file": "requirements.json",
-      "sha256": "2bdde12472ac78d820f69beec99b061d7380d1475eb9ad78c6da56904cbc8c7e",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/counter_overflow_safety/generation_input/requirements.json"
+      "sha256": "c44e0a544fb8d5d3c7ebd9e99cc5de659bdbd57636d5d270021b7e3470737e75",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/counter_overflow_safety/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "atomic-data/counter_overflow_safety",
       "file": "spec.md",
       "sha256": "d7f1f124ce4ed5a843d3d166cf900bc0e6d94f5e5cc07c89eef37b37dfb49472",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/counter_overflow_safety/spec.md"
+    },
+    {
+      "task": "atomic-data/counter_overflow_safety",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "41c365739cf2e4060563237e84f77827a61298d3aa2e28379e6b87400e3dd9cf",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "atomic-data/counter_overflow_safety",
+      "file": "rust/buggy.rs",
+      "sha256": "cf6d40020ed73c7988029c7377a5efbd0ad7bde5ead24143bc995d05ec83abcc",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "atomic-data/counter_overflow_safety",
+      "file": "rust/expect.json",
+      "sha256": "968a5f44f72eed4cae848b6cb28f9f1d0d15db43b0a705497ded701e32fddb8a",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "atomic-data/counter_overflow_safety",
+      "file": "rust/fixed.rs",
+      "sha256": "206ac89907b49016df68d2c8333b514672c95308388e331b44b7addf3ac195aa",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "boundary/async_select_unsupported",
@@ -228,20 +300,39 @@
     {
       "task": "channel/bounded_backpressure_lock_held",
       "file": "requirements.json",
-      "sha256": "e273fc219e7b0fceb7c74aecbca744f2ea70310cf7a234b3bfa7b27a6786f634",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/bounded_backpressure_lock_held/generation_input/requirements.json"
+      "sha256": "23f641eb324c0b0429baed6ab2e72e1fcdd861a91cfcc29e35775f600bf6641c",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/bounded_backpressure_lock_held/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "channel/bounded_backpressure_lock_held",
       "file": "rust/fixed.rs",
-      "sha256": "74e426dd3d51643818302a1ae0db649982f28c4c0a96ce95e96606d43fb1c54d",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/bounded_backpressure_lock_held/rust/fixed.rs"
+      "sha256": "24f4dd193bcb9c723e8e3925962d3985e9f9139df538ca1efce517628cf83d3f",
+      "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/bounded_backpressure_lock_held/rust/fixed.rs"
     },
     {
       "task": "channel/bounded_backpressure_lock_held",
       "file": "spec.md",
       "sha256": "68f1b79ee7bfd9c28df05a67aa73ad265a77995a44ad3b55257cebbcb7bca9fc",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/bounded_backpressure_lock_held/spec.md"
+    },
+    {
+      "task": "channel/bounded_backpressure_lock_held",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "4b8898df8465df2afd621ef3055c820c6686c681bdc98505e1eb9600e531d2ee",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "channel/bounded_backpressure_lock_held",
+      "file": "rust/buggy.rs",
+      "sha256": "812bd9d6a20643b23e70dda55d13f2be69ccbedda14169cfc72754194e311494",
+      "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/channel/bounded_backpressure_lock_held/rust/buggy.rs (modified)",
+      "source_sha256": "2b8d43e3948345e0049b8e290bd3ada33d998cd12d009207456897ca8337ce7f"
+    },
+    {
+      "task": "channel/bounded_backpressure_lock_held",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "channel/rendezvous_both_send",
@@ -276,14 +367,38 @@
     {
       "task": "channel/rendezvous_both_send",
       "file": "requirements.json",
-      "sha256": "d7b616c8c91f7b8876b6c674c2667fb64cb0ff2aa811a32028911030b11aa3c5",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/rendezvous_both_send/generation_input/requirements.json"
+      "sha256": "1b9bb03f8acdea24536364ead0a666f1512564a82d86d23e3ef9542fed54d83c",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/rendezvous_both_send/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "channel/rendezvous_both_send",
       "file": "spec.md",
       "sha256": "3fc38d01a3b0a007dc93cef12f8385b1b2617092756e29ea261ddecfab4d57bd",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/rendezvous_both_send/spec.md"
+    },
+    {
+      "task": "channel/rendezvous_both_send",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "e9c8ffc15fa6a29930508da6a8539adade6fa38e37a73e1b929bc414e2fe8c01",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "channel/rendezvous_both_send",
+      "file": "rust/fixed.rs",
+      "sha256": "388672309812a88a54017765c0563770388fd832cf69cc43b7de88b17a0c0d09",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "channel/rendezvous_both_send",
+      "file": "rust/buggy.rs",
+      "sha256": "84b1e375cb19854615a686546f8843f114f85ca336900a6684e39b4148954955",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "channel/rendezvous_both_send",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "channel/send_while_holding_mutex",
@@ -318,20 +433,39 @@
     {
       "task": "channel/send_while_holding_mutex",
       "file": "requirements.json",
-      "sha256": "b45a10cf53de53704605a1d6758f4a748ae2bb6edbaabc0206a0dc123d28e322",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/send_while_holding_mutex/generation_input/requirements.json"
+      "sha256": "45279ec734c06e8c39bdef3c7cf8e7cc89d98a2860b5863d4ab4f792aea149f0",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/send_while_holding_mutex/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "channel/send_while_holding_mutex",
       "file": "rust/fixed.rs",
-      "sha256": "6ea3d2d57aaf0ac6db1a9de9779ea7f42f6b670db985295885e4b0bd4c0d9d26",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/send_while_holding_mutex/rust/fixed.rs"
+      "sha256": "fc698bacb6978877af430f2ddba152fad638bba73b3a7437b9021c9bdd9ff966",
+      "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/send_while_holding_mutex/rust/fixed.rs"
     },
     {
       "task": "channel/send_while_holding_mutex",
       "file": "spec.md",
       "sha256": "89521f3dc39d79958bdad3ea6674d785d5323b3f809cb54b3c92bef23fafdcce",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/channel/send_while_holding_mutex/spec.md"
+    },
+    {
+      "task": "channel/send_while_holding_mutex",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "a1239c270f23afcf6e7a501f564841c93f7fa4c6b9091eb261fdc86aa7887572",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "channel/send_while_holding_mutex",
+      "file": "rust/buggy.rs",
+      "sha256": "011a131d4a750b33077584c8905813ad7989b295aa5ebcb27139266e6fef7ef0",
+      "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/channel/send_while_holding_mutex/rust/buggy.rs (modified)",
+      "source_sha256": "43806b614bb334d3b46af4deed139341e5cf7cabd5d5c7dd2b9192354c8f3b8f"
+    },
+    {
+      "task": "channel/send_while_holding_mutex",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "condvar/bare_wait_no_predicate",
@@ -366,20 +500,39 @@
     {
       "task": "condvar/bare_wait_no_predicate",
       "file": "requirements.json",
-      "sha256": "e08a4e5bd4da1d31586ee2dc8366d0337d098511cf1d64dc338a9bd2f49e28e3",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/bare_wait_no_predicate/generation_input/requirements.json"
+      "sha256": "c270f2ba824cebace13647882fe02f2379015891b3fde731c5438ba1be2ac70f",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/bare_wait_no_predicate/generation_input/requirements.json (R7a-2: added hint_variants/tier keys)"
     },
     {
       "task": "condvar/bare_wait_no_predicate",
       "file": "rust/fixed.rs",
-      "sha256": "326c6ab628a59c7862342906fdba55569d19677c7df2e360100da1640d9bd49f",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/bare_wait_no_predicate/rust/fixed.rs"
+      "sha256": "a070ae6faac0683223e40a5a23b5d15d3e12293171cc018d51f859dc6f6d53d8",
+      "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/bare_wait_no_predicate/rust/fixed.rs"
     },
     {
       "task": "condvar/bare_wait_no_predicate",
       "file": "spec.md",
       "sha256": "9b0f73fab5f3d405cf7c93069db11c5fdc166ea70575cd2d565cf58db83932b9",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/bare_wait_no_predicate/spec.md"
+    },
+    {
+      "task": "condvar/bare_wait_no_predicate",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "df908883dc711a970ce1afdc7678f5b35f1383809377922497a954ae9f79c066",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "condvar/bare_wait_no_predicate",
+      "file": "rust/buggy.rs",
+      "sha256": "fce5e8889bef4568e775de481f27c75e7104511f9449aaf3a6dc9956a31d81d6",
+      "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/condvar/bare_wait_no_predicate/rust/buggy.rs (modified)",
+      "source_sha256": "c3323d8c653b8eb97764ad337b42bf3f0bc7e89b616e8bbdbf80e11dfcf1f60a"
+    },
+    {
+      "task": "condvar/bare_wait_no_predicate",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "condvar/lost_wakeup_notify_before_wait",
@@ -414,14 +567,38 @@
     {
       "task": "condvar/lost_wakeup_notify_before_wait",
       "file": "requirements.json",
-      "sha256": "058f0e55f25ed81cd63c31a5cd59b35ba2ee82e15927e92d3f33d179ded3dc0e",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/lost_wakeup_notify_before_wait/generation_input/requirements.json"
+      "sha256": "2a16908c6257f9dcf2c09468892687a3587dac0e107b79bafa94baa3c9a9c586",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/lost_wakeup_notify_before_wait/generation_input/requirements.json (R7a-2: added hint_variants/tier keys)"
     },
     {
       "task": "condvar/lost_wakeup_notify_before_wait",
       "file": "spec.md",
       "sha256": "bf19c9bda5010fff69dd91da9834eca14228e882bec71691dc24916ba595ca50",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/lost_wakeup_notify_before_wait/spec.md"
+    },
+    {
+      "task": "condvar/lost_wakeup_notify_before_wait",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "7ffd842d620f66201f8d4859e457ef510638c02e75b7c19323d67db271478b88",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "condvar/lost_wakeup_notify_before_wait",
+      "file": "rust/fixed.rs",
+      "sha256": "8f7eb5729ecf5b5c74f7d50c9bb2b0ba4ab8bb501ec5a4ce556aa9515f4e4557",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "condvar/lost_wakeup_notify_before_wait",
+      "file": "rust/buggy.rs",
+      "sha256": "696e036d69cc6ec06474df47d6c4788ee72dd968cbdf342047b57ac9fa3ff7a3",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "condvar/lost_wakeup_notify_before_wait",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "condvar/notify_one_multi_waiter_wrong_pick",
@@ -456,20 +633,39 @@
     {
       "task": "condvar/notify_one_multi_waiter_wrong_pick",
       "file": "requirements.json",
-      "sha256": "359d6204cec24083e1065502570e8594aa20137823eccd84e3dc26d35eddd318",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/notify_one_multi_waiter_wrong_pick/generation_input/requirements.json"
+      "sha256": "0646c15b53cbf5874ae67a57fad29e35d27c0a67fec6f575ada4d1fd2262e6a6",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/notify_one_multi_waiter_wrong_pick/generation_input/requirements.json (R7a-2: added hint_variants/tier keys)"
     },
     {
       "task": "condvar/notify_one_multi_waiter_wrong_pick",
       "file": "rust/fixed.rs",
-      "sha256": "17581f66d15bd9c7dc246790cf3b758c5ce95cc311a6444a407956a91b1f1789",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/notify_one_multi_waiter_wrong_pick/rust/fixed.rs"
+      "sha256": "984366fdcbd97e23279183546e9320916faf0d4f50e9fe26f400fcc686d41900",
+      "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/notify_one_multi_waiter_wrong_pick/rust/fixed.rs"
     },
     {
       "task": "condvar/notify_one_multi_waiter_wrong_pick",
       "file": "spec.md",
       "sha256": "d0e949dbad319ceb5293f16fa8b54fe95b2220ec99012f9090ccca6162a54d7b",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/condvar/notify_one_multi_waiter_wrong_pick/spec.md"
+    },
+    {
+      "task": "condvar/notify_one_multi_waiter_wrong_pick",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "7e0762124a1a6d96b237da66c44cf502e9a78c4063a69bc98713d43938f8db61",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "condvar/notify_one_multi_waiter_wrong_pick",
+      "file": "rust/buggy.rs",
+      "sha256": "44f90abd663f88ccc97373da73761482808afd217378c7888ddd256c22dda0ab",
+      "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/condvar/notify_one_multi_waiter_wrong_pick/rust/buggy.rs (modified)",
+      "source_sha256": "ad73c2a778d0d6756e636a791d865e8ba428f633285c6cbebe4424b59f382c4b"
+    },
+    {
+      "task": "condvar/notify_one_multi_waiter_wrong_pick",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "boundary/same_cv_different_locks",
@@ -540,14 +736,38 @@
     {
       "task": "condvar/two_cv_two_locks",
       "file": "requirements.json",
-      "sha256": "a1494332cfa7eed9281d6900b0b28dc829a4e6382b6235feb069c9f22a4a66f6",
-      "source": "R6 (D9): copied from condvar/same_cv_different_locks"
+      "sha256": "c5ec3112cc46c21cfa9a3a3aee2000634b6ef52e13532929932f933ccfc058ce",
+      "source": "R6 (D9): copied from condvar/same_cv_different_locks (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "condvar/two_cv_two_locks",
       "file": "spec.md",
       "sha256": "7ce3c57e6ce5d2e5283d693261fc5e472fe3ddc423d18fceccb2247fb89e93bd",
       "source": "R6 (D9): copied from condvar/same_cv_different_locks"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "6bc568d73b48ad89d0b1659c681c9ac9dce0c39fe1289872f14b8c32044fe050",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "rust/fixed.rs",
+      "sha256": "f41bcf4b2cc7711631063281960f9f4fc62c2cdd2dfe404cf6b09483c4868965",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "rust/buggy.rs",
+      "sha256": "7bf2977aa2549d03136968b1bbdf620842588bdd2305fc945eb4973736883f7a",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "condvar/two_cv_two_locks",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/abba_2lock",
@@ -582,20 +802,39 @@
     {
       "task": "lock-order/abba_2lock",
       "file": "requirements.json",
-      "sha256": "f35e954878a17a9ce64d2e244758a62d1340659278b34f69126ccd0fd7a1d9cc",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/abba_2lock/generation_input/requirements.json"
+      "sha256": "7922ba7f17c9afb4575235edbec91c6380b9141f4c7d125f916d3eeda0ba1fe2",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/abba_2lock/generation_input/requirements.json (R7a-2: added hint_variants/tier keys)"
     },
     {
       "task": "lock-order/abba_2lock",
       "file": "rust/fixed.rs",
-      "sha256": "f9095bb5bfefab40ef467ca86325a853828cc2ba43c42866f012f4a09b05b5e1",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/abba_2lock/rust/fixed.rs"
+      "sha256": "b94681280fc2bb3197eaa27fc8b69b15c5863a9d62688809f0e69580b1798057",
+      "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/abba_2lock/rust/fixed.rs"
     },
     {
       "task": "lock-order/abba_2lock",
       "file": "spec.md",
       "sha256": "847d8c94a9af493d1c1353b21d697871b089396a05506bffaa398113706fecf5",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/abba_2lock/spec.md"
+    },
+    {
+      "task": "lock-order/abba_2lock",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "b282f21b7510d692b601b7c4210717327d7343bd67ddc2066c11d4744d8f2cee",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "lock-order/abba_2lock",
+      "file": "rust/buggy.rs",
+      "sha256": "348a317e97274091b132c92f2797c55e3d13d0a0461e7b61145a36aa6c2e78aa",
+      "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/lock-order/abba_2lock/rust/buggy.rs (modified)",
+      "source_sha256": "ce946300ec53e50326d3dc56d51c3496408cf6d95bea4802043980a5e771d13a"
+    },
+    {
+      "task": "lock-order/abba_2lock",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/cross_module_cycle",
@@ -630,20 +869,39 @@
     {
       "task": "lock-order/cross_module_cycle",
       "file": "requirements.json",
-      "sha256": "b76be6563bc00f1ea4623d74bbd165795639483bbc179f611c3b07282edac66e",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cross_module_cycle/generation_input/requirements.json"
+      "sha256": "d13d2a8ef39ca4ff59f93dbfd12a993d5cbb37f2de91d772c0034c88234baa8c",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cross_module_cycle/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "lock-order/cross_module_cycle",
       "file": "rust/fixed.rs",
-      "sha256": "3513db380281a11ad5eb7a3f3715c7de6fbf68c07b60cf83037c8dcdcc2d17c2",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cross_module_cycle/rust/fixed.rs"
+      "sha256": "cf9434abdf93c6a7e234549aa3b56ba1c2a8702dc9e8a74ce7997c3cb426be03",
+      "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cross_module_cycle/rust/fixed.rs"
     },
     {
       "task": "lock-order/cross_module_cycle",
       "file": "spec.md",
       "sha256": "2832aeab6c6da78f125d60e98543593a6d7d14020f18aff8d16b9a33bfc73f02",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cross_module_cycle/spec.md"
+    },
+    {
+      "task": "lock-order/cross_module_cycle",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "7fc72345e1857103e2c9a1fc71f99ba749be68dabcb16a6e02abd0fc4efb282a",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "lock-order/cross_module_cycle",
+      "file": "rust/buggy.rs",
+      "sha256": "4662d28a6a54512ae685bc4f94a5f40c5ecf9f3d8b9a722f147c25f7f2d2e813",
+      "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/lock-order/cross_module_cycle/rust/buggy.rs (modified)",
+      "source_sha256": "01e9baed641d979280318dbdd5ae3de7e0942a3c9f8fbd378fd863beee4682f4"
+    },
+    {
+      "task": "lock-order/cross_module_cycle",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/cycle_3lock",
@@ -678,20 +936,39 @@
     {
       "task": "lock-order/cycle_3lock",
       "file": "requirements.json",
-      "sha256": "2858005fa4a4e06c14f39101443fb09b351bf2caabe30abad69e7b92b0535b27",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cycle_3lock/generation_input/requirements.json"
+      "sha256": "8b51e0907a09a99ef5b94976f712311cb284ccef5f5d8ae85b2ea7ce75f2aa8b",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cycle_3lock/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "lock-order/cycle_3lock",
       "file": "rust/fixed.rs",
-      "sha256": "0916d7ee878bf7e9be3086fbba74265dbd49d3d166b390d6b49fe45560738e3d",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cycle_3lock/rust/fixed.rs"
+      "sha256": "15e6757a90599d66de551e3559529d54257cb69e0e3840376fa4a6e7544db756",
+      "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cycle_3lock/rust/fixed.rs"
     },
     {
       "task": "lock-order/cycle_3lock",
       "file": "spec.md",
       "sha256": "da1e07857c91a2687ca582ed2f68a89ae730821cbf4faf55fd283dc652cd999e",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cycle_3lock/spec.md"
+    },
+    {
+      "task": "lock-order/cycle_3lock",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "1c5540ed651a08e368de1785cdcf692c3920f280cbf67aa3311108a6c14bdfb4",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "lock-order/cycle_3lock",
+      "file": "rust/buggy.rs",
+      "sha256": "c55ce167e5fb19bc06b839d484b77880a3cf0b4dc73ab843686e023a37bd189c",
+      "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/lock-order/cycle_3lock/rust/buggy.rs (modified)",
+      "source_sha256": "8e25677b26d2014c731a13da23d163cb96a558a896f8e36d7fb32da633cdcd88"
+    },
+    {
+      "task": "lock-order/cycle_3lock",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/partial_deadlock_bystander",
@@ -726,20 +1003,39 @@
     {
       "task": "lock-order/partial_deadlock_bystander",
       "file": "requirements.json",
-      "sha256": "6c3bc0761080135ef69c1286bdadaafd48a3facd4d2abf26e354d1c8c35da13f",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/partial_deadlock_bystander/generation_input/requirements.json"
+      "sha256": "60f76dad25691bb626075889efb1676e5a4d329de3315c0fd114ec65d4314228",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/partial_deadlock_bystander/generation_input/requirements.json (R7a-2: added hint_variants/tier keys)"
     },
     {
       "task": "lock-order/partial_deadlock_bystander",
       "file": "rust/fixed.rs",
-      "sha256": "62a4a5ca6c4f383aa03b9931541ccd6d85f465d820e40de6c7b01041ca47bc07",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/partial_deadlock_bystander/rust/fixed.rs"
+      "sha256": "be623d0582f1d61da6e7ec2c7621bcf2da9b022722d9bdd15c9092f4a6657fc2",
+      "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/partial_deadlock_bystander/rust/fixed.rs"
     },
     {
       "task": "lock-order/partial_deadlock_bystander",
       "file": "spec.md",
       "sha256": "71c5f363fd84ac33461a6d54bcf74b48f21e3f32c1af73da8a9dc4505dbe4e43",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/partial_deadlock_bystander/spec.md"
+    },
+    {
+      "task": "lock-order/partial_deadlock_bystander",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "d595c4806865b885624280960c49a4d1121c8786f8ec1c3c28f3c4055049714e",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "lock-order/partial_deadlock_bystander",
+      "file": "rust/buggy.rs",
+      "sha256": "7c88358e00a7977bd0fdfa6f9c0ae725c11f400e1600c6fb4e3b947cc0dbb63e",
+      "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/lock-order/partial_deadlock_bystander/rust/buggy.rs (modified)",
+      "source_sha256": "fd8efdba862186b48388f77c175dd095be231564e273057aa8d252b3f078978c"
+    },
+    {
+      "task": "lock-order/partial_deadlock_bystander",
+      "file": "rust/expect.json",
+      "sha256": "22038ca37051395b48b84ecb64dd342bdc35759a504181c05f43582cf17c7276",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/two_independent_cycles",
@@ -774,14 +1070,38 @@
     {
       "task": "lock-order/two_independent_cycles",
       "file": "requirements.json",
-      "sha256": "4fb0684ec2bb1956b940779e63fc12d8cc5e1a9c7ccdaf0f431a86278df9af62",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/two_independent_cycles/generation_input/requirements.json"
+      "sha256": "cc2f121a8a734151a2243493cd1a51988f2567ee1255284af116373456305f78",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/two_independent_cycles/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "lock-order/two_independent_cycles",
       "file": "spec.md",
       "sha256": "da0154144286a8eb3bed11366c00065aa0ea1b168471fa3b41d6160d9534d7fb",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/two_independent_cycles/spec.md"
+    },
+    {
+      "task": "lock-order/two_independent_cycles",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "c0c4cbb384f5db6d12ce5cca5a58a3aedae917f2c3790f40e61c50d70b6bfd5f",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "lock-order/two_independent_cycles",
+      "file": "rust/fixed.rs",
+      "sha256": "c20d82fe322ca6ab511bafca7e063bfb7f311982e77471c41df688efbc7d3803",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "lock-order/two_independent_cycles",
+      "file": "rust/buggy.rs",
+      "sha256": "49f6b99da6305a2a203ccf6d8f2502cfadea540248632d510cf3e7d20f2e3122",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "lock-order/two_independent_cycles",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "semaphore/acquire_twice_no_release",
@@ -816,20 +1136,39 @@
     {
       "task": "semaphore/acquire_twice_no_release",
       "file": "requirements.json",
-      "sha256": "a67f928c05cb8b5080c61de23feb50007cb8a241f7c5fe4d9269d84a1f4a2d31",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/acquire_twice_no_release/generation_input/requirements.json"
+      "sha256": "76f9a7fdd64e3e496210005dede45daf58c7195b3f0d3e63a7b68fa22080e32e",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/acquire_twice_no_release/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "semaphore/acquire_twice_no_release",
       "file": "rust/fixed.rs",
-      "sha256": "a1b000081a593388dfa74d2132b351e89c5285a92edc98b9e7fbd0c197370585",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/acquire_twice_no_release/rust/fixed.rs"
+      "sha256": "2bcd8f3d4fb32aefdfa3f3dcdb76a389d0fa4710bc615a2212140ffdb48a724d",
+      "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/acquire_twice_no_release/rust/fixed.rs"
     },
     {
       "task": "semaphore/acquire_twice_no_release",
       "file": "spec.md",
       "sha256": "578cbea7d7fe3be40bf9c55648bf031e3ff643fdfbe359344789c34b24844c8f",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/acquire_twice_no_release/spec.md"
+    },
+    {
+      "task": "semaphore/acquire_twice_no_release",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "2c7ccde266af3f6b207a1281960d67350a31d498a8a3e40ac5ce12a53be76a07",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "semaphore/acquire_twice_no_release",
+      "file": "rust/buggy.rs",
+      "sha256": "9814854f5496f106c68c1a7c68878967b17755a4288158f089e15347f99e1c3a",
+      "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/semaphore/acquire_twice_no_release/rust/buggy.rs (modified)",
+      "source_sha256": "2313586fc6d66812f493229abf230c4f79b062908fa32667bd7a3c81abf58196"
+    },
+    {
+      "task": "semaphore/acquire_twice_no_release",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "semaphore/permit_leak",
@@ -864,14 +1203,38 @@
     {
       "task": "semaphore/permit_leak",
       "file": "requirements.json",
-      "sha256": "b8900bf11c103f88150bfb6c1751d0d9146eb2fe3f1b2d2af846b0a3c56a5f05",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/permit_leak/generation_input/requirements.json"
+      "sha256": "f6d7fe5560420f5c6cfd4b0fbacf613832c2914a9ac56b0f4d53e5cfafe3edbf",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/permit_leak/generation_input/requirements.json (R7a-2: added hint_variants/tier keys)"
     },
     {
       "task": "semaphore/permit_leak",
       "file": "spec.md",
       "sha256": "851fda96c6984166d0f2858f28559af87ea61569fb49e286435d5f333d6564c3",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/permit_leak/spec.md"
+    },
+    {
+      "task": "semaphore/permit_leak",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "8674a6bcdc9f93fa3890dc851f1f01b437974d3042c0ffa1ea55b6a1c0869d5f",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "semaphore/permit_leak",
+      "file": "rust/fixed.rs",
+      "sha256": "a1b674bdec214db76d31578e0fad481bb3061892be182852e3be4f365d8319fb",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "semaphore/permit_leak",
+      "file": "rust/buggy.rs",
+      "sha256": "2df17bfab4c1cb1a71e2d98c774d5641e15876907856adf6e1a01356bcd15192",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "semaphore/permit_leak",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "semaphore/throttle_n_permits",
@@ -906,14 +1269,38 @@
     {
       "task": "semaphore/throttle_n_permits",
       "file": "requirements.json",
-      "sha256": "c40629a2954fd67780f398326d7d0f1c0d99774cbbb2655f23dca93966103d54",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/throttle_n_permits/generation_input/requirements.json"
+      "sha256": "e91772a61afced58977875b147bb6740b24685f666fba5af447fdfaf069f99a4",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/throttle_n_permits/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "semaphore/throttle_n_permits",
       "file": "spec.md",
       "sha256": "c4e83ea219c13f624af8f2e4823f345e076445389e512f18bd8b2833ae167fcc",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/semaphore/throttle_n_permits/spec.md"
+    },
+    {
+      "task": "semaphore/throttle_n_permits",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "9cb066355ee51fc370da1fd1d50a6ff9e5ba93542579a83eca8213bf35afba76",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "semaphore/throttle_n_permits",
+      "file": "rust/fixed.rs",
+      "sha256": "458a50e73bc7f312ef142847c0d707463bb51685b7ab7c0a0e7e8641528d997d",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "semaphore/throttle_n_permits",
+      "file": "rust/buggy.rs",
+      "sha256": "2d23ca6f62cf8d23345ca112298f1bfd8358da86873a3a2e340e192469844db8",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "semaphore/throttle_n_permits",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "structure/finite_call_loop",
@@ -948,14 +1335,38 @@
     {
       "task": "structure/finite_call_loop",
       "file": "requirements.json",
-      "sha256": "ce532350b573548c5fd15efd3c4a746067652e99b3722e73992acd1b5ca7b685",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/finite_call_loop/generation_input/requirements.json"
+      "sha256": "f1f285e4ed36e890449cd5267d9f80216e335a5f50c37019dded3df9068759c3",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/finite_call_loop/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "structure/finite_call_loop",
       "file": "spec.md",
       "sha256": "66fb01e1188bf2cd3e480d84013c7de7dc46e147c2e0c4f5dc355a8648eccc02",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/finite_call_loop/spec.md"
+    },
+    {
+      "task": "structure/finite_call_loop",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "941014269642770c8551645ad5623cfd76e2acfe76279fdc97156b557b47cca5",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/finite_call_loop",
+      "file": "rust/buggy.rs",
+      "sha256": "3efe87929c01f7e354cf75632bc12eca4c09bf94ec90e363b19067da5e5cbfad",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/finite_call_loop",
+      "file": "rust/expect.json",
+      "sha256": "968a5f44f72eed4cae848b6cb28f9f1d0d15db43b0a705497ded701e32fddb8a",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/finite_call_loop",
+      "file": "rust/fixed.rs",
+      "sha256": "644dab3263ebf28f2e51d0b9ad3f867b5866e6c0a4ed5f864607115bc0f758ac",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "structure/nested_scope_lock_order",
@@ -990,20 +1401,39 @@
     {
       "task": "structure/nested_scope_lock_order",
       "file": "requirements.json",
-      "sha256": "31cbc3c3c133b3e5400c092fed4769906a7a853cf38b94fffc3f7272a4ecf904",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/nested_scope_lock_order/generation_input/requirements.json"
+      "sha256": "068e3260a58e74cbfcd3a6d2bd0b6f2242c29cde726cf2ff6d3ba413abfe140e",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/nested_scope_lock_order/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "structure/nested_scope_lock_order",
       "file": "rust/fixed.rs",
-      "sha256": "8413e31aacbd6eeef448c39ee60366e2ef230b12fdb070010b224ea273b8defb",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/nested_scope_lock_order/rust/fixed.rs"
+      "sha256": "555d20c1d11e8b74995543e0d5105139bdb17f24c86236365f500b7834f7fc30",
+      "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/nested_scope_lock_order/rust/fixed.rs"
     },
     {
       "task": "structure/nested_scope_lock_order",
       "file": "spec.md",
       "sha256": "9aca708bc00c13a4c8a99648f8c22dd60b72bc5090ae022defee703be9c3c350",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/nested_scope_lock_order/spec.md"
+    },
+    {
+      "task": "structure/nested_scope_lock_order",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "2772b03808863ff7e9dc707c4e04bd2ee99c09a6927a2c48798e2a7466308af7",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/nested_scope_lock_order",
+      "file": "rust/buggy.rs",
+      "sha256": "651a68397c0f2f9bc2276d78948bef62e087317d891ccb9e27a26beaf7ba424a",
+      "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/structure/nested_scope_lock_order/rust/buggy.rs (modified)",
+      "source_sha256": "9d9517f3f5b020e4edc3770b178df13282d61ae7c74c026971d25f2e102c88d5"
+    },
+    {
+      "task": "structure/nested_scope_lock_order",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "structure/scope_bound_k_workers",
@@ -1038,14 +1468,38 @@
     {
       "task": "structure/scope_bound_k_workers",
       "file": "requirements.json",
-      "sha256": "78867ef8dec8330dd751fe1ede0d771c5360ca6a5aba80af515f8b61c6daa8fb",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/scope_bound_k_workers/generation_input/requirements.json"
+      "sha256": "ddf8512a74d9f9aad1e883bdab251305a15bdf345cd62ae16d8de09055dee4fb",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/scope_bound_k_workers/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "structure/scope_bound_k_workers",
       "file": "spec.md",
       "sha256": "25e589302ff9669e32cd41ff59ecfdbdfebeaa4467d6d53970b3fb020ac4ce9a",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/scope_bound_k_workers/spec.md"
+    },
+    {
+      "task": "structure/scope_bound_k_workers",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "e5c18c6b0a8461eab6bfcc4835247bb833005a404c317ff8dc28bdf3baec972a",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/scope_bound_k_workers",
+      "file": "rust/buggy.rs",
+      "sha256": "e06ed789e02d1e0687792b9d4c3da6349e36fe72fadc78db6b2423a23569f96e",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/scope_bound_k_workers",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/scope_bound_k_workers",
+      "file": "rust/fixed.rs",
+      "sha256": "78b5ca6faa15507088ef23c97c808f3213364ee7d34a3b3e7618f10c881d5734",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "structure/scope_worker_abba",
@@ -1080,14 +1534,38 @@
     {
       "task": "structure/scope_worker_abba",
       "file": "requirements.json",
-      "sha256": "8bbdaba9a0baee21ecbc19d973b781d3acf523ffe5ec9fbd4446044091b5d1aa",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/scope_worker_abba/generation_input/requirements.json"
+      "sha256": "e67a3c625cdb5583fe015bc7a396e3a62ed71c15cd1d5de3754d324fde18ab7e",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/scope_worker_abba/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "structure/scope_worker_abba",
       "file": "spec.md",
       "sha256": "b4d15204f16e0b569ce5f3661aff065a3ff043637b2d418a9cd6cbc2a3cd4f63",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/scope_worker_abba/spec.md"
+    },
+    {
+      "task": "structure/scope_worker_abba",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "63a3709122256b38b42418e27aebfb3ea04fc79fe1088066ca37ccaf8b2d6528",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/scope_worker_abba",
+      "file": "rust/buggy.rs",
+      "sha256": "0ed589b1f9d1a0a9a0af4222e49bfba6e7db6405e7e009180fd543bed53a2630",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/scope_worker_abba",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/scope_worker_abba",
+      "file": "rust/fixed.rs",
+      "sha256": "95fb9aeed6ea5c682349500c642f8725f1e9e731f1471e4027880b8afa26d174",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "structure/spawn_join_loop_finite",
@@ -1122,14 +1600,38 @@
     {
       "task": "structure/spawn_join_loop_finite",
       "file": "requirements.json",
-      "sha256": "3a00c2a7230f599cae43787411f2470c2700c3b9350d0344a0e7b07d5bc1333d",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/spawn_join_loop_finite/generation_input/requirements.json"
+      "sha256": "81129ac60c794afe9fe06c2aca0f15f30890ae3ab8747f5c9153acfe49436381",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/spawn_join_loop_finite/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "structure/spawn_join_loop_finite",
       "file": "spec.md",
       "sha256": "9ef9ad0f106ea53aa5eab3f70618c6b4d20eff9720bc031b283e00b812341aac",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/spawn_join_loop_finite/spec.md"
+    },
+    {
+      "task": "structure/spawn_join_loop_finite",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "d2dcb24f9f34c297df4c45f164ebb91954f807bc7278b03e3c818f87d05fa067",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/spawn_join_loop_finite",
+      "file": "rust/buggy.rs",
+      "sha256": "e87e9b5d9a591b0792f70b9845f68e4821c33aff5368fa4e62c00e5be16a331d",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/spawn_join_loop_finite",
+      "file": "rust/expect.json",
+      "sha256": "968a5f44f72eed4cae848b6cb28f9f1d0d15db43b0a705497ded701e32fddb8a",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/spawn_join_loop_finite",
+      "file": "rust/fixed.rs",
+      "sha256": "3a55340bc774b46c6e1ecff4ead52640d2e10417cb3295ce85d4fad066b754b5",
+      "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "structure/worker_with_payload",
@@ -1164,14 +1666,38 @@
     {
       "task": "structure/worker_with_payload",
       "file": "requirements.json",
-      "sha256": "2ef5aa500a9ccb80ef3da795392ba8590d4d14e5904a982462349a6a9c506afd",
-      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/worker_with_payload/generation_input/requirements.json"
+      "sha256": "7ab78ae8999f22cc0289f484e78d20a261509c901966511d404b12fc7fefe223",
+      "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/worker_with_payload/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
       "task": "structure/worker_with_payload",
       "file": "spec.md",
       "sha256": "416c1c62f7ded1009fb8670a356d9696ffd8e1ff7f1d3ee76c340a89509e6390",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/worker_with_payload/spec.md"
+    },
+    {
+      "task": "structure/worker_with_payload",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "39f08dbee9b5836c7be9889f324cb33f73f1ad01761cb738d47b254055c24763",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/worker_with_payload",
+      "file": "rust/buggy.rs",
+      "sha256": "c50690be9eca7f923bf018893968d212599d690a55a23e97576bf06839d1757b",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/worker_with_payload",
+      "file": "rust/expect.json",
+      "sha256": "968a5f44f72eed4cae848b6cb28f9f1d0d15db43b0a705497ded701e32fddb8a",
+      "source": "new (SkelNet R7a-2)"
+    },
+    {
+      "task": "structure/worker_with_payload",
+      "file": "rust/fixed.rs",
+      "sha256": "377ae765a41a97184e61fb94f6861b0402b3a0c24f3e15afe6114716b5953c53",
+      "source": "new (SkelNet R7a-2)"
     }
   ]
 }

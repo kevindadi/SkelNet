@@ -57,6 +57,25 @@ A validation failure is a program bug and aborts the run.
   `pass|fail|unsupported|unavailable|not_run`; each layer's `category`/`detail`
   are `str|null` and `wall_ms` is `int|null`.
 
+### Oracle sub-tool fields (round 8)
+
+`oracle.o3_tools` (`object|null`) exposes the two halves of O3, which
+`_combine_o3` keeps in the O3 layer's `data` but does not otherwise write to
+`result.json`:
+
+```json
+{"shuttle": {"status": "pass|fail|unsupported|unavailable|not_run|null",
+             "category": "str|null"},
+ "miri":    {"status": "…", "category": "…"},
+ "no_concurrency": false}
+```
+
+When O3 did not run (O1 failed, O3 disabled, or an older run recorded before
+round 8) the key is `null`; readers must fall back to parsing the O3 `detail`
+text for `no concurrency to explore` and `shuttle_unsupported`.  The value is
+taken verbatim from the O3 layer's `data` and changes no decision logic:
+`functional_ok` and the layer statuses are unaffected.
+
 ### SKEL/CIR method fields (round 5)
 
 Present on SKEL/CIR cells (G0 and the round-4 baselines may omit them):
@@ -88,3 +107,15 @@ Rust version.
 
 Codegen mode (`--rust-mode codegen`) reports only `run_ok` and the layer
 statuses: both `functional_ok` and `functional_ok_no_o4` are `null`.
+
+### Tool timing fields (round 9a)
+
+Optional, checked only when present. Each value is an `int` or `null`, in
+milliseconds. A string such as `"12"` is rejected. `bool` is not an int.
+
+- SKEL/CIR `history[]` check and verify items: `wall_ms`.
+- `rust_attempts[]`: `compile_wall_ms` (`null` when that attempt did not compile).
+- G0 cells: top-level `compile_wall_ms`.
+- Baseline `rounds[]`: `compile_wall_ms`.
+- Baseline `rounds[].tools.clippy`, `rounds[].tools.lockbud`, and the DYNAMIC
+  tool slices: `wall_ms`.

@@ -1,0 +1,142 @@
+{
+  "accepted": true,
+  "arm": "SKEL",
+  "budget_used": {
+    "calls": 2,
+    "tokens": 2860
+  },
+  "calls": [
+    {
+      "attempt": 1,
+      "cache_hit": false,
+      "error": null,
+      "finish_reason": "stop",
+      "finish_reasons": [
+        "stop"
+      ],
+      "request_sha256": "abb15fedfa7df58f8857714b227b1ece89328d9e3e022b736cc9f3c7ad8e5878",
+      "stage": "generate",
+      "system_sha256": "c9533021ce75a22c15f3ba183d03592ed1eaf7197bf088674b54336af9777601",
+      "transport_attempt": 1,
+      "truncation_retry": false,
+      "usage": {
+        "cached": null,
+        "input": 1424,
+        "output": 256,
+        "reasoning": 0
+      },
+      "wall_ms": 1410
+    },
+    {
+      "attempt": 2,
+      "cache_hit": false,
+      "error": null,
+      "finish_reason": "stop",
+      "finish_reasons": [
+        "stop"
+      ],
+      "request_sha256": "97ddf06b9ece8e85892b478d66448d762dccf716b60b548b1b249c7ae5247fbc",
+      "stage": "rust",
+      "system_sha256": "963227fddc63b54e38de5bae8258b580e88f27361ba4fd0adaf13dc1771841eb",
+      "transport_attempt": 1,
+      "truncation_retry": false,
+      "usage": {
+        "cached": null,
+        "input": 889,
+        "output": 291,
+        "reasoning": 145
+      },
+      "wall_ms": 3972
+    }
+  ],
+  "check_ok": true,
+  "error": null,
+  "evidence_sufficient": true,
+  "feedback_mode": "full",
+  "hint": "h1",
+  "history": [
+    {
+      "attempt": 1,
+      "complete": true,
+      "outcome": "PASS",
+      "stage": "verify",
+      "unmapped": []
+    }
+  ],
+  "ledger": {},
+  "model": "GPT 6 Luna",
+  "model_id": "gpt-6-luna",
+  "oracle": {
+    "built": true,
+    "functional_ok": true,
+    "functional_ok_no_o4": true,
+    "layers": {
+      "O1": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 19
+      },
+      "O2": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 28
+      },
+      "O3": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 309
+      },
+      "O4": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 108
+      }
+    },
+    "o3_tools": {
+      "miri": {
+        "category": null,
+        "status": "pass"
+      },
+      "no_concurrency": false,
+      "shuttle": {
+        "category": null,
+        "status": "pass"
+      }
+    },
+    "oracle_complete": true,
+    "ran": true,
+    "run_ok": true,
+    "terminal_check": "pass"
+  },
+  "parse_ok": true,
+  "property_ids": "keep",
+  "rep": 0,
+  "rounds_used": 1,
+  "rust_attempts": [
+    {
+      "call": 2,
+      "compile": "ok",
+      "compile_wall_ms": 940,
+      "compiled": true,
+      "reply_kind": "program",
+      "stage": "rust"
+    }
+  ],
+  "rust_calls": 1,
+  "rust_compiled": true,
+  "rust_mode": "llm",
+  "rust_skipped": null,
+  "rust_when_unverified": "last",
+  "schema_version": "skelnet-cell-v1",
+  "seed": 951296104318811053,
+  "skel_status": "PASS",
+  "skel_verified": true,
+  "skip_reason": null,
+  "status": "ok",
+  "task": "lock-order/abba_2lock",
+  "tier": "L1"
+}

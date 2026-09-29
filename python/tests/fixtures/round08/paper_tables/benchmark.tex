@@ -1,0 +1,19 @@
+% Benchmark composition (experiment-plan §4, D10). L1 counts are the current
+% benchmarks/tasks/ families; L2/L3 counts are fixed by D10 (12 + 8) but the
+% per-family split is decided in round 7b.
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Family} & \textbf{L1} & \textbf{L2} & \textbf{L3} & \textbf{Total} \\
+\midrule
+lock-order   & 5 & \PH & \PH & \PH \\
+condvar      & 4 & \PH & \PH & \PH \\
+semaphore    & 3 & \PH & \PH & \PH \\
+channel      & 3 & \PH & \PH & \PH \\
+atomic-data  & 3 & \PH & \PH & \PH \\
+structure    & 6 & \PH & \PH & \PH \\
+\midrule
+\textbf{Total} & \textbf{24} & \textbf{12} & \textbf{8} & \textbf{44} \\
+\addlinespace
+\multicolumn{5}{@{}p{0.9\linewidth}@{}}{\scriptsize Tier criteria: L1 $\le$3 threads, $\le$2 resources, one mechanism, $\le$300 states; L2 3--4 threads, two mechanisms, 300--5k states; L3 4--6 threads, $\ge$3 mechanisms or a parameterised protocol, 5k--100k states (gold skeleton must still \textsf{PASS} completely). Boundary negatives (\PH[3 or 4]) are reported separately.}\\
+\bottomrule
+\end{tabular}

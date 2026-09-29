@@ -12,23 +12,23 @@ matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 7 | spawn sender | matched | 6 |
-| 7 | spawn receiver | reordered | 7 |
+| 7 | spawn sender | matched | 47 |
+| 7 | spawn receiver | matched | 48 |
 
 ## main::sender
 
-matched Rust fn: `<none>`; DSL lock depth 0; Rust lock calls 0
+matched Rust fn: `sender`; DSL lock depth 0; Rust lock calls 3
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 10 | send ch | reordered | 6 |
-| 10 | send ch | matched | 6 |
+| 10 | send ch | reordered | 23 |
+| 10 | send ch | reordered | 25 |
 
 ## main::receiver
 
-matched Rust fn: `<none>`; DSL lock depth 0; Rust lock calls 0
+matched Rust fn: `receiver`; DSL lock depth 0; Rust lock calls 3
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 13 | recv ch | missing | - |
-| 13 | recv ch | missing | - |
+| 13 | recv ch | matched | 31 |
+| 13 | recv ch | reordered | 33 |

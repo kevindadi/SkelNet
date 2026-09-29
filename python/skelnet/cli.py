@@ -47,6 +47,39 @@ def _select_tasks(root: Path, pattern: str) -> list[Path]:
     return out
 
 
+def select_task_patterns(root: Path, pattern: str | None) -> tuple[list[Path], list[str]]:
+    """``all`` or a comma-separated union of fnmatch patterns.
+
+    Returns task directories in directory order, and the patterns that matched
+    nothing. An empty repository makes ``all`` unmatched. ``_select_tasks``
+    stays single-pattern.
+    """
+    text = "all" if pattern in (None, "") else str(pattern)
+    universe = _select_tasks(root, "all")
+    if text == "all":
+        return (universe, []) if universe else ([], ["all"])
+    parts = [part.strip() for part in text.split(",") if part.strip()]
+    if not parts:
+        return [], [text]
+    order = {task: index for index, task in enumerate(universe)}
+    chosen: dict[Path, int] = {}
+    unmatched: list[str] = []
+    for part in parts:
+        hits = _select_tasks(root, part)
+        if not hits:
+            unmatched.append(part)
+            continue
+        for task in hits:
+            chosen.setdefault(task, order.get(task, 10**9))
+    ordered = [task for task, _index in sorted(chosen.items(), key=lambda item: item[1])]
+    return ordered, unmatched
+
+
+def _report_unmatched_patterns(unmatched: list[str], pattern: str) -> None:
+    names = unmatched or [str(pattern)]
+    print("unmatched task patterns: " + ", ".join(names), file=sys.stderr)
+
+
 def read_terminal(task_dir: Path, hint: str = "h1") -> str | None:
     """The required terminating stdout line for a task.
 
@@ -182,10 +215,20 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         raise SystemExit(
             "--arm G0 writes Rust directly and has no codegen stage; "
             "use --rust-mode llm")
+    if getattr(args, "replay_mode", "key") == "sequence" and not args.replay_from:
+        raise SystemExit("--replay-mode sequence requires --replay-from")
     root = repo_root()
-    tasks = _select_tasks(root, args.tasks)
+    tasks, unmatched = select_task_patterns(root, args.tasks)
+    if unmatched or not tasks:
+        _report_unmatched_patterns(unmatched, args.tasks)
+        return 2
     spec = resolve_model(build_registry(), args.model)
     run_params = _run_params(args, spec)
+    if args.stage in (1, 2, 3) and run_params.hint != "h1" \
+            and not getattr(args, "allow_nonprotocol_hint", False):
+        raise SystemExit(
+            "--stage 1, 2, or 3 requires hint h1 (plan D10); "
+            "pass --allow-nonprotocol-hint to override")
     budget = _budget(args.arm, len(tasks), args.reps, args.rounds,
                      args.rust_mode, run_params.call_budget)
     if args.dry_run:
@@ -195,6 +238,8 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         print(json.dumps({
             **budget,
             "dry_run": True,
+            "hint_source": getattr(args, "hint_source", "default"),
+            "requirements_missing": _requirements_missing(root, tasks, run_params.hint),
             "run_params": run_params.to_dict(),
             "sample_seed": ({"task": first_task, "rep": 0,
                              "seed": seed_for(first_task, 0)} if first_task else None),
@@ -214,6 +259,7 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         return 0
 
     _preflight_baseline_tools(args)
+    _preflight_hint_requirements(run_params, tasks)
     out = Path(args.out)
     if args.resume:
         _check_resume(out, args, run_params)
@@ -240,7 +286,7 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         tier = _task_tier(task_dir)
         contract = task_dir / "contract.json"
         try:
-            requirements = render_requirements(task_dir, args.hint)
+            requirements = render_requirements(task_dir, run_params.hint)
         except RequirementsMissing:
             for rep in range(args.reps):
                 workdir = out / "cells" / task / str(rep)
@@ -251,7 +297,7 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
                 _write_cell(workdir, cell)
                 summary["cells"].append(cell)
             continue
-        terminal = read_terminal(task_dir, args.hint)
+        terminal = read_terminal(task_dir, run_params.hint)
         task_oracle = oracle_factory(task_dir, terminal)
         for rep in range(args.reps):
             workdir = out / "cells" / task / str(rep)
@@ -354,7 +400,7 @@ def _run_params(args: argparse.Namespace, spec):
         temperature_policy=args.temperature_policy,
         temperature=(temperature if args.temperature_policy == "fixed" else None),
         seed_policy=args.seed_policy, call_budget=args.call_budget,
-        token_budget=args.token_budget, hint=args.hint,
+        token_budget=args.token_budget, hint=_resolved_hint(args),
         feedback_mode=getattr(args, "feedback_mode", "full"),
         rust_when_unverified=getattr(args, "rust_when_unverified", "last"),
         property_ids=getattr(args, "property_ids", "keep"))
@@ -404,8 +450,12 @@ def _check_resume(out: Path, args, run_params) -> None:
     if manifest.get("run_params") != run_params.to_dict():
         raise SystemExit("--resume: RunParams do not match the existing run")
     selected = (manifest.get("tasks") or {}).get("selected")
+    selected_now, unmatched = select_task_patterns(repo_root(), args.tasks)
+    if unmatched or not selected_now:
+        _report_unmatched_patterns(unmatched, args.tasks)
+        raise SystemExit(2)
     want = [str(t.relative_to(repo_root() / "benchmarks" / "tasks"))
-            for t in _select_tasks(repo_root(), args.tasks)]
+            for t in selected_now]
     if selected != want:
         raise SystemExit("--resume: tasks do not match the existing run")
     recorded = manifest.get("baseline_tools")
@@ -528,6 +578,10 @@ def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
         "arm": args.arm,
         "rust_mode": args.rust_mode,
         "hint": getattr(run_params, "hint", None),
+        "hint_source": getattr(args, "hint_source", None),
+        "hint_override": bool(getattr(args, "allow_nonprotocol_hint", False)),
+        "evidence_reasoning": getattr(args, "evidence_reasoning", "hash"),
+        "replay_mode": getattr(args, "replay_mode", "key"),
         "stage": args.stage,
         "run_params": run_params.to_dict() if run_params is not None else None,
         "budget_file": args.budget_file,
@@ -601,7 +655,7 @@ class _ChatProvider:
     def _record(self, stage: str, system: str, user: str, outcome, error=None) -> None:
         usage = (self._usage_of(outcome) if outcome is not None
                  else {"input": None, "output": None, "reasoning": None, "cached": None})
-        self.calls.append({
+        record = {
             "attempt": self._attempt,
             "stage": stage,
             "system_sha256": hashlib.sha256(system.encode("utf-8")).hexdigest(),
@@ -615,7 +669,10 @@ class _ChatProvider:
             "usage": usage,
             "wall_ms": getattr(outcome, "wall_ms", 0),
             "error": (str(error) if error is not None else None),
-        })
+        }
+        if getattr(outcome, "replay_mismatch", False):
+            record["replay_mismatch"] = True
+        self.calls.append(record)
 
     def propose(self, request):
         if self.cell_budget is not None:
@@ -734,7 +791,8 @@ def _build_provider(args: argparse.Namespace, audit: AuditLog, out: Path,
         key = key_for(spec, dict(os.environ), channel.api_key_env)
         inner = build_client(spec, run_params, budget=ledger,
                              evidence_dir=out / "evidence", api_key=key,
-                             timeout=args.timeout)
+                             timeout=args.timeout,
+                             reasoning_log=getattr(args, "evidence_reasoning", "hash"))
     cache = ResponseCache(args.cache_dir if args.cache_dir else out / "cache")
     replay = None
     if args.replay_from:
@@ -745,7 +803,9 @@ def _build_provider(args: argparse.Namespace, audit: AuditLog, out: Path,
         replay = ResponseCache(replay_dir)
     cached = CachedClient(inner, cache=cache, replay=replay,
                           model_id=spec.model_id or "", params=run_params,
-                          first_round=getattr(args, "first_round", "auto"))
+                          first_round=getattr(args, "first_round", "auto"),
+                          arm=args.arm,
+                          replay_mode=getattr(args, "replay_mode", "key"))
     audited = _make_audited(cached, audit=audit, out=out, spec=spec, arm=args.arm)
     return _ChatProvider(audited, arm=args.arm, params=run_params)
 
@@ -927,13 +987,61 @@ def _lockbud_present() -> bool:
     return locate_lockbud() is not None
 
 
+def _resolved_hint(args: argparse.Namespace) -> str:
+    """Resolve ``--hint`` at call time from ``params.DEFAULT_HINT``.
+
+    The argparse default is ``None`` so a later edit of the constant is visible
+    without re-importing this module.
+    """
+    from . import params as params_mod
+    explicit = getattr(args, "hint", None)
+    if explicit:
+        args.hint_source = "explicit"
+        return str(explicit)
+    args.hint_source = "default"
+    return params_mod.DEFAULT_HINT
+
+
+def _requirements_filename(hint: str) -> str:
+    return "REQUIREMENTS.md" if hint == "h0" else "REQUIREMENTS.h1.md"
+
+
+def _is_boundary_rel(rel: str) -> bool:
+    return rel == "boundary" or rel.startswith("boundary/")
+
+
+def _requirements_missing(root: Path, tasks: list[Path], hint: str) -> list[str]:
+    """Non-boundary tasks that lack the requirements file for ``hint``."""
+    filename = _requirements_filename(hint)
+    base = root / "benchmarks" / "tasks"
+    missing: list[str] = []
+    for task_dir in tasks:
+        rel = str(task_dir.relative_to(base))
+        if _is_boundary_rel(rel):
+            continue
+        if not (task_dir / filename).is_file():
+            missing.append(rel)
+    return missing
+
+
+def _preflight_hint_requirements(run_params, tasks: list[Path]) -> None:
+    """Refuse a run whose selected main tasks lack the hint's requirements file."""
+    missing = _requirements_missing(repo_root(), tasks, run_params.hint)
+    if not missing:
+        return
+    filename = _requirements_filename(run_params.hint)
+    raise SystemExit(
+        f"missing {filename} for: " + ", ".join(missing))
+
+
 def cmd_eval(args: argparse.Namespace, *, runner=None) -> int:
+    from . import params as params_mod
     run_dir = Path(args.run_dir)
     manifest: dict = {}
     manifest_path = run_dir / "MANIFEST.json"
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    hint = manifest.get("hint") or "h0"
+    hint = manifest.get("hint") or params_mod.LEGACY_HINT
     updated = 0
     for result_path in sorted(run_dir.glob("cells/**/result.json")):
         data = json.loads(result_path.read_text(encoding="utf-8"))
@@ -1002,12 +1110,66 @@ def _selected_cells(run_dir: Path, manifest: dict) -> list[dict]:
 
 
 def cmd_report(args: argparse.Namespace) -> int:
-    summaries = []
+    from . import report
+
+    requested = list(args.table or [])
+    if not requested and not args.figure and not args.out:
+        # Legacy behaviour: one SUMMARY-based table over the runs.
+        summaries = []
+        for d in args.run_dirs:
+            path = Path(d) / "SUMMARY.json"
+            if path.exists():
+                summaries.append(json.loads(path.read_text(encoding="utf-8")))
+        print(_report_markdown(summaries))
+        return 0
+
+    if not requested or "all" in requested:
+        tables = list(report.ALL_TABLES)
+    else:
+        tables = []
+        for name in requested:
+            if name not in tables:
+                tables.append(name)
+
+    try:
+        prices = (json.loads(Path(args.prices).read_text(encoding="utf-8"))
+                  if args.prices else None)
+        fp_check = (json.loads(Path(args.fp_check).read_text(encoding="utf-8"))
+                    if args.fp_check else None)
+        probe = (json.loads(Path(args.probe).read_text(encoding="utf-8"))
+                 if args.probe else None)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"report: cannot read input file: {exc}", file=sys.stderr)
+        return 2
+
+    call_budget = 5
     for d in args.run_dirs:
-        path = Path(d) / "SUMMARY.json"
-        if path.exists():
-            summaries.append(json.loads(path.read_text(encoding="utf-8")))
-    print(_report_markdown(summaries))
+        manifest_path = Path(d) / "MANIFEST.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            value = (manifest.get("run_params") or {}).get("call_budget")
+            if isinstance(value, int):
+                call_budget = value
+            break
+
+    ctx = report.ReportContext(
+        root=Path(args.root), look=args.look, planned_units=args.planned_units,
+        previous_look_units=args.previous_look_units, bootstrap=args.bootstrap,
+        seed=args.seed, prices=prices, fp_check=fp_check, probe=probe,
+        call_budget=call_budget, allow_duplicates=args.allow_duplicates,
+        allow_mixed=args.allow_mixed)
+    try:
+        ds, payloads = report.build_report(args.run_dirs, ctx, tables,
+                                           figure=bool(args.figure))
+    except report.ReportInputError as exc:
+        print(f"report: {exc}", file=sys.stderr)
+        return 2
+
+    if args.out:
+        report.write_outputs(Path(args.out), ds, payloads, tables,
+                             figure=bool(args.figure), fmt=args.format, ctx=ctx)
+        return 0
+    print(report.markdown_report(ds, payloads, tables, ctx))
     return 0
 
 
@@ -1103,7 +1265,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--call-budget", type=int, default=5)
     run.add_argument("--token-budget", type=int, default=200000)
     run.add_argument("--max-output-tokens", type=int, default=None)
-    run.add_argument("--hint", default="h0", choices=["h0", "h1"])
+    run.add_argument("--hint", default=None, choices=["h0", "h1"])
     run.add_argument("--stage", type=int, default=0, choices=[0, 1, 2, 3])
     run.add_argument("--budget-file",
                      default=str(repo_root() / "experiments" / "budget.json"))
@@ -1116,6 +1278,9 @@ def build_parser() -> argparse.ArgumentParser:
                      choices=["auto", "require-cache"])
     run.add_argument("--allow-missing-tools", action="store_true")
     run.add_argument("--feedback-miri-seeds", type=int, default=16)
+    run.add_argument("--evidence-reasoning", default="hash", choices=["hash", "gzip"])
+    run.add_argument("--replay-mode", default="key", choices=["key", "sequence"])
+    run.add_argument("--allow-nonprotocol-hint", action="store_true")
     run.add_argument("--timeout", type=float, default=300.0)
     run.set_defaults(func=cmd_run)
 
@@ -1139,8 +1304,28 @@ def build_parser() -> argparse.ArgumentParser:
     _register_tools(sub)
 
     rep = sub.add_parser("report", help="one table over runs")
-    rep.add_argument("run_dirs", nargs="+")
+    rep.add_argument("run_dirs", nargs="*")
+    rep.add_argument("--table", action="append", default=None,
+                     choices=["main", "tiers", "design", "failures", "cost",
+                              "models", "benchmark", "coverage", "lockbud",
+                              "tests", "numbers", "all"])
+    rep.add_argument("--figure", default=None, choices=["anytime"])
+    rep.add_argument("--format", default="both", choices=["md", "tex", "both"])
+    rep.add_argument("--out", default=None)
+    rep.add_argument("--root", default=str(repo_root()))
+    rep.add_argument("--look", type=int, default=0, choices=[0, 1, 2, 3])
+    rep.add_argument("--planned-units", type=int, default=880)
+    rep.add_argument("--previous-look-units", type=int, default=528)
+    rep.add_argument("--prices", default=None)
+    rep.add_argument("--fp-check", default=None)
+    rep.add_argument("--probe", default=None)
+    rep.add_argument("--bootstrap", type=int, default=10000)
+    rep.add_argument("--seed", type=int, default=20260928)
+    rep.add_argument("--allow-mixed", action="store_true")
+    rep.add_argument("--allow-duplicates", action="store_true")
     rep.set_defaults(func=cmd_report)
+    from .stop_check import register as _register_stop
+    _register_stop(sub)
     from .bench import register as _register_bench
     _register_bench(sub)
     return parser

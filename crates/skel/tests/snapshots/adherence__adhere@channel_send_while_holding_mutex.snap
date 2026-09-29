@@ -12,21 +12,21 @@ matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 7 | spawn s | matched | 6 |
-| 7 | spawn r | reordered | 7 |
+| 7 | spawn s | matched | 31 |
+| 7 | spawn r | matched | 32 |
 
 ## main::s
 
-matched Rust fn: `<none>`; DSL lock depth 0; Rust lock calls 0
+matched Rust fn: `s`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 10 | send ch1 | reordered | 6 |
+| 10 | send ch1 | matched | 17 |
 
 ## main::r
 
-matched Rust fn: `<none>`; DSL lock depth 0; Rust lock calls 0
+matched Rust fn: `r`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 13 | recv ch1 | missing | - |
+| 13 | recv ch1 | matched | 22 |

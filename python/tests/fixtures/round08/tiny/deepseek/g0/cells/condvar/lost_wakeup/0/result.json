@@ -1,0 +1,38 @@
+{
+  "accepted": false,
+  "arm": "G0",
+  "budget_used": {
+    "calls": 0,
+    "tokens": 0
+  },
+  "calls": [],
+  "check_ok": false,
+  "compile_wall_ms": 1893,
+  "error": null,
+  "evidence_sufficient": false,
+  "hint": "h1",
+  "history": [],
+  "ledger": {},
+  "model": "DeepSeek Flash",
+  "model_id": "deepseek-flash",
+  "oracle": {
+    "built": false,
+    "functional_ok": null,
+    "functional_ok_no_o4": null,
+    "layers": {},
+    "oracle_complete": false,
+    "ran": false,
+    "run_ok": false,
+    "terminal_check": "not_run"
+  },
+  "parse_ok": false,
+  "rep": 0,
+  "rounds_used": 0,
+  "rust_mode": "llm",
+  "schema_version": "skelnet-cell-v1",
+  "seed": 1071684921155837473,
+  "skip_reason": "no_requirements_text",
+  "status": "skipped",
+  "task": "condvar/lost_wakeup",
+  "tier": "L2"
+}

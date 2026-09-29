@@ -1,0 +1,188 @@
+{
+  "accepted": true,
+  "arm": "STATIC",
+  "baseline": {
+    "accept_reason": "static_clean",
+    "accepted_at_call": 2,
+    "final_version": 2,
+    "first_round_cache_hit": true,
+    "rounds": [
+      {
+        "call": 1,
+        "compile": "ok",
+        "compile_wall_ms": 1258,
+        "compiled": true,
+        "feedback_bytes": 7712,
+        "feedback_sha256": "f5aba5f825df43649461ac3d3145c7c00eca3904589666cf6fbe8be103b24629",
+        "reply_kind": "program",
+        "seeds": {},
+        "stage": "generate",
+        "tools": {
+          "clippy": {
+            "category": null,
+            "status": "pass",
+            "wall_ms": 269
+          },
+          "lockbud": {
+            "category": "ConflictLock",
+            "status": "fail",
+            "wall_ms": 68
+          }
+        },
+        "truncated": false,
+        "version": 1
+      },
+      {
+        "call": 2,
+        "compile": "ok",
+        "compile_wall_ms": 1866,
+        "compiled": true,
+        "feedback_bytes": 2302,
+        "feedback_sha256": "06052349664ac398641384a541d77e5b5118379c9e8cf8fe24a4d9639af57c47",
+        "reply_kind": "program",
+        "seeds": {},
+        "stage": "tool_feedback",
+        "tools": {
+          "clippy": {
+            "category": null,
+            "status": "pass",
+            "wall_ms": 163
+          },
+          "lockbud": {
+            "category": "ConflictLock",
+            "status": "fail",
+            "wall_ms": 227
+          }
+        },
+        "truncated": false,
+        "version": 2
+      }
+    ],
+    "tools_missing": []
+  },
+  "budget_used": {
+    "calls": 2,
+    "tokens": 4932
+  },
+  "calls": [
+    {
+      "attempt": 1,
+      "cache_hit": true,
+      "error": null,
+      "finish_reason": "stop",
+      "finish_reasons": [
+        "stop"
+      ],
+      "request_sha256": "abb15fedfa7df58f8857714b227b1ece89328d9e3e022b736cc9f3c7ad8e5878",
+      "stage": "generate",
+      "system_sha256": "c9533021ce75a22c15f3ba183d03592ed1eaf7197bf088674b54336af9777601",
+      "transport_attempt": 1,
+      "truncation_retry": false,
+      "usage": {
+        "cached": null,
+        "input": 1383,
+        "output": 660,
+        "reasoning": 0
+      },
+      "wall_ms": 3476
+    },
+    {
+      "attempt": 2,
+      "cache_hit": false,
+      "error": null,
+      "finish_reason": "stop",
+      "finish_reasons": [
+        "stop"
+      ],
+      "request_sha256": "9dbd4762ddfb8f83a60a92650507a3b3a9110d8b82fae4487efaad4238c77410",
+      "stage": "tool_feedback",
+      "system_sha256": "363533605820196fa31fb55b78126985ab49ea660e3a0585e4bf264b0c4ae872",
+      "transport_attempt": 1,
+      "truncation_retry": false,
+      "usage": {
+        "cached": null,
+        "input": 2170,
+        "output": 719,
+        "reasoning": 0
+      },
+      "wall_ms": 2097
+    }
+  ],
+  "check_ok": true,
+  "error": null,
+  "evidence_sufficient": true,
+  "hint": "h1",
+  "history": [
+    {
+      "call": 1,
+      "reply_kind": "program",
+      "stage": "generate",
+      "version": 1
+    },
+    {
+      "call": 2,
+      "reply_kind": "program",
+      "stage": "tool_feedback",
+      "version": 2
+    }
+  ],
+  "ledger": {},
+  "model": "GPT 6 Luna",
+  "model_id": "gpt-6-luna",
+  "oracle": {
+    "built": true,
+    "functional_ok": true,
+    "functional_ok_no_o4": true,
+    "layers": {
+      "O1": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 23
+      },
+      "O2": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 8
+      },
+      "O3": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 108
+      },
+      "O4": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 124
+      }
+    },
+    "o3_tools": {
+      "miri": {
+        "category": null,
+        "status": "pass"
+      },
+      "no_concurrency": false,
+      "shuttle": {
+        "category": null,
+        "status": "pass"
+      }
+    },
+    "oracle_complete": true,
+    "ran": true,
+    "run_ok": true,
+    "terminal_check": "pass"
+  },
+  "parse_ok": true,
+  "rep": 1,
+  "rounds_used": 2,
+  "rust_mode": "llm",
+  "schema_version": "skelnet-cell-v1",
+  "seed": 9430667517849087086,
+  "skip_reason": null,
+  "status": "ok",
+  "task": "lock-order/abba_2lock",
+  "tier": "L1"
+}

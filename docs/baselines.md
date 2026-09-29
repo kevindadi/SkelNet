@@ -30,6 +30,18 @@ Official order: run `G0` first, then the four baseline arms with the same
 `first_round_miss` (no inner call, no oracle) when call 1 is absent.
 `auto` (the default) uses a hit and otherwise calls the model.
 
+`--replay-mode key` (default) requires the tool feedback to be byte-identical,
+because the next request is part of the cache key. Offline reproduction of
+DYNAMIC and DYNAMIC_M uses `--replay-mode sequence`: the reply is the one
+stored for `(model_id, arm, task, rep, call_index)`, even when the request
+text differs. A differing request sets `calls[].replay_mismatch` to true and
+still returns the recorded reply. See `docs/experiments.md` (Reproducibility).
+
+`--tasks` accepts `all` or a comma-separated union of fnmatch patterns, in
+directory order. Any pattern that matches nothing prints
+`unmatched task patterns: ...` on stderr and exits 2. The same syntax applies
+to `tools fp-check`.
+
 A version that does not compile is followed by `stage=rust_fix` for every
 arm, including SKEL and CIR. The system prompt is `rust_compile_fix_v1.md`
 plus the runtime appendix, and the user text is `render_compile_errors`
@@ -196,6 +208,7 @@ lockbud test and by `tools fp-check`.
 
 ```bash
 python -m skelnet tools fp-check --tasks all --out /tmp/fp
+python -m skelnet tools fp-check --tasks 'lock-order/*,condvar/*' --out /tmp/fp
 ```
 
 For every selected task, clippy (`CONCURRENCY_LINTS`) and lockbud run on
@@ -211,7 +224,7 @@ detection rate.
 
 | Field | Meaning |
 | --- | --- |
-| `rounds` | one record per LLM call: `call`, `stage`, `reply_kind`, `version`, `compiled` (`null` when the compiler did not run), `compile` (`ok` / `error` / `unavailable` / `timeout`), per-tool `status`/`category`, `seeds`, `feedback_sha256`, `feedback_bytes`, `truncated` |
+| `rounds` | one record per LLM call: `call`, `stage`, `reply_kind`, `version`, `compiled` (`null` when the compiler did not run), `compile` (`ok` / `error` / `unavailable` / `timeout`), `compile_wall_ms` (milliseconds, or null when nothing was compiled), per-tool `status`/`category` and `wall_ms`, `seeds`, `feedback_sha256`, `feedback_bytes`, `truncated` |
 | `accepted_at_call` | the call that met the in-group rule, or null |
 | `accept_reason` | `no_issues`, `static_clean`, `dynamic_pass`, `dynamic_monitor_pass`, `budget_exhausted`, `model_error`, `compile_unavailable`, or `compile_timeout` |
 | `final_version` | index of the latest program (0 if none) |

@@ -1,0 +1,136 @@
+{
+  "accepted": false,
+  "arm": "STATIC",
+  "baseline": {
+    "accept_reason": "static_clean",
+    "accepted_at_call": null,
+    "final_version": 1,
+    "first_round_cache_hit": true,
+    "rounds": [
+      {
+        "call": 1,
+        "compile": "ok",
+        "compile_wall_ms": 1853,
+        "compiled": true,
+        "feedback_bytes": 3683,
+        "feedback_sha256": "f5aba5f825df43649461ac3d3145c7c00eca3904589666cf6fbe8be103b24629",
+        "reply_kind": "program",
+        "seeds": {},
+        "stage": "generate",
+        "tools": {
+          "clippy": {
+            "category": null,
+            "status": "pass",
+            "wall_ms": 49
+          },
+          "lockbud": {
+            "category": "ConflictLock",
+            "status": "fail",
+            "wall_ms": 106
+          }
+        },
+        "truncated": false,
+        "version": 1
+      }
+    ],
+    "tools_missing": []
+  },
+  "budget_used": {
+    "calls": 1,
+    "tokens": 2397
+  },
+  "calls": [
+    {
+      "attempt": 1,
+      "cache_hit": true,
+      "error": null,
+      "finish_reason": "stop",
+      "finish_reasons": [
+        "stop"
+      ],
+      "request_sha256": "abb15fedfa7df58f8857714b227b1ece89328d9e3e022b736cc9f3c7ad8e5878",
+      "stage": "generate",
+      "system_sha256": "c9533021ce75a22c15f3ba183d03592ed1eaf7197bf088674b54336af9777601",
+      "transport_attempt": 1,
+      "truncation_retry": false,
+      "usage": {
+        "cached": 530,
+        "input": 2121,
+        "output": 276,
+        "reasoning": 0
+      },
+      "wall_ms": 1238
+    }
+  ],
+  "check_ok": false,
+  "error": null,
+  "evidence_sufficient": false,
+  "hint": "h1",
+  "history": [
+    {
+      "call": 1,
+      "reply_kind": "program",
+      "stage": "generate",
+      "version": 1
+    }
+  ],
+  "ledger": {},
+  "model": "GPT 6 Luna",
+  "model_id": "gpt-6-luna",
+  "oracle": {
+    "built": true,
+    "functional_ok": false,
+    "functional_ok_no_o4": true,
+    "layers": {
+      "O1": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 20
+      },
+      "O2": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 11
+      },
+      "O3": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 190
+      },
+      "O4": {
+        "category": "monitor_fail",
+        "detail": null,
+        "status": "fail",
+        "wall_ms": 146
+      }
+    },
+    "o3_tools": {
+      "miri": {
+        "category": null,
+        "status": "pass"
+      },
+      "no_concurrency": false,
+      "shuttle": {
+        "category": null,
+        "status": "pass"
+      }
+    },
+    "oracle_complete": true,
+    "ran": true,
+    "run_ok": true,
+    "terminal_check": "fail"
+  },
+  "parse_ok": false,
+  "rep": 2,
+  "rounds_used": 1,
+  "rust_mode": "llm",
+  "schema_version": "skelnet-cell-v1",
+  "seed": 15227690479972136098,
+  "skip_reason": null,
+  "status": "ok",
+  "task": "lock-order/abba_2lock",
+  "tier": "L1"
+}

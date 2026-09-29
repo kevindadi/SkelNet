@@ -1,0 +1,34 @@
+---
+source: crates/skel/tests/adherence.rs
+expression: md
+---
+# Skeleton adherence report (human review only)
+
+skeleton: `benchmarks/tasks/condvar/lost_wakeup_notify_before_wait/gold.skel`
+
+## main::main
+
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 8 | spawn waiter | matched | 28 |
+| 8 | spawn notifier | matched | 30 |
+
+## main::waiter
+
+matched Rust fn: `waiter`; DSL lock depth 1; Rust lock calls 1
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 11 | lock m | matched | 11 |
+| 11 | wait cv | matched | 13 |
+
+## main::notifier
+
+matched Rust fn: `notifier`; DSL lock depth 1; Rust lock calls 1
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 14 | lock m | matched | 19 |
+| 14 | notify_one cv | matched | 21 |

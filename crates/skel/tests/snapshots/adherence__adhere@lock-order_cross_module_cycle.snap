@@ -8,21 +8,21 @@ skeleton: `benchmarks/tasks/lock-order/cross_module_cycle/gold.skel`
 
 ## main::main
 
-matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 4
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 7 | spawn t1 | matched | 8 |
-| 7 | spawn other::t2 | reordered | 10 |
+| 7 | spawn t1 | matched | 47 |
+| 7 | spawn other::t2 | matched | 49 |
 
 ## main::t1
 
-matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+matched Rust fn: `t1`; DSL lock depth 2; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 10 | lock a | reordered | 8 |
-| 10 | lock other::b | matched | 8 |
+| 10 | lock a | matched | 19 |
+| 10 | lock other::b | matched | 20 |
 
 ## other::t2
 
