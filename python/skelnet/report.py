@@ -37,7 +37,7 @@ _FAIL_MAP = {
     "O2": {"hang": "hang", "wrong_output": "output", "no_output": "output",
            "crash": "output"},
     "O3": {"deadlock": "deadl", "panic": "other", "thread_leak": "other",
-           "ub": "other"},
+           "ub": "other", "wrong_output": "other", "livelock": "other"},
     "O4": {"design_loss": "design", "monitor_fail": "monitor",
            "not_observed": "monitor", "unmapped": "monitor"},
 }
@@ -192,8 +192,8 @@ def _fail_column(cell: dict) -> str | None:
             if mapped:
                 return mapped
             if name == "O3":
-                # Unknown O3 categories (e.g. R9b wrong_output/livelock) stay
-                # in the O3 "other" column.
+                # An unknown O3 category stays in the O3 "other" column (and
+                # is reported by _unclassified_warnings).
                 return "other"
             return None
     return None
@@ -214,8 +214,6 @@ def _unclassified_warnings(cells) -> list[str]:
                 continue
             category = layer.get("category")
             if _FAIL_MAP.get(name, {}).get(category):
-                break
-            if name == "O3":
                 break
             key = f"{name}:{category}"
             tally[key] = tally.get(key, 0) + 1
