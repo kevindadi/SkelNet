@@ -49,5 +49,10 @@
       }
     ]
   },
-  "contract": "channel/rendezvous_both_send/contract.json"
+  "contract": "channel/rendezvous_both_send/contract.json",
+  "terminal_v2": "DONE done=2",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

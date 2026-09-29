@@ -38,5 +38,10 @@
       }
     ]
   },
-  "contract": "channel/send_while_holding_mutex/contract.json"
+  "contract": "channel/send_while_holding_mutex/contract.json",
+  "terminal_v2": "DONE done=2",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }
