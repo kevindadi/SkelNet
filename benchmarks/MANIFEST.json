@@ -36,7 +36,7 @@
     {
       "task": "atomic-data/atomic_lost_update",
       "file": "requirements.json",
-      "sha256": "91237c3af4c314b2c38d8518a097fdbb4d8d17a2fe9d0788007476e5e3292378",
+      "sha256": "527f1a2ebdae7e0f27e04e1609e7bb36024b1cd9f0d94b65b186f036e3a7317d",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/atomic_lost_update/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
@@ -102,7 +102,7 @@
     {
       "task": "atomic-data/bounded_counter_invariant",
       "file": "requirements.json",
-      "sha256": "19efbbefed512481e09e270c77a5b320ef235ce922fb3d2b299d52db3a9a8328",
+      "sha256": "ceb81404b34fc6e5c07fe6efc36015d9d415e3aead983ecc920e22ec3ec9c325",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/bounded_counter_invariant/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
@@ -168,7 +168,7 @@
     {
       "task": "atomic-data/counter_overflow_safety",
       "file": "requirements.json",
-      "sha256": "4218adc2cf19e5c5402c62f315d6814dbcfe569bdc2dd1ae6ccad856f96daed8",
+      "sha256": "c44e0a544fb8d5d3c7ebd9e99cc5de659bdbd57636d5d270021b7e3470737e75",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/atomic-data/counter_overflow_safety/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
@@ -1020,7 +1020,7 @@
     {
       "task": "structure/finite_call_loop",
       "file": "requirements.json",
-      "sha256": "ab654589cae6f9d7e2ba6ec5d7a61fdf77bb16f5203e308ba47340fcd9255a33",
+      "sha256": "f1f285e4ed36e890449cd5267d9f80216e335a5f50c37019dded3df9068759c3",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/finite_call_loop/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
@@ -1086,7 +1086,7 @@
     {
       "task": "structure/nested_scope_lock_order",
       "file": "requirements.json",
-      "sha256": "28395ea732d94022f08c25c9d27b1ebab5bb8c0cd4810fc2cdb0bc55eabe8b8c",
+      "sha256": "068e3260a58e74cbfcd3a6d2bd0b6f2242c29cde726cf2ff6d3ba413abfe140e",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/nested_scope_lock_order/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
@@ -1153,7 +1153,7 @@
     {
       "task": "structure/scope_bound_k_workers",
       "file": "requirements.json",
-      "sha256": "8dd2090752974c41eebc2e823c1bf2d6fb046468ddb8059f1889a5f4cefe2982",
+      "sha256": "ddf8512a74d9f9aad1e883bdab251305a15bdf345cd62ae16d8de09055dee4fb",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/scope_bound_k_workers/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
@@ -1219,7 +1219,7 @@
     {
       "task": "structure/scope_worker_abba",
       "file": "requirements.json",
-      "sha256": "a4b562d885ec0f1cd8a227b377c4eff54573a80bf2cba632acac25f8c63366eb",
+      "sha256": "e67a3c625cdb5583fe015bc7a396e3a62ed71c15cd1d5de3754d324fde18ab7e",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/scope_worker_abba/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
@@ -1285,7 +1285,7 @@
     {
       "task": "structure/spawn_join_loop_finite",
       "file": "requirements.json",
-      "sha256": "dec4140942640e53007b860466a4b4a699b0152f1345b88139f40d4531be74b3",
+      "sha256": "81129ac60c794afe9fe06c2aca0f15f30890ae3ab8747f5c9153acfe49436381",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/spawn_join_loop_finite/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
@@ -1351,7 +1351,7 @@
     {
       "task": "structure/worker_with_payload",
       "file": "requirements.json",
-      "sha256": "5554485fe4baccf4854a5bcd7e7ea7272e9cc98f1e4c4ca1d906c08c3c0cac75",
+      "sha256": "7ab78ae8999f22cc0289f484e78d20a261509c901966511d404b12fc7fefe223",
       "source": "/Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/structure/worker_with_payload/generation_input/requirements.json (R7a-2: added terminal_v2/hint_variants/tier keys)"
     },
     {
