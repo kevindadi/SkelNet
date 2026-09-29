@@ -324,10 +324,10 @@ all per-property outcomes equal to BASELINE and `unmapped == 0`.
   UNSUPPORTED in the precise backend ("sequential fill sites have no defined
   semantics yet"), so *any* skeleton containing a compute hole would be
   UNSUPPORTED and could never match a PASS baseline (e.g. Appendix B ABBA).
-  `nop` is ConcIR's supported, semantics-neutral construct; the source-map
-  entry still uses `construct: "seq_hole"` so codegen/adhere can identify the
-  hole. This is the one deliberate mapping-table deviation and is called out
-  for reviewer confirmation.
+  `nop` is ConcIR's supported, semantics-neutral construct. The source-map
+  entry's `construct` is `compute`. A compute hole is local-only: a read or
+  write set that names a shared resource is S110. See `benchmarks/DEVIATIONS.json`
+  D9 and `docs/lowering.md`.
 - The source map's `span` serialises `line/col/end_line/end_col` (matching the
   §5.4 example); byte offsets are omitted there.
 - `requires` is computed by scanning emitted ops for cross-module resource and
