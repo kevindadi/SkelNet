@@ -1,3 +1,7 @@
+//! Defect: the second worker takes b before a, preserving the ABBA wait cycle.
+//! Source: ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f
+//! benchmarks/families/structure/nested_scope_lock_order/rust/buggy.rs
+//! Adapted role/resource names, added outer and computed output; lock inversion retained.
 //! Match gold.skel: both workers hold a then b and update the protected counters.
 //! Rewritten reference: outer now starts and joins x1/x2; output is computed.
 use std::sync::{Arc, Mutex};
@@ -11,8 +15,8 @@ fn x1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) {
 }
 
 fn x2(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) {
-    let mut ga = a.lock().unwrap();
     let mut gb = b.lock().unwrap();
+    let mut ga = a.lock().unwrap();
     *ga += 1;
     *gb += 1;
 }

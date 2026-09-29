@@ -28,5 +28,27 @@
     ],
     "resources": []
   },
-  "contract": "structure/finite_call_loop/contract.json"
+  "contract": "structure/finite_call_loop/contract.json",
+  "terminal_v2": "DONE calls=2",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 0,
+    "thread_funcs": [],
+    "sync_resources": 0,
+    "unused_resources": [],
+    "mechanisms": [],
+    "mechanism_count": 0,
+    "parameterized": false,
+    "states": 6,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L1",
+    "nearest_tier": "L1",
+    "violations": []
+  }
 }
