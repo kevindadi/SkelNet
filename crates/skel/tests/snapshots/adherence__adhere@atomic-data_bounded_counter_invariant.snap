@@ -1,0 +1,32 @@
+---
+source: crates/skel/tests/adherence.rs
+expression: md
+---
+# Skeleton adherence report (human review only)
+
+skeleton: `benchmarks/tasks/atomic-data/bounded_counter_invariant/gold.skel`
+
+## main::main
+
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 1
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 7 | spawn w1 | matched | 18 |
+| 7 | spawn w2 | matched | 20 |
+
+## main::w1
+
+matched Rust fn: `w1`; DSL lock depth 1; Rust lock calls 1
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 10 | lock m | matched | 6 |
+
+## main::w2
+
+matched Rust fn: `w2`; DSL lock depth 1; Rust lock calls 1
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 13 | lock m | matched | 11 |

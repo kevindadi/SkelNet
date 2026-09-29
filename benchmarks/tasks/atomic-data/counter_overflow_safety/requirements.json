@@ -52,5 +52,10 @@
       }
     ]
   },
-  "contract": "atomic-data/counter_overflow_safety/contract.json"
+  "contract": "atomic-data/counter_overflow_safety/contract.json",
+  "terminal_v2": "DONE c=1",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

@@ -56,5 +56,10 @@
       }
     ]
   },
-  "contract": "atomic-data/atomic_lost_update/contract.json"
+  "contract": "atomic-data/atomic_lost_update/contract.json",
+  "terminal_v2": "DONE c=2",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }
