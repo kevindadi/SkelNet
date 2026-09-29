@@ -1,0 +1,12 @@
+% Models (experiment-plan §2.2, decisions K2--K4, D3, D5). Effective values are
+% recorded per run in MANIFEST.json; the probe column is filled after Stage 0.
+\begin{tabular}{@{}llllp{0.22\linewidth}@{}}
+\toprule
+\textbf{Family} & \textbf{Model id} & \textbf{API} & \textbf{Reasoning} & \textbf{Stage-0 probe (truncation, seed honoured)} \\
+\midrule
+GPT      & \texttt{gpt-6-luna}     & Responses (gateway) & effort \texttt{medium}     & \PH \\
+Kimi     & \texttt{kimi-k3}        & Chat (gateway)      & effort \texttt{medium}     & \PH \\
+DeepSeek & \texttt{deepseek-flash} & Chat (direct)       & thinking enabled           & \PH \\
+Qwen     & \texttt{qwen3.8-flash}  & Chat (direct)       & thinking enabled           & \PH \\
+\bottomrule
+\end{tabular}
