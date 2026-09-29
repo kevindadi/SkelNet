@@ -5,10 +5,11 @@
 //!
 //! Changes: bindings renamed to the contract entities, the hand-written
 //! semaphore replaced by `concir_sync::Semaphore` (matching the gold's declared
-//! `sa`/`sb`), the bystander's `thread::sleep` removed, and the computed
-//! terminal line added. The defect is unchanged: the two workers release their
-//! own permit and then wait for the other's while already holding one lock, so
-//! they deadlock; the bystander keeps the process alive.
+//! `sa`/`sb`), the bystander's `thread::sleep` removed (it now busy-waits on
+//! `flag` like the gold loop), and the computed terminal line added. The defect
+//! is unchanged: the two workers release their own permit and then wait for the
+//! other's while already holding one lock, so they deadlock; the bystander
+//! keeps the process alive.
 
 use concir_sync::Semaphore;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,12 +23,11 @@ struct Locks {
 
 fn a(locks: Arc<Locks>, sa: Arc<Semaphore>, sb: Arc<Semaphore>) -> u32 {
     let mut ga = locks.a.lock().unwrap();
-    *ga += 1;
-    let n = *ga;
     sa.post();
     sb.take();
     let gb = locks.b.lock().unwrap(); // DEFECT: deadlocks against b
-    let _ = &*gb;
+    *ga += 1;
+    let n = *ga;
     drop(gb);
     drop(ga);
     n
@@ -35,21 +35,18 @@ fn a(locks: Arc<Locks>, sa: Arc<Semaphore>, sb: Arc<Semaphore>) -> u32 {
 
 fn b(locks: Arc<Locks>, sa: Arc<Semaphore>, sb: Arc<Semaphore>) -> u32 {
     let mut gb = locks.b.lock().unwrap();
-    *gb += 1;
-    let n = *gb;
     sb.post();
     sa.take();
     let ga = locks.a.lock().unwrap(); // DEFECT: deadlocks against a
-    let _ = &*ga;
+    *gb += 1;
+    let n = *gb;
     drop(ga);
     drop(gb);
     n
 }
 
 fn bystander(flag: Arc<AtomicBool>) {
-    while !flag.load(Ordering::SeqCst) {
-        thread::park();
-    }
+    while !flag.load(Ordering::SeqCst) {}
 }
 
 fn main() {
@@ -71,7 +68,6 @@ fn main() {
     let ra = a.join().unwrap();
     let rb = b.join().unwrap();
     flag.store(true, Ordering::SeqCst);
-    bystander.thread().unpark();
     bystander.join().unwrap();
 
     println!("DONE a={} b={}", ra, rb);

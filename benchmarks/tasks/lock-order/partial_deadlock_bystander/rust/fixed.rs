@@ -11,9 +11,12 @@
 //!
 //! Rewritten from the ConcPlanVerify reference: bindings renamed to the
 //! contract entities, `thread::sleep` removed, the bystander joined after
-//! `flag` is set, and the terminal line computed. The bystander parks on the
-//! atomic instead of spin-looping: a tight spin exceeds Shuttle's bounded
-//! `max_steps` (the design is unchanged, only the waiting primitive differs).
+//! `flag` is set, and the terminal line computed. The bystander busy-waits on
+//! the atomic, matching the gold loop.
+//!
+//! `gold.skel` (`defect_family: goal_layer`) does not implement the permit
+//! handshake of requirement R5; the reference follows the gold design and does
+//! not construct `sa` or `sb`.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -26,10 +29,9 @@ struct Locks {
 
 fn a(locks: Arc<Locks>) -> u32 {
     let mut ga = locks.a.lock().unwrap();
+    let gb = locks.b.lock().unwrap();
     *ga += 1;
     let n = *ga;
-    let gb = locks.b.lock().unwrap();
-    let _ = &*gb;
     drop(gb);
     drop(ga);
     n
@@ -46,9 +48,7 @@ fn b(locks: Arc<Locks>) -> u32 {
 }
 
 fn bystander(flag: Arc<AtomicBool>) {
-    while !flag.load(Ordering::SeqCst) {
-        thread::park();
-    }
+    while !flag.load(Ordering::SeqCst) {}
 }
 
 fn main() {
@@ -67,7 +67,6 @@ fn main() {
     let ra = a.join().unwrap();
     let rb = b.join().unwrap();
     flag.store(true, Ordering::SeqCst);
-    bystander.thread().unpark();
     bystander.join().unwrap();
 
     println!("DONE a={} b={}", ra, rb);
