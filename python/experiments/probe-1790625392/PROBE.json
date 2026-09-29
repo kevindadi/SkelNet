@@ -1,0 +1,188 @@
+{
+  "schema_version": "skelnet-probe-v1",
+  "created_at": 1790625416.087896,
+  "models": [
+    {
+      "display_name": "GPT 6 Luna",
+      "model_id": "gpt-6-luna",
+      "channel": "opencode-go",
+      "provider": "openai",
+      "surface": "responses",
+      "base_url": "https://opencode.ai/zen/go/v1",
+      "api_key_env": "OPENCODE_API_KEY",
+      "status": "available",
+      "thinking": true,
+      "reasoning_effort": "medium",
+      "max_output_tokens": 32768,
+      "max_output_tokens_cap": 65536,
+      "supports_seed": false,
+      "stream": false,
+      "api_key_present": true,
+      "probed": true,
+      "error": null,
+      "thinking_accepted": null,
+      "output_includes_reasoning": true,
+      "requires_stream": false,
+      "seed_deterministic": null,
+      "reasoning_content_present": false,
+      "reasoning_tokens_low": 0,
+      "reasoning_tokens_medium": 0,
+      "reasoning_tokens_high": null,
+      "returned_model": "gpt-6-luna",
+      "usage": {
+        "input_tokens": 22,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 5,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 27
+      },
+      "finish_reason": "stop",
+      "seed_sent": false
+    },
+    {
+      "display_name": "Kimi",
+      "model_id": "kimi-k3",
+      "channel": "moonshot-direct",
+      "provider": "moonshot",
+      "surface": "chat",
+      "base_url": "https://api.moonshot.cn/v1",
+      "api_key_env": "MOONSHOT_API_KEY",
+      "status": "available",
+      "thinking": "always",
+      "reasoning_effort": "high",
+      "max_output_tokens": 32768,
+      "max_output_tokens_cap": 65536,
+      "supports_seed": false,
+      "stream": false,
+      "api_key_present": true,
+      "probed": true,
+      "error": null,
+      "thinking_accepted": true,
+      "output_includes_reasoning": true,
+      "requires_stream": false,
+      "seed_deterministic": null,
+      "reasoning_content_present": true,
+      "reasoning_tokens_low": 22,
+      "reasoning_tokens_medium": null,
+      "reasoning_tokens_high": 59,
+      "returned_model": "kimi-k3",
+      "usage": {
+        "completion_tokens": 49,
+        "prompt_tokens": 109,
+        "total_tokens": 158,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 33,
+          "rejected_prediction_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": null,
+          "cache_write_tokens": 0
+        }
+      },
+      "finish_reason": "stop",
+      "seed_sent": false
+    },
+    {
+      "display_name": "DeepSeek Flash",
+      "model_id": "deepseek-flash",
+      "channel": "deepseek-direct",
+      "provider": "deepseek",
+      "surface": "chat",
+      "base_url": "https://api.deepseek.com",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "status": "available",
+      "thinking": true,
+      "reasoning_effort": null,
+      "max_output_tokens": 32768,
+      "max_output_tokens_cap": 65536,
+      "supports_seed": true,
+      "stream": false,
+      "api_key_present": true,
+      "probed": true,
+      "error": null,
+      "thinking_accepted": true,
+      "output_includes_reasoning": true,
+      "requires_stream": false,
+      "seed_deterministic": true,
+      "reasoning_content_present": true,
+      "reasoning_tokens_low": null,
+      "reasoning_tokens_medium": null,
+      "reasoning_tokens_high": null,
+      "returned_model": "deepseek-flash",
+      "usage": {
+        "completion_tokens": 70,
+        "prompt_tokens": 42,
+        "total_tokens": 112,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 68,
+          "rejected_prediction_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 42
+      },
+      "finish_reason": "stop",
+      "seed_sent": true
+    },
+    {
+      "display_name": "Qwen",
+      "model_id": "qwen3.8-flash",
+      "channel": "dashscope-direct",
+      "provider": "qwen",
+      "surface": "chat",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "api_key_env": "DASHSCOPE_API_KEY",
+      "status": "available",
+      "thinking": true,
+      "reasoning_effort": null,
+      "max_output_tokens": 32768,
+      "max_output_tokens_cap": 65536,
+      "supports_seed": false,
+      "stream": false,
+      "api_key_present": true,
+      "probed": true,
+      "error": null,
+      "thinking_accepted": true,
+      "output_includes_reasoning": true,
+      "requires_stream": false,
+      "seed_deterministic": null,
+      "reasoning_content_present": true,
+      "reasoning_tokens_low": null,
+      "reasoning_tokens_medium": null,
+      "reasoning_tokens_high": null,
+      "returned_model": "qwen3.8-flash",
+      "usage": {
+        "completion_tokens": 24,
+        "prompt_tokens": 65,
+        "total_tokens": 89,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 21,
+          "rejected_prediction_tokens": null,
+          "text_tokens": 24
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 0,
+          "text_tokens": 65
+        }
+      },
+      "finish_reason": "stop",
+      "seed_sent": false
+    }
+  ]
+}
