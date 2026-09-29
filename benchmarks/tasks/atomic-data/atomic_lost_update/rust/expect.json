@@ -1,0 +1,11 @@
+{
+  "schema_version": "skelnet-rust-expect-v1",
+  "fixed.rs": {
+    "functional": true
+  },
+  "buggy.rs": {
+    "functional": false,
+    "layer": "O2",
+    "category": "wrong_output"
+  }
+}
