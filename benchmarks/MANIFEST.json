@@ -60,7 +60,7 @@
     {
       "task": "atomic-data/atomic_lost_update",
       "file": "rust/expect.json",
-      "sha256": "968a5f44f72eed4cae848b6cb28f9f1d0d15db43b0a705497ded701e32fddb8a",
+      "sha256": "0078216a8739cb0a42d19df5fac343f423e7d7a746a025d6b2724bddcca8cd12",
       "source": "new (SkelNet R7a-2)"
     },
     {
@@ -192,7 +192,7 @@
     {
       "task": "atomic-data/counter_overflow_safety",
       "file": "rust/expect.json",
-      "sha256": "968a5f44f72eed4cae848b6cb28f9f1d0d15db43b0a705497ded701e32fddb8a",
+      "sha256": "0078216a8739cb0a42d19df5fac343f423e7d7a746a025d6b2724bddcca8cd12",
       "source": "new (SkelNet R7a-2)"
     },
     {
@@ -1690,7 +1690,7 @@
     {
       "task": "structure/worker_with_payload",
       "file": "rust/expect.json",
-      "sha256": "968a5f44f72eed4cae848b6cb28f9f1d0d15db43b0a705497ded701e32fddb8a",
+      "sha256": "0078216a8739cb0a42d19df5fac343f423e7d7a746a025d6b2724bddcca8cd12",
       "source": "new (SkelNet R7a-2)"
     },
     {

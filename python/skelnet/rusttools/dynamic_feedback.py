@@ -154,6 +154,11 @@ def _shuttle_text(layer, failure_file: Path) -> str:
         return f"## shuttle\nshuttle could not run: {layer.detail}"
     if layer.status == PASS:
         return "## shuttle\npassed"
+    if layer.category == "livelock":
+        # The failing schedule of a step-bound failure is ~1M steps of hex;
+        # the diagnostic line is the useful part.
+        return "\n".join(["## shuttle", "category: livelock",
+                          layer.detail or ""]).rstrip()
     parts = ["## shuttle", f"category: {layer.category}"]
     if layer.detail:
         parts.append(layer.detail)
@@ -214,7 +219,7 @@ def run_dynamic(tools: ToolRunner, workdir: Path | str, source: str, *,
     shuttle = evaluate_shuttle(
         tools, workdir, source, shim_path=SHUTTLE_SHIM_CRATE,
         iterations=shuttle_iterations, depth=shuttle_depth,
-        seed=shuttle_seed, timeout=timeout, cargo=cargo)
+        seed=shuttle_seed, timeout=timeout, cargo=cargo, terminal=terminal)
     # no_concurrency is already PASS. unsupported does not block (D4-4).
     shuttle_block = shuttle.status != PASS and not _nonblocking(shuttle.category)
     failure_file = workdir / "shuttle" / "failure.txt"

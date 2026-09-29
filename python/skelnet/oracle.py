@@ -246,13 +246,17 @@ class RustOracle:
         self.tools: ToolRunner | None = None
 
     # ── layer runners ────────────────────────────────────────────────
-    def _o3(self, tools: ToolRunner, workdir: Path, src: str) -> LayerResult:
+    def _o3(self, tools: ToolRunner, workdir: Path, src: str, *,
+            check_terminal: bool = True) -> LayerResult:
         if "O3" not in self.layers:
             return LayerResult("O3", NOT_RUN, "disabled", "O3 disabled")
+        # Every explored Shuttle schedule must end with the terminal line,
+        # as every O2 run must (round 9b). Codegen mode checks no terminal.
         shuttle = evaluate_shuttle(
             tools, workdir, src, shim_path=SHUTTLE_SHIM_CRATE,
             iterations=self.shuttle_iterations, depth=self.shuttle_depth,
-            seed=ORACLE_SHUTTLE_SEED, timeout=self.timeout, cargo=self.cargo)
+            seed=ORACLE_SHUTTLE_SEED, timeout=self.timeout, cargo=self.cargo,
+            terminal=self.terminal if check_terminal else None)
         miri = evaluate_miri(
             tools, workdir, seed_start=self.miri_seed_start,
             seed_count=self.miri_seed_count, timeout=self.timeout, cargo=self.cargo)
@@ -299,7 +303,8 @@ class RustOracle:
                          runs=self.stress_runs, run_timeout=self.stress_timeout,
                          check_terminal=check_terminal)
         layers["O2"] = o2
-        layers["O3"] = self._o3(tools, workdir, rust_source)
+        layers["O3"] = self._o3(tools, workdir, rust_source,
+                                check_terminal=check_terminal)
         if o2.category in ("hang", "crash"):
             # A program that hangs/crashes cannot be instrumented meaningfully;
             # O4 depends on O2's termination.

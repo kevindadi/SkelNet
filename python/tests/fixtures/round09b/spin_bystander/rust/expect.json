@@ -5,7 +5,7 @@
   },
   "buggy.rs": {
     "functional": false,
-    "layer": "O3",
-    "category": "wrong_output"
+    "layer": "O2",
+    "category": "hang"
   }
 }

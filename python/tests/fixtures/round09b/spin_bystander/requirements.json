@@ -1,0 +1,124 @@
+{
+  "task": "lock-order/partial_deadlock_bystander",
+  "requirements": [
+    "The design contains one main thread and two short-lived workers.",
+    "An independent bystander task also runs and keeps making progress without ever finishing on its own.",
+    "The two workers share the same two locks and also use two counting permits to coordinate with each other.",
+    "Each worker must hold both locks at the same time while it enters its critical section.",
+    "The two workers must use the two permits as a handshake, so that neither takes its second lock before the other has taken its first.",
+    "The bystander task must not prevent the two workers from finishing.",
+    "At every point during execution, it must still be possible for the first worker to finish.",
+    "At every point during execution, it must still be possible for the second worker to finish.",
+    "Neither worker may wait forever for a permit or a lock that the other worker never provides.",
+    "Every worker must release each lock it holds before it finishes.",
+    "The main thread starts all three tasks and only finishes after both workers have finished, even though the bystander may keep running.",
+    "The program must print exactly the line `DONE a=1 b=1` and then exit."
+  ],
+  "unverifiable": [
+    2,
+    12
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R6",
+        "R9",
+        "R10",
+        "R11"
+      ],
+      [
+        "R6",
+        "R7",
+        "R11"
+      ],
+      [
+        "R6",
+        "R8",
+        "R11"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R7",
+        "R11"
+      ],
+      [
+        "R1",
+        "R8",
+        "R11"
+      ],
+      [
+        "R3",
+        "R4",
+        "R5"
+      ],
+      [
+        "R3",
+        "R4",
+        "R5"
+      ]
+    ]
+  },
+  "terminal": "DONE a=1 b=1",
+  "entities": {
+    "roles": [
+      "a",
+      "b",
+      "bystander"
+    ],
+    "resources": [
+      {
+        "name": "a",
+        "kind": "lock"
+      },
+      {
+        "name": "b",
+        "kind": "lock"
+      },
+      {
+        "name": "sa",
+        "kind": "semaphore"
+      },
+      {
+        "name": "sb",
+        "kind": "semaphore"
+      },
+      {
+        "name": "flag",
+        "kind": "shared variable"
+      }
+    ]
+  },
+  "contract": "lock-order/partial_deadlock_bystander/contract.json",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 3,
+    "thread_funcs": [
+      "main::a",
+      "main::b",
+      "main::bystander"
+    ],
+    "sync_resources": 2,
+    "unused_resources": [
+      "main::sa",
+      "main::sb"
+    ],
+    "mechanisms": [
+      "Mutex"
+    ],
+    "mechanism_count": 1,
+    "parameterized": false,
+    "states": 149,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L1",
+    "nearest_tier": "L1",
+    "violations": []
+  }
+}

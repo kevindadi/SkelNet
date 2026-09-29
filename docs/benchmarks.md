@@ -53,7 +53,8 @@ tasks skip the literal-terminal check.
 
 Keys are file names under `rust/`. `layer` is `O1`–`O4`. Categories match the
 oracle: O1 `no_build` / `policy_violation`; O2 `hang` / `crash` /
-`wrong_output` / `no_output`; O3 `deadlock` / `panic` / `thread_leak` / `ub`;
+`wrong_output` / `no_output`; O3 `deadlock` / `livelock` / `wrong_output` /
+`panic` / `thread_leak` / `ub`;
 O4 `monitor_fail` / `not_observed` / `unmapped` / `design_loss`.
 
 ## Checks (`bench validate`)
