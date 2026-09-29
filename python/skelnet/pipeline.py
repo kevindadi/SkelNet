@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -46,15 +47,49 @@ class CellResult:
     extra: dict[str, Any] = field(default_factory=dict)
 
 
+_LANG_ALIASES = {
+    "rust": frozenset({"rust", "rs"}),
+    "skel": frozenset({"skel", "skeleton"}),
+    "json": frozenset({"json", "jsonc"}),
+}
+_FENCE_OPEN = re.compile(r"```([^\n]*)")
+_LANG_TOKEN = re.compile(r"([A-Za-z0-9_+.-]+)")
+
+
+def _fence_body(text: str, info_end: int) -> str:
+    """Code after an opening fence, without the info-string line."""
+    rest = text[info_end:]
+    if rest.startswith("\r\n"):
+        rest = rest[2:]
+    elif rest.startswith("\n"):
+        rest = rest[1:]
+    close = rest.find("```")
+    if close < 0:
+        return rest.strip()
+    return rest[:close].strip()
+
+
 def _extract_block(text: str, language: str) -> str:
-    fence = f"```{language}"
-    if fence in text:
-        body = text.split(fence, 1)[1]
-        return body.split("```", 1)[0].strip()
-    if "```" in text:
-        body = text.split("```", 1)[1]
-        return body.split("```", 1)[0].strip()
-    return text.strip()
+    """Extract a fenced block for ``language``.
+
+    Prefer the first fence whose info-string's first word is a known alias
+    (case-insensitive). Otherwise use the first fence of any kind. The info
+    string itself is not part of the result. An unclosed fence runs to the
+    end of the reply. With no fence, the whole reply is returned.
+    """
+    aliases = _LANG_ALIASES[language]
+    opens = list(_FENCE_OPEN.finditer(text or ""))
+    if not opens:
+        return (text or "").strip()
+
+    def token(info: str) -> str:
+        match = _LANG_TOKEN.search(info or "")
+        return match.group(1).lower() if match else ""
+
+    chosen = next((item for item in opens if token(item.group(1)) in aliases), None)
+    if chosen is None:
+        chosen = opens[0]
+    return _fence_body(text, chosen.end())
 
 
 def extract_skel(text: str) -> str:
@@ -115,12 +150,19 @@ def classify_rust_reply(text: str, *, allow_no_issues: bool = False) -> RustRepl
     return RustReply(kind="other")
 
 
+def _ms_since(started: float) -> int:
+    return int((time.monotonic() - started) * 1000)
+
+
 def _skel_verify(backend, path: Path, contract_path: Path) -> Any:
+    started = time.monotonic()
     check = backend.check(path)
+    check_ms = _ms_since(started)
     if not check.ok:
-        return check, None
+        return check, None, check_ms, None
+    started = time.monotonic()
     verify = backend.verify(path, contract_path)
-    return check, verify
+    return check, verify, check_ms, _ms_since(started)
 
 
 def _design_kind(arm: str) -> str | None:
@@ -197,11 +239,12 @@ def _run_rust_stage(*, arm: str, rust_mode: str, design: str | None,
         call_number = calls_used + extra["rust_calls"]
         reply = classify_rust_reply(response.text)
         entry = {"call": call_number, "stage": stage, "reply_kind": reply.kind,
-                 "compiled": None, "compile": None}
+                 "compiled": None, "compile": None, "compile_wall_ms": None}
         if reply.kind == "program":
             current_program = reply.source
             compiled_result = compile_fn(
                 tools, workdir / "compile" / f"c{call_number}", current_program)
+            entry["compile_wall_ms"] = getattr(compiled_result, "wall_ms", None)
             if compiled_result.unavailable:
                 # The compiler itself could not run: stop, never retry.
                 entry["compile"] = "unavailable"
@@ -276,7 +319,7 @@ def run_skel_cell(*, task: str, requirements: str, contract_path: Path,
         # only a non-empty reply can drive the Rust stage (D5-6).
         skel_path = workdir / f"candidate_{attempt}.skel"
         skel_path.write_text(candidate, encoding="utf-8")
-        check, verify = _skel_verify(backend, skel_path, contract_path)
+        check, verify, check_ms, verify_ms = _skel_verify(backend, skel_path, contract_path)
         if attempt == 1:
             result.parse_ok = bool(candidate) and check.kind == "semantic" and not _has_parse_error(check)
         if check.ok:
@@ -292,11 +335,13 @@ def run_skel_cell(*, task: str, requirements: str, contract_path: Path,
                 check, property_ids=property_ids, index=property_index))
             result.history.append({"attempt": attempt, "stage": "check",
                                    "status": check.status,
-                                   "diagnostics": (check.payload or {}).get("diagnostics")})
+                                   "diagnostics": (check.payload or {}).get("diagnostics"),
+                                   "wall_ms": check_ms})
             continue
         result.history.append({"attempt": attempt, "stage": "verify",
                                "outcome": verify.outcome, "complete": verify.complete,
-                               "unmapped": (verify.payload or {}).get("unmapped")})
+                               "unmapped": (verify.payload or {}).get("unmapped"),
+                               "wall_ms": verify_ms})
         if candidate:
             last_status = verify.outcome
         if verify.outcome == "PASS" and verify.complete:
@@ -349,7 +394,9 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
         cir_path = workdir / f"candidate_{attempt}.cir.json"
         # CIR is never normalised: the backend sees the extracted bytes as-is.
         cir_path.write_text(candidate, encoding="utf-8")
+        started = time.monotonic()
         verify = backend.verify_cir(cir_path, contract_path)
+        verify_ms = _ms_since(started)
         ok = verify.kind == "semantic" and verify.outcome not in (
             "INVALID", "UNSUPPORTED")
         if attempt == 1:
@@ -362,7 +409,8 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
             last_check_ok = ok
             last_status = verify.outcome
         result.history.append({"attempt": attempt, "stage": "verify",
-                               "outcome": verify.outcome, "complete": verify.complete})
+                               "outcome": verify.outcome, "complete": verify.complete,
+                               "wall_ms": verify_ms})
         if verify.outcome == "PASS" and verify.complete:
             result.accepted = True
             result.ledger = evidence.property_ledger(verify.payload)
@@ -438,6 +486,7 @@ def run_g0_cell(*, task: str, requirements: str, provider: CandidateProvider,
     if tools is None:
         tools = ToolRunner()
     compiled = compile_fn(tools, Path(workdir) / "compile" / "c1", result.rust or "")
+    result.extra["compile_wall_ms"] = getattr(compiled, "wall_ms", None)
     if getattr(compiled, "unavailable", None):
         result.check_ok = False
         result.accepted = False
