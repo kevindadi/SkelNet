@@ -88,3 +88,15 @@ Rust version.
 
 Codegen mode (`--rust-mode codegen`) reports only `run_ok` and the layer
 statuses: both `functional_ok` and `functional_ok_no_o4` are `null`.
+
+### Tool timing fields (round 9a)
+
+Optional, checked only when present. Each value is an `int` or `null`, in
+milliseconds. A string such as `"12"` is rejected. `bool` is not an int.
+
+- SKEL/CIR `history[]` check and verify items: `wall_ms`.
+- `rust_attempts[]`: `compile_wall_ms` (`null` when that attempt did not compile).
+- G0 cells: top-level `compile_wall_ms`.
+- Baseline `rounds[]`: `compile_wall_ms`.
+- Baseline `rounds[].tools.clippy`, `rounds[].tools.lockbud`, and the DYNAMIC
+  tool slices: `wall_ms`.
