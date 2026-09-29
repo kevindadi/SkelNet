@@ -56,14 +56,49 @@ seed policy, per-cell call/token budgets, max output tokens and hint.
 is present (never the value); `--env-file` selects the dotenv file to load
 (defaults to the repository `.env`).
 
+A real probe also sends one nontrivial concurrency question
+(`PROBE_NONTRIVIAL_USER`, correct answer `YES`) at the model's default effort,
+and, for models that take a reasoning effort (Kimi and GPT), once more at
+`low`. The record stores `reasoning_tokens_nontrivial`,
+`nontrivial_answer_ok`, `nontrivial_output_tokens`, and
+`reasoning_tokens_nontrivial_low` when the low call ran. GPT's Responses
+channel also stores `responses_reasoning_echo` (the `reasoning` object echoed
+on the response, or null), `responses_reasoning_items` (output items whose
+`type` is `reasoning`), `responses_output_tokens_details`, and
+`responses_reasoning_summary_present` from one extra probe-only request that
+sets `reasoning.summary` to `"auto"`. Experiment runs never send `summary`.
+
+`reasoning_diagnosis` reads the nontrivial call:
+
+| value | meaning |
+| --- | --- |
+| `model_reasons` | `reasoning_tokens_nontrivial` > 0 |
+| `gateway_dropped_reasoning_param` | tokens are 0 and the Responses echo is null or has no effort |
+| `reasoning_not_reported_or_not_used` | tokens are 0 and the echo still carries an effort |
+| `no_reasoning_observed` | a Chat channel reported 0 reasoning tokens and no `reasoning_content` |
+| `probe_error` | the probe call failed |
+
 ## Terminal line
 
 The required terminating stdout line is read from
 `benchmarks/tasks/<task>/requirements.json`. With `--hint h0` the `terminal`
 field is used; otherwise `terminal_v2` is preferred when present (falling back
-to `terminal`). The default is `h1` so tooling that does not pass a hint uses
-the v2 line once it exists. Tasks without a `requirements.json` (the boundary
-tasks) have no terminal line.
+to `terminal`). `read_terminal`'s own default argument is `h1` so tooling that
+does not pass a hint uses the v2 line once it exists. Tasks without a
+`requirements.json` (the boundary tasks) have no terminal line.
+
+`run --hint` defaults to `params.DEFAULT_HINT` (currently `h0`). The argparse
+default is unset; `_run_params` reads the constant when the command runs, so
+round 9 changes the protocol default by editing `DEFAULT_HINT` to `h1` and
+nothing else. MANIFEST and `--dry-run` record `hint_source` as `explicit` or
+`default`. Before any model call, a non-boundary task that lacks
+`REQUIREMENTS.md` (h0) or `REQUIREMENTS.h1.md` (h1) aborts the run and lists
+the tasks. `--dry-run` does not abort: it lists them in `requirements_missing`
+and exits 0. Boundary tasks stay skipped. `--stage` 1, 2, or 3 requires hint
+`h1` (plan D10) unless `--allow-nonprotocol-hint` is set, which records
+`hint_override: true`. `eval` of a MANIFEST with no `hint` uses
+`params.LEGACY_HINT` (`h0`) and does not follow a later change of
+`DEFAULT_HINT`.
 
 The oracle records `terminal_check` as one of:
 
@@ -114,12 +149,20 @@ not comparable to the LLM modes' `functional_ok`.
 ## Commands
 
 ```
-python -m skelnet run  --arm SKEL --model <name> --tasks all|<glob> --reps 3 --rounds 4 --out experiments/<run_id>
+python -m skelnet run  --arm SKEL --model <name> --tasks all|<glob>[,<glob>...] --reps 3 --rounds 4 --out experiments/<run_id>
 python -m skelnet eval experiments/<run_id>          # external oracle, offline re-run
 python -m skelnet report experiments/<run_id> [...]  # one table
 python -m skelnet models probe --dry-run             # key presence + policy, no calls
 python -m skelnet run --arm SKEL --tasks all --reps 3 --rounds 4 --dry-run
 ```
+
+`--tasks` for `run`, `oracle calibrate`, and `tools fp-check` matches `bench`:
+`all`, or a comma-separated union of fnmatch patterns, in directory order.
+If any pattern matches nothing, the command prints
+`unmatched task patterns: ...` on stderr and exits 2 without creating the
+output directory (`run --dry-run` included). `oracle calibrate --fixtures`
+still reads that directory and does not use `--tasks`. MANIFEST
+`tasks.pattern` keeps the raw string; `tasks.selected` is the union.
 
 `--dry-run` prints the request budget and prompt shas and calls no model.
 `--out` must be absent or empty. `--force` only clears a *previous run
@@ -176,6 +219,15 @@ run directories can be compared in one call.
 - `--cache-dir` shares responses across runs; `--replay-from` replays a run
   directory or a cache directory without any network call. Cache hits count as a
   logical call but not against the global spend.
+- `--replay-mode key` (the default) looks up the request hash. It only
+  reproduces a run when tool results are reproducible: DYNAMIC and DYNAMIC_M
+  feed native stress output back into the next prompt, and a hang that appears
+  on one machine changes that prompt, so the hash misses. `--replay-mode
+  sequence` (requires `--replay-from`) ignores the request text and returns the
+  reply recorded at `(model_id, arm, task, rep, call_index)`. A different
+  request still returns that reply and sets `calls[].replay_mismatch` to true.
+  A cache recorded before round 9a has no `sequence/` index; sequence mode then
+  exits with `replay cache has no sequence index (recorded before round 9a)`.
 - `--resume` reuses a run directory, skipping cells that already have a
   `result.json`, and requires matching arm/model/tasks/reps/rounds/RunParams.
 - `eval` re-runs the oracle on stored Rust without any model calls.
