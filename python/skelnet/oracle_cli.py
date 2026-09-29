@@ -107,6 +107,19 @@ def _first_fail_layer(result) -> str | None:
     return None
 
 
+_O3_SHUTTLE_KEYS = ("output_check", "schedules_checked", "schedules_wrong",
+                    "pct_completed", "pct_abandoned", "random_completed")
+
+
+def _o3_shuttle(result) -> dict | None:
+    """Round 9b: the Shuttle half's output-check and coverage counters."""
+    o3 = result.layers.get("O3")
+    shuttle = (o3.data or {}).get("shuttle") if o3 is not None else None
+    if not isinstance(shuttle, dict):
+        return None
+    return {key: shuttle.get(key) for key in _O3_SHUTTLE_KEYS}
+
+
 def cmd_calibrate(args: argparse.Namespace, *, runner=None) -> int:
     from . import cli
     layers = _parse_layers(args.layers)
@@ -159,6 +172,7 @@ def cmd_calibrate(args: argparse.Namespace, *, runner=None) -> int:
                 "wall_ms": {name: (layer.wall_ms or 0)
                             for name, layer in result.layers.items()},
                 "matched": matched,
+                "o3_shuttle": _o3_shuttle(result),
             }
             programs_report.append(entry)
             for name, layer in result.layers.items():
