@@ -176,3 +176,23 @@ def test_normal_cdf_and_ppf():
     assert stats.normal_ppf(0.975) == pytest.approx(1.959964, abs=1e-6)
     assert stats.normal_cdf(0.0) == pytest.approx(0.5)
     assert stats.normal_cdf(-1.959964) == pytest.approx(0.025, abs=1e-6)
+
+
+def test_wilcoxon_exact_dp_large_n():
+    # n=20, all differences negative -> W+=0, W-=210.  Exact two-sided
+    # p = 2 * 1 / 2^20 = 1.9073486328125e-06 (single subset of size 0).
+    result = stats.wilcoxon_signed_rank([-i for i in range(1, 21)])
+    assert result["method"] == "exact"
+    assert result["w_plus"] == 0 and result["w_minus"] == 210
+    assert result["p"] == pytest.approx(2 / 2 ** 20)
+
+
+def test_wilcoxon_exact_matches_textbook_n10():
+    # n=10, no ties: negative ranks {1,2,3} -> W=6.  Subsets of {1..10} with
+    # sum <= 6 number 14 (sums 0,1,2,3(x2),4(x2),5(x3),6(x4)); two-sided
+    # p = 2*14/2^10 = 0.02734375.
+    diffs = [4, 5, 6, 7, 8, 9, 10, -1, -2, -3]
+    result = stats.wilcoxon_signed_rank(diffs)
+    assert result["method"] == "exact"
+    assert result["statistic"] == 6
+    assert result["p"] == pytest.approx(0.02734375)

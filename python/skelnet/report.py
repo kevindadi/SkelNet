@@ -132,7 +132,7 @@ def _llm_wall(cell: dict) -> int:
 
 
 def _tool_wall(cell: dict) -> int | None:
-    values = []
+    values = [cell.get("compile_wall_ms")]
     for item in cell.get("history") or []:
         values.append(item.get("wall_ms"))
     for attempt in cell.get("rust_attempts") or []:
@@ -188,8 +188,40 @@ def _fail_column(cell: dict) -> str | None:
         layer = layers.get(name)
         if isinstance(layer, dict) and layer.get("status") == "fail":
             category = layer.get("category")
-            return _FAIL_MAP.get(name, {}).get(category, "other")
+            mapped = _FAIL_MAP.get(name, {}).get(category)
+            if mapped:
+                return mapped
+            if name == "O3":
+                # Unknown O3 categories (e.g. R9b wrong_output/livelock) stay
+                # in the O3 "other" column.
+                return "other"
+            return None
     return None
+
+
+def _unclassified_warnings(cells) -> list[str]:
+    tally: dict = {}
+    for cell in cells:
+        if not cell.included:
+            continue
+        oracle = cell.raw.get("oracle") or {}
+        if oracle.get("functional_ok") is not False:
+            continue
+        layers = oracle.get("layers") or {}
+        for name in ("O1", "O2", "O3", "O4"):
+            layer = layers.get(name)
+            if not (isinstance(layer, dict) and layer.get("status") == "fail"):
+                continue
+            category = layer.get("category")
+            if _FAIL_MAP.get(name, {}).get(category):
+                break
+            if name == "O3":
+                break
+            key = f"{name}:{category}"
+            tally[key] = tally.get(key, 0) + 1
+            break
+    return [f"unclassified failing layer {key} in {count} cell(s)"
+            for key, count in sorted(tally.items())]
 
 
 def _deadlock(cell: dict) -> bool:
@@ -263,6 +295,8 @@ class Dataset:
     n_error: int = 0
     statuses: list[str] = field(default_factory=list)
     manifests: list[dict] = field(default_factory=list)
+    counts: dict = field(default_factory=dict)
+    null_reasons: dict = field(default_factory=dict)
 
     def included(self, label=None, model=None, task=None) -> list[Cell]:
         out = []
@@ -417,11 +451,76 @@ def _assemble(run_dirs, root, allow_duplicates, allow_mixed) -> Dataset:
     consistency_warnings, mixed = _consistency_check(
         manifests, run_ids, allow_mixed=allow_mixed)
     warnings.extend(consistency_warnings)
+    warnings.extend(_unavailable_warnings(all_cells))
+    warnings.extend(_unclassified_warnings(all_cells))
     git_shas = {m.get("git_sha") for m in manifests if m.get("git_sha")}
     git_sha = (git_shas.pop() if len(git_shas) == 1 else "mixed") if git_shas else "unknown"
+    counts = _group_counts(all_cells)
+    null_reasons = _null_reason_counts(all_cells)
     return Dataset(cells=all_cells, run_ids=run_ids, git_sha=git_sha,
                    warnings=warnings, mixed=mixed, n_skipped=n_skipped,
-                   n_error=n_error, statuses=statuses, manifests=manifests)
+                   n_error=n_error, statuses=statuses, manifests=manifests,
+                   counts=counts, null_reasons=null_reasons)
+
+
+def _group_counts(cells) -> dict:
+    """Per label: included / skipped / error (D8-1, D8-2)."""
+    counts: dict = {}
+    for cell in cells:
+        entry = counts.setdefault(cell.label, {"included": 0, "skipped": 0,
+                                               "error": 0})
+        if cell.status == "skipped":
+            entry["skipped"] += 1
+        else:
+            entry["included"] += 1
+            if cell.status == "error":
+                entry["error"] += 1
+    return counts
+
+
+def _null_reason(cell) -> str | None:
+    oracle = cell.raw.get("oracle")
+    if not isinstance(oracle, dict) or not oracle:
+        return "no_oracle"
+    layers = oracle.get("layers") or {}
+    for name in ("O1", "O2", "O3", "O4"):
+        if (layers.get(name) or {}).get("status") == "unavailable":
+            return f"unavailable:{name}"
+    if oracle.get("terminal_check") == "not_applicable":
+        return "not_applicable"
+    if oracle.get("functional_ok") is None:
+        return "other"
+    return None
+
+
+def _null_reason_counts(cells) -> dict:
+    counts: dict = {}
+    for cell in cells:
+        if not cell.included:
+            continue
+        reason = _null_reason(cell)
+        if reason is None:
+            continue
+        entry = counts.setdefault(cell.label, {})
+        entry[reason] = entry.get(reason, 0) + 1
+    return counts
+
+
+def _unavailable_warnings(cells) -> list[str]:
+    """D8-1: warn once per layer/group that has unavailable layers."""
+    tally: dict = {}
+    for cell in cells:
+        if not cell.included:
+            continue
+        layers = (cell.raw.get("oracle") or {}).get("layers") or {}
+        for name in ("O1", "O2", "O3", "O4"):
+            if (layers.get(name) or {}).get("status") == "unavailable":
+                tally[(name, cell.label)] = tally.get((name, cell.label), 0) + 1
+    warnings = []
+    for (name, label), count in sorted(tally.items()):
+        warnings.append(
+            f"unavailable layer {name} in {count} {label} cell(s)")
+    return warnings
 
 
 def _make_cell(raw: dict, run_id: str, label: str, root: Path) -> Cell:
@@ -453,9 +552,12 @@ def _pct(v) -> str:
     return "--" if v is None else f"{v * 100:.1f}"
 
 
-def _signed(v) -> str:
-    text = f"{abs(v):.1f}"
-    return f"+{text}" if v >= 0 else f"$-$" + text
+def _signed(v, minus: str = "$-$") -> str:
+    rounded = round(v, 1)
+    if rounded == 0:
+        rounded = 0.0
+    text = f"{abs(rounded):.1f}"
+    return f"+{text}" if rounded >= 0 else minus + text
 
 
 def _pp(v) -> str:
@@ -468,12 +570,26 @@ def _ci(lo, hi) -> str:
     return f"[{_signed(lo)}, {_signed(hi)}]"
 
 
+def _pp_md(v) -> str:
+    return "--" if v is None else _signed(v, minus="\u2212")
+
+
+def _ci_md(lo, hi) -> str:
+    if lo is None or hi is None:
+        return "--"
+    return f"[{_signed(lo, minus='\u2212')}, {_signed(hi, minus='\u2212')}]"
+
+
 def _pval(p) -> str:
     if p is None:
         return "--"
     if p < 0.001:
         return "<0.001"
-    return f"{p:.3g}"
+    if p <= 0:
+        return "0.000"
+    exponent = math.floor(math.log10(p))
+    decimals = max(0, 2 - exponent)
+    return f"{p:.{decimals}f}"
 
 
 def _num(v, digits: int = 3) -> str:
@@ -550,6 +666,8 @@ def _comparison(ds: Dataset, reference: str, control: str,
     units = ds.pair_units(reference, control)
     boot = stats.cluster_bootstrap_diff(units, n_boot=ctx.bootstrap,
                                         seed=ctx.seed)
+    index_a = {(c.model_id, c.task, c.rep) for c in ds.included(reference)}
+    index_b = {(c.model_id, c.task, c.rep) for c in ds.included(control)}
     if not units:
         delta = ci_low = ci_high = None
     else:
@@ -562,6 +680,8 @@ def _comparison(ds: Dataset, reference: str, control: str,
         "per_model": merged["per_model"],
         "delta": delta, "ci_low": ci_low, "ci_high": ci_high,
         "n_units": len(units),
+        "missing_reference": len(index_a - index_b),
+        "missing_control": len(index_b - index_a),
         "per_model_delta": {
             model: (sum(int(a) - int(b) for a, b in pairs) / len(pairs) * 100.0
                     if pairs else None)
@@ -645,6 +765,12 @@ def table_main(ds: Dataset, ctx: ReportContext) -> dict:
     pass3_sens = _pass3(ds, "G0", sens=True)
     means = _pass3_means(pass3, models)
     means_sens = _pass3_means(pass3_sens, models)
+    pass3_short = {}
+    for model in models:
+        for task in sorted({c.task for c in ds.cells}):
+            n = len(ds.included("G0", model=model, task=task))
+            if 0 < n < 3:
+                pass3_short[f"{model}/{task}"] = n
     skel_p1 = ds.rate("SKEL", lambda c: c.ok)
     units = []
     p1_by = {}
@@ -676,7 +802,8 @@ def table_main(ds: Dataset, ctx: ReportContext) -> dict:
     alpha = nominal_alpha(ds, ctx)
     return {"models": models, "rows": rows, "pass3": pass3_row,
             "cochran": cochran, "alpha": alpha, "look": ctx.look,
-            "comparisons": comparisons, "holm": p_holm}
+            "comparisons": comparisons, "holm": p_holm,
+            "pass3_short": pass3_short}
 
 
 def _cochran_by_model(ds: Dataset) -> dict:
@@ -712,6 +839,7 @@ def table_tiers(ds: Dataset, ctx: ReportContext) -> dict:
             "L1": rate_for(lambda c: c.tier == "L1"),
             "L2": rate_for(lambda c: c.tier == "L2"),
             "L3": rate_for(lambda c: c.tier == "L3"),
+            "unclassified": rate_for(lambda c: c.tier is None),
             "classic": rate_for(lambda c: c.origin == "classic"),
             "disguised": rate_for(lambda c: c.origin == "disguised"),
         })
@@ -800,39 +928,103 @@ def table_failures(ds: Dataset, ctx: ReportContext) -> dict:
     return {"rows": rows, "columns": FAIL_COLUMNS}
 
 
+def _cost_row(label: str, cells: list) -> dict:
+    n = len(cells)
+    ok_count = sum(1 for c in cells if c.ok)
+    billable = sum(c.billable_tokens for c in cells)
+    tool_cells = [c for c in cells if c.tool_wall_ms is not None]
+    oracle_cells = [c for c in cells if c.oracle_wall_ms is not None]
+    first_ok = [c.final_call for c in cells if c.ok and c.final_call]
+    cache_calls = [call for c in cells for call in (c.raw.get("calls") or [])
+                   if call.get("cache_hit")]
+    cache_billable = 0
+    for call in cache_calls:
+        usage = call.get("usage") or {}
+        for key in ("input", "output"):
+            value = usage.get(key)
+            if isinstance(value, int):
+                cache_billable += value
+    cache_llm = sum(call.get("wall_ms") or 0 for call in cache_calls)
+    return {
+        "label": label, "n": n,
+        "calls": sum(c.raw.get("budget_used", {}).get("calls", 0)
+                     for c in cells) / n,
+        "input": sum(c.input_tokens for c in cells) / n,
+        "output": sum(c.output_tokens for c in cells) / n,
+        "reasoning": sum(c.reasoning_tokens for c in cells) / n,
+        "tokens_correct": (billable / ok_count) if ok_count else None,
+        "llm_ms": sum(c.llm_wall_ms for c in cells) / n,
+        "tool_ms": (sum(c.tool_wall_ms for c in tool_cells) / len(tool_cells)
+                    if tool_cells else None),
+        "tool_n": len(tool_cells),
+        "oracle_ms": (sum(c.oracle_wall_ms for c in oracle_cells)
+                      / len(oracle_cells) if oracle_cells else None),
+        "first_ok_calls": (sum(first_ok) / len(first_ok) if first_ok
+                           else None),
+        "cache_hit_calls": len(cache_calls),
+        "cache_hit_billable": cache_billable,
+        "cache_hit_llm_ms": cache_llm,
+    }
+
+
 def table_cost(ds: Dataset, ctx: ReportContext) -> dict:
     rows = []
+    per_model = []
     for label in GROUP_ORDER:
         cells = ds.included(label)
         if not cells:
             rows.append({"label": label, "n": 0})
-            continue
-        n = len(cells)
-        ok_count = sum(1 for c in cells if c.ok)
-        billable = sum(c.billable_tokens for c in cells)
-        tool_cells = [c for c in cells if c.tool_wall_ms is not None]
-        first_ok = [c.final_call for c in cells if c.ok and c.final_call]
-        row = {
-            "label": label, "n": n,
-            "calls": sum(c.raw.get("budget_used", {}).get("calls", 0)
-                         for c in cells) / n,
-            "input": sum(c.input_tokens for c in cells) / n,
-            "output": sum(c.output_tokens for c in cells) / n,
-            "reasoning": sum(c.reasoning_tokens for c in cells) / n,
-            "tokens_correct": (billable / ok_count) if ok_count else None,
-            "llm_ms": sum(c.llm_wall_ms for c in cells) / n,
-            "tool_ms": (sum(c.tool_wall_ms for c in tool_cells) / len(tool_cells)
-                        if tool_cells else None),
-            "tool_n": len(tool_cells),
-            "oracle_ms": (sum(c.oracle_wall_ms for c in cells if c.oracle_wall_ms
-                              is not None) / max(1, sum(
-                                  1 for c in cells if c.oracle_wall_ms is not None)))
-            if any(c.oracle_wall_ms is not None for c in cells) else None,
-            "first_ok_calls": (sum(first_ok) / len(first_ok) if first_ok
-                               else None),
-        }
-        rows.append(row)
-    return {"rows": rows}
+        else:
+            rows.append(_cost_row(label, cells))
+        for model in ds.models():
+            model_cells = ds.included(label, model=model)
+            if model_cells:
+                entry = _cost_row(label, model_cells)
+                entry["model"] = model
+                per_model.append(entry)
+    prices = _cost_prices(ds, ctx)
+    for model in prices.get("missing", []):
+        message = f"missing prices for {model}"
+        if message not in ds.warnings:
+            ds.warnings.append(message)
+    return {"rows": rows, "per_model": per_model, "prices": prices,
+            "models": ds.models()}
+
+
+def _cost_prices(ds: Dataset, ctx: ReportContext) -> dict:
+    if not ctx.prices:
+        return {}
+    per_million = ctx.prices.get("per_million", {})
+    currency = ctx.prices.get("currency", "USD")
+    by_model = {}
+    missing = set()
+    for label in GROUP_ORDER:
+        for model in ds.models():
+            cells = ds.included(label, model=model)
+            if not cells:
+                continue
+            price = per_million.get(model)
+            if not price:
+                missing.add(model)
+                by_model.setdefault(label, {})[model] = None
+                continue
+            total = 0.0
+            for cell in cells:
+                cached = sum((call.get("usage") or {}).get("cached") or 0
+                             for call in (cell.raw.get("calls") or []))
+                uncached = max(0, cell.input_tokens - cached)
+                total += (uncached * price.get("input", 0)
+                          + cached * price.get("cached_input", price.get("input", 0))
+                          + cell.output_tokens * price.get("output", 0)) / 1e6
+            by_model.setdefault(label, {})[model] = total
+    totals = {}
+    for label, entry in by_model.items():
+        if all(value is not None for value in entry.values()):
+            totals[label] = sum(entry.values())
+        else:
+            totals[label] = None
+    return {"currency": currency, "by_model": by_model, "totals": totals,
+            "missing": sorted(missing)}
 
 
 def table_models(ds: Dataset, ctx: ReportContext) -> dict:
@@ -911,16 +1103,23 @@ def table_benchmark(ds: Dataset, ctx: ReportContext) -> dict:
                 boundary += 1
             elif family in counts and tier in ("L1", "L2", "L3"):
                 counts[family][tier] += 1
+    l2_data = sum(counts[f]["L2"] for f in families)
+    l3_data = sum(counts[f]["L3"] for f in families)
+    has_l2 = l2_data > 0
+    has_l3 = l3_data > 0
     rows = []
     for family in families:
         row = {"family": family, "L1": counts[family]["L1"],
-               "L2": counts[family]["L2"] or None,
-               "L3": counts[family]["L3"] or None}
+               "L2": counts[family]["L2"] if has_l2 else None,
+               "L3": counts[family]["L3"] if has_l3 else None}
         rows.append(row)
     l1_total = sum(counts[f]["L1"] for f in families)
+    l2_total = l2_data if has_l2 else 12
+    l3_total = l3_data if has_l3 else 8
     return {"rows": rows, "boundary": boundary,
-            "total": {"L1": l1_total, "L2": 12, "L3": 8,
-                      "Total": l1_total + 20}}
+            "source": ("data" if (has_l2 or has_l3) else "D10"),
+            "total": {"L1": l1_total, "L2": l2_total, "L3": l3_total,
+                      "Total": l1_total + l2_total + l3_total}}
 
 
 def table_coverage(ds: Dataset, ctx: ReportContext) -> dict:
@@ -947,13 +1146,31 @@ def table_coverage(ds: Dataset, ctx: ReportContext) -> dict:
                 row[key] = (sum(1 for c in cells if c.coverage.get(key))
                             / len(cells))
             per_model.append(row)
-    return {"keys": keys, "rows": rows, "per_model": per_model}
+    reasons = sorted({reason for entry in ds.null_reasons.values()
+                      for reason in entry})
+    return {"keys": keys, "rows": rows, "per_model": per_model,
+            "reasons": reasons, "null_reasons": ds.null_reasons}
+
+
+def _lockbud_ratios(bucket: dict) -> dict:
+    dead = bucket["tp"] + bucket["fn"]
+    ok = bucket["ok_fail"] + bucket["ok_pass"]
+    not_dead = bucket["fp"] + bucket["tn"]
+    return {
+        "recall": bucket["tp"] / dead if dead else None,
+        "fp_on_ok": bucket["ok_fail"] / ok if ok else None,
+        "report_on_not_deadlock": bucket["fp"] / not_dead if not_dead else None,
+    }
+
+
+def _empty_bucket() -> dict:
+    return {"tp": 0, "fp": 0, "fn": 0, "tn": 0, "ok_fail": 0, "ok_pass": 0}
 
 
 def table_lockbud(ds: Dataset, ctx: ReportContext) -> dict:
     reference = ctx.fp_check
-    joined = {"tp": 0, "fp": 0, "fn": 0, "tn": 0, "unavailable": 0,
-              "excluded": 0}
+    joined = dict(_empty_bucket())
+    joined.update({"unavailable": 0, "excluded": 0, "no_g0": 0})
     per_model: dict = {}
     per_family: dict = {}
     g0_index = {(c.model_id, c.task, c.rep): c for c in ds.included("G0")}
@@ -970,17 +1187,56 @@ def table_lockbud(ds: Dataset, ctx: ReportContext) -> dict:
             joined["unavailable"] += 1
             continue
         counterpart = g0_index.get((cell.model_id, cell.task, cell.rep))
-        dead = counterpart.deadlock if counterpart is not None else False
+        if counterpart is None or counterpart.raw.get("oracle") is None:
+            joined["no_g0"] += 1
+            continue
+        dead = counterpart.deadlock
+        ok = counterpart.ok is True
         reported = status == "fail"
         bucket = ("tp" if reported and dead else "fp" if reported
                   else "fn" if dead else "tn")
         joined[bucket] += 1
+        if ok:
+            joined["ok_fail" if reported else "ok_pass"] += 1
         for store, key in ((per_model, cell.model_id),
                            (per_family, cell.task.split("/")[0])):
-            entry = store.setdefault(key, {"tp": 0, "fp": 0, "fn": 0, "tn": 0})
+            entry = store.setdefault(key, _empty_bucket())
             entry[bucket] += 1
+            if ok:
+                entry["ok_fail" if reported else "ok_pass"] += 1
+    for store in (per_model, per_family):
+        for entry in store.values():
+            entry.update(_lockbud_ratios(entry))
     return {"reference": reference, "joined": joined,
-            "per_model": per_model, "per_family": per_family}
+            "ratios": _lockbud_ratios(joined),
+            "per_model": per_model, "per_family": per_family,
+            "reference_by_family": _fp_check_by_family(reference)}
+
+
+def _fp_check_by_family(reference: dict | None) -> dict:
+    if not reference:
+        return {}
+    families: dict = {}
+    for task in reference.get("tasks", []):
+        family = task.get("task", "").split("/")[0]
+        entry = families.setdefault(family, {
+            "clippy": {"fixed_hits": 0, "fixed_n": 0, "buggy_hits": 0,
+                       "buggy_n": 0},
+            "lockbud": {"fixed_hits": 0, "fixed_n": 0, "buggy_hits": 0,
+                        "buggy_n": 0}})
+        for program in task.get("programs", []):
+            role = program.get("role")
+            for tool in ("clippy", "lockbud"):
+                column = program.get(tool) or {}
+                if column.get("status") != "ok":
+                    continue
+                key = "findings" if tool == "clippy" else "records"
+                hit = bool(column.get(key))
+                bucket = "fixed" if role == "fixed" else "buggy"
+                entry[tool][f"{bucket}_n"] += 1
+                if hit:
+                    entry[tool][f"{bucket}_hits"] += 1
+    return families
 
 
 def _wilcoxon_pairs(ds: Dataset, reference: str, control: str, metric):
@@ -1011,6 +1267,31 @@ def _wilcoxon_pairs(ds: Dataset, reference: str, control: str, metric):
             "cliffs": stats.cliffs_delta(xs, ys) if xs and ys else None}
 
 
+def _subset_comparison(ds, reference, control, predicate, ctx) -> dict:
+    """Paired stats on the units where ``predicate(reference_cell)`` holds."""
+    index_a = {(c.model_id, c.task, c.rep): c for c in ds.included(reference)
+               if predicate(c)}
+    index_b = {(c.model_id, c.task, c.rep): c for c in ds.included(control)}
+    units = []
+    b = c = 0
+    for key in sorted(set(index_a) & set(index_b)):
+        a_ok = index_a[key].ok is True
+        b_ok = index_b[key].ok is True
+        units.append((key[1], int(a_ok) - int(b_ok)))
+        if a_ok and not b_ok:
+            b += 1
+        elif b_ok and not a_ok:
+            c += 1
+    if not units:
+        return {"b": 0, "c": 0, "n": 0, "delta": None, "ci_low": None,
+                "ci_high": None}
+    boot = stats.cluster_bootstrap_diff(units, n_boot=ctx.bootstrap,
+                                        seed=ctx.seed)
+    return {"b": b, "c": c, "n": len(units),
+            "delta": boot["point"] * 100.0, "ci_low": boot["ci_low"] * 100.0,
+            "ci_high": boot["ci_high"] * 100.0}
+
+
 def table_tests(ds: Dataset, ctx: ReportContext) -> dict:
     comparisons = []
     for control in MAIN_BASELINES:
@@ -1032,31 +1313,58 @@ def table_tests(ds: Dataset, ctx: ReportContext) -> dict:
             0 if family == "main" else index - len(family1)]
         comparison["family"] = family
         comparison["p_holm"] = adjusted
+        comparison["key"] = f"{reference}-{control}"
+        comparison["per_model_stats"] = {}
+        for model in ds.models():
+            entry = _subset_comparison(
+                ds, reference, control, lambda c, m=model: c.model_id == m, ctx)
+            comparison["per_model_stats"][model] = entry
+        comparison["per_tier_stats"] = {}
+        for tier in ("L1", "L2", "L3", "unclassified"):
+            if tier == "unclassified":
+                pred = lambda c: c.tier is None
+            else:
+                pred = lambda c, t=tier: c.tier == t
+            comparison["per_tier_stats"][tier] = _subset_comparison(
+                ds, reference, control, pred, ctx)
         rows.append(comparison)
     dynamic_m_q = _cochran_seven(ds)
-    metrics = {
-        "tokens": _wilcoxon_pairs(
-            ds, "SKEL", "G0", lambda c: c.billable_tokens),
-        "calls": _wilcoxon_pairs(
-            ds, "SKEL", "G0",
-            lambda c: c.raw.get("budget_used", {}).get("calls", 0)),
-    }
+    metrics = {}
+    for family, reference, control in comparisons:
+        metrics[f"{reference}-{control}"] = {
+            "tokens": _wilcoxon_pairs(
+                ds, reference, control, lambda c: c.billable_tokens),
+            "calls": _wilcoxon_pairs(
+                ds, reference, control,
+                lambda c: c.raw.get("budget_used", {}).get("calls", 0)),
+        }
     return {"rows": rows, "family1": holm1, "family2": holm2,
             "dynamic_m_q": dynamic_m_q, "metrics": metrics}
 
 
 def _cochran_seven(ds: Dataset) -> dict:
-    groups = ["SKEL", "CIR", "G0", "REFINE", "STATIC", "DYNAMIC", "DYNAMIC_M"]
+    groups6 = ["SKEL", "CIR", "G0", "REFINE", "STATIC", "DYNAMIC"]
+    groups7 = groups6 + ["DYNAMIC_M"]
     out = {}
     for model in ds.models():
         index: dict = {}
-        for label in groups:
+        for label in groups7:
             for cell in ds.included(label, model=model):
                 index.setdefault((cell.task, cell.rep), {})[label] = cell
-        blocks = [[1 if row[label].ok else 0 for label in groups]
-                  for row in index.values()
-                  if all(label in row for label in groups)]
-        out[model] = (stats.cochran_q(blocks) if blocks else None)
+        blocks6 = [row for row in index.values()
+                   if all(label in row for label in groups6)]
+        covered = [row for row in blocks6 if "DYNAMIC_M" in row]
+        if blocks6 and len(covered) == len(blocks6):
+            blocks = [[1 if row[label].ok else 0 for label in groups7]
+                      for row in covered]
+            result = stats.cochran_q(blocks)
+            out[model] = {"Q": result["Q"], "df": result["df"],
+                          "p": result["p"], "blocks": len(blocks),
+                          "covered": len(covered), "total": len(blocks6)}
+        else:
+            out[model] = {"Q": None, "df": None, "p": None,
+                          "blocks": len(covered), "covered": len(covered),
+                          "total": len(blocks6)}
     return out
 
 
@@ -1091,8 +1399,14 @@ def table_numbers(ds: Dataset, ctx: ReportContext) -> dict:
 def anytime_data(ds: Dataset, ctx: ReportContext) -> dict:
     labels = GROUP_ORDER + ["SKEL-outcome"]
     series = []
+    total_excluded = 0
     for label in labels:
-        cells = ds.included(label)
+        all_cells = ds.included(label)
+        cells = [c for c in all_cells if c.raw.get("rust_mode") != "codegen"]
+        if not all_cells:
+            continue
+        excluded = len(all_cells) - len(cells)
+        total_excluded += excluded
         if not cells:
             continue
         points = []
@@ -1102,8 +1416,10 @@ def anytime_data(ds: Dataset, ctx: ReportContext) -> dict:
                       and c.final_call <= b)
             points.append({"b": b, "ok_rate": hit / len(cells),
                            "n": len(cells)})
-        series.append({"label": label, "points": points})
-    return {"series": series, "call_budget": ctx.call_budget}
+        series.append({"label": label, "points": points,
+                       "excluded_codegen": excluded})
+    return {"series": series, "call_budget": ctx.call_budget,
+            "excluded_codegen": total_excluded}
 
 
 # ── LaTeX renderers (layout matches the paper placeholders) ─────────────
@@ -1153,7 +1469,12 @@ def render_main_tex(payload: dict, ds: Dataset, ctx: ReportContext) -> str:
                            f"($p$={_pval(value['p'])})")
         else:
             cochran.append(f"{header} $Q$=--")
-    alpha = "--" if payload["alpha"] is None else _num(payload["alpha"])
+    if payload.get("look") == 0:
+        alpha = "-- (Stage 0: descriptive only)"
+    elif payload["alpha"] is None:
+        alpha = "--"
+    else:
+        alpha = _num(payload["alpha"])
     lines.append(
         "\\multicolumn{10}{@{}l@{}}{\\scriptsize $^{s}$ secondary family. "
         "Cochran's Q per model: " + "; ".join(cochran) +
@@ -1323,48 +1644,61 @@ def render_coverage_tex(payload, ds, ctx) -> str:
 
 def render_lockbud_tex(payload, ds, ctx) -> str:
     joined = payload["joined"]
-    lines = [_gen_comment("lockbud", ds), "\\begin{tabular}{@{}lrr@{}}",
+    ratios = payload["ratios"]
+    lines = [_gen_comment("lockbud", ds),
+             "% (a) reference programs by family",
+             "\\begin{tabular}{@{}llrrrr@{}}",
              "\\toprule",
-             "\\textbf{Tool} & \\textbf{fixed FP rate} & "
-             "\\textbf{buggy detection rate} \\\\",
+             "\\textbf{Family} & \\textbf{Tool} & \\textbf{fixed FP} & "
+             "\\textbf{fixed n} & \\textbf{buggy hits} & \\textbf{buggy n} \\\\",
              "\\midrule"]
-    if payload.get("reference"):
-        summary = payload["reference"].get("summary", {})
-        for name in ("clippy", "lockbud"):
-            entry = summary.get(name, {})
-            lines.append(f"{name} & {_num(entry.get('fixed_fp_rate'))} & "
-                         f"{_num(entry.get('buggy_detection_rate'))} \\\\")
-    lines += ["\\bottomrule", "\\end{tabular}", "", "\\begin{tabular}{@{}lrr@{}}",
-              "\\toprule",
-              "\\textbf{Experiment join} & \\textbf{oracle deadlock} & "
-              "\\textbf{oracle not deadlock} \\\\",
-              "\\midrule"]
-    lines.append(f"lockbud fail & {joined['tp']} & {joined['fp']} \\\\")
-    lines.append(f"lockbud pass & {joined['fn']} & {joined['tn']} \\\\")
-    dead = joined["tp"] + joined["fn"]
-    ok_programs = joined["fp"] + joined["tn"]
-    recall = joined["tp"] / dead if dead else None
-    fp_rate = joined["fp"] / ok_programs if ok_programs else None
+    for family, entry in sorted(payload.get("reference_by_family", {}).items()):
+        for tool in ("clippy", "lockbud"):
+            row = entry[tool]
+            lines.append(f"{family} & {tool} & {row['fixed_hits']} & "
+                         f"{row['fixed_n']} & {row['buggy_hits']} & "
+                         f"{row['buggy_n']} \\\\")
     lines += ["\\bottomrule", "\\end{tabular}", "",
-              f"% recall {_num(recall)}, FP on ok {_num(fp_rate)}, "
-              f"unavailable {joined['unavailable']}, "
+              "% (b) experiment 2x2",
+              "\\begin{tabular}{@{}lrrrr@{}}",
+              "\\toprule",
+              "\\textbf{Group} & \\textbf{tp} & \\textbf{fp} & \\textbf{fn} & "
+              "\\textbf{tn} \\\\",
+              "\\midrule"]
+    lines.append(f"pooled & {joined['tp']} & {joined['fp']} & {joined['fn']} & "
+                 f"{joined['tn']} \\\\")
+    for model, entry in sorted(payload["per_model"].items()):
+        lines.append(f"{model} & {entry['tp']} & {entry['fp']} & {entry['fn']} & "
+                     f"{entry['tn']} \\\\")
+    for family, entry in sorted(payload["per_family"].items()):
+        lines.append(f"{family} & {entry['tp']} & {entry['fp']} & {entry['fn']} & "
+                     f"{entry['tn']} \\\\")
+    lines += ["\\bottomrule", "\\end{tabular}", "",
+              f"% recall {_num(ratios['recall'])}, "
+              f"FP on oracle-ok {_num(ratios['fp_on_ok'])}, "
+              f"report on not-deadlock {_num(ratios['report_on_not_deadlock'])}, "
+              f"no_g0 {joined['no_g0']}, unavailable {joined['unavailable']}, "
               f"excluded (no v1 compile) {joined['excluded']}"]
     return "\n".join(lines) + "\n"
 
 
 def render_tests_tex(payload, ds, ctx) -> str:
-    lines = [_gen_comment("tests", ds), "\\begin{tabular}{@{}llrrrrrr@{}}",
+    lines = [_gen_comment("tests", ds),
+             "\\begin{tabular}{@{}llrrrrrrrr@{}}",
              "\\toprule",
              "\\textbf{Family} & \\textbf{Comparison} & \\textbf{b} & \\textbf{c} & "
              "\\textbf{p} & \\textbf{$p_{Holm}$} & \\textbf{$\\Delta$ (pp)} & "
-             "\\textbf{95\\% CI} \\\\",
+             "\\textbf{95\\% CI} & \\textbf{n} & \\textbf{missing} \\\\",
              "\\midrule"]
     for row in payload["rows"]:
+        missing = (f"{row['missing_reference']}/{row['missing_control']}"
+                   if (row["missing_reference"] or row["missing_control"]) else "--")
         lines.append(
             f"{row['family']} & {_tex_label(row['reference'])} $-$ "
             f"{_tex_label(row['control'])} & {row['b']} & {row['c']} & "
             f"{_pval(row['p'])} & {_pval(row['p_holm'])} & "
-            f"{_pp(row['delta'])} & {_ci(row['ci_low'], row['ci_high'])} \\\\")
+            f"{_pp(row['delta'])} & {_ci(row['ci_low'], row['ci_high'])} & "
+            f"{row['n_units']} & {missing} \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 
@@ -1431,7 +1765,8 @@ def render_main_md(payload, ds, ctx) -> str:
     for row in payload["rows"] + [payload["pass3"]]:
         cells = [_pct(row["per_model"].get(m)) for m in payload["models"]]
         cells.append(_pct(row.get("pooled")))
-        cells += [_pp(row.get("delta")), _ci(row.get("ci_low"), row.get("ci_high")),
+        cells += [_pp_md(row.get("delta")),
+                  _ci_md(row.get("ci_low"), row.get("ci_high")),
                   _pval(row.get("p"))]
         cells.append(_pct(row.get("sens")))
         lines.append("| " + row["label"] + " | " + " | ".join(cells) + " |")
@@ -1440,17 +1775,27 @@ def render_main_md(payload, ds, ctx) -> str:
         if (v := payload["cochran"].get(m)) else f"{MODEL_HEADER.get(m, m)} Q=--"
         for m in payload["models"])
     lines.append("")
+    if payload.get("look") == 0:
+        alpha = "-- (Stage 0: descriptive only)"
+    else:
+        alpha = _num(payload["alpha"])
     lines.append(f"Cochran's Q per model: {cochran}. "
-                 f"Nominal alpha: {_num(payload['alpha'])}.")
+                 f"Nominal alpha: {alpha}.")
+    if payload.get("pass3_short"):
+        cells = ", ".join(f"{key} (n={n})"
+                          for key, n in sorted(payload["pass3_short"].items()))
+        lines.append("")
+        lines.append(f"G0 pass@3 uses pass@n for n<3: {cells}.")
     return "\n".join(lines) + "\n"
 
 
 def render_tiers_md(payload, ds, ctx) -> str:
-    lines = ["| Arm | L1 | L2 | L3 | classic | disguised |",
-             "| --- | --- | --- | --- | --- | --- |"]
+    lines = ["| Arm | L1 | L2 | L3 | unclassified | classic | disguised |",
+             "| --- | --- | --- | --- | --- | --- | --- |"]
     for row in payload["rows"]:
         lines.append("| " + row["label"] + " | " + " | ".join(
-            _pct(row[k]) for k in ("L1", "L2", "L3", "classic", "disguised")) + " |")
+            _pct(row[k]) for k in ("L1", "L2", "L3", "unclassified",
+                                   "classic", "disguised")) + " |")
     return "\n".join(lines) + "\n"
 
 
@@ -1468,7 +1813,7 @@ def render_design_md(payload, ds, ctx) -> str:
 
 def render_failures_md(payload, ds, ctx) -> str:
     lines = ["| Arm | " + " | ".join(FAIL_COLUMNS) +
-             " | deadlock rate | false acc. | other |",
+             " | deadlock rate | false acc. | no failing layer |",
              "| --- | " + " | ".join(["---"] * (len(FAIL_COLUMNS) + 3)) + " |"]
     for row in payload["rows"]:
         columns = [_pct(row["columns"][c]) for c in FAIL_COLUMNS]
@@ -1481,51 +1826,78 @@ def render_failures_md(payload, ds, ctx) -> str:
     return "\n".join(lines) + "\n"
 
 
+_COST_HEADER = ("| Arm | calls | input k | output k | reasoning k | "
+                "tokens/correct k | LLM s | tool s | oracle s | first-ok calls |")
+_COST_RULE = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+
+
+def _cost_row_md(label: str, row: dict) -> str:
+    if not row.get("n"):
+        return "| " + label + " | " + " | ".join(["--"] * 9) + " |"
+    return "| " + label + " | " + " | ".join([
+        _calls(row["calls"]), _thousands(row["input"]),
+        _thousands(row["output"]), _thousands(row["reasoning"]),
+        _thousands(row["tokens_correct"]), _seconds(row["llm_ms"]),
+        _seconds(row["tool_ms"]), _seconds(row["oracle_ms"]),
+        _calls(row["first_ok_calls"])]) + " |"
+
+
 def render_cost_md(payload, ds, ctx) -> str:
-    lines = ["| Arm | calls | input k | output k | reasoning k | tokens/correct k | LLM s | tool s | oracle s | first-ok calls |",
-             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+    lines = [_COST_HEADER, _COST_RULE]
     for row in payload["rows"]:
-        if not row.get("n"):
-            lines.append("| " + row["label"] + " | " + " | ".join(["--"] * 9) + " |")
-            continue
-        lines.append("| " + row["label"] + " | " + " | ".join([
-            _calls(row["calls"]), _thousands(row["input"]),
-            _thousands(row["output"]), _thousands(row["reasoning"]),
-            _thousands(row["tokens_correct"]), _seconds(row["llm_ms"]),
-            _seconds(row["tool_ms"]), _seconds(row["oracle_ms"]),
-            _calls(row["first_ok_calls"])]) + " |")
+        lines.append(_cost_row_md(row["label"], row))
     lines.append("")
     lines.append("Costs are per cell (mean); `tokens/correct` is total billable "
-                 "tokens over correct programs. Tool seconds cover "
+                 "tokens over correct programs. Costs are computed by running "
+                 "each group on its own; a cache-hit first round is billed to "
+                 "the group that replays it (D8-12). Tool seconds cover "
                  f"{sum(r.get('tool_n', 0) for r in payload['rows'])} cells.")
-    if ctx.prices:
+    lines.append("")
+    lines.append("Per group × model:")
+    lines.append("")
+    lines.append("| Arm | Model | " + _COST_HEADER.split("|", 2)[2].strip())
+    lines.append("| --- | --- | " + " | ".join(["---"] * 9) + " |")
+    for row in payload["per_model"]:
+        cells = [_calls(row["calls"]), _thousands(row["input"]),
+                 _thousands(row["output"]), _thousands(row["reasoning"]),
+                 _thousands(row["tokens_correct"]), _seconds(row["llm_ms"]),
+                 _seconds(row["tool_ms"]), _seconds(row["oracle_ms"]),
+                 _calls(row["first_ok_calls"])]
+        lines.append(f"| {row['label']} | {row['model']} | " +
+                     " | ".join(cells) + " |")
+    lines.append("")
+    lines.append("Cache-hit calls (the paired design's saving):")
+    lines.append("")
+    lines.append("| Arm | cache-hit calls | billable tokens | LLM s |")
+    lines.append("| --- | --- | --- | --- |")
+    for row in payload["rows"]:
+        if not row.get("n"):
+            continue
+        lines.append(f"| {row['label']} | {row['cache_hit_calls']} | "
+                     f"{row['cache_hit_billable']} | "
+                     f"{_seconds(row['cache_hit_llm_ms'])} |")
+    prices = payload.get("prices") or {}
+    if prices:
         lines.append("")
-        lines.append(_prices_md(ds, ctx))
+        lines.append(f"Cost in {prices['currency']} (per group × model):")
+        lines.append("")
+        models = payload.get("models") or []
+        lines.append("| Arm | " + " | ".join(models) + " | total |")
+        lines.append("| --- | " + " | ".join(["---"] * (len(models) + 1)) + " |")
+        for label in GROUP_ORDER:
+            entry = prices["by_model"].get(label)
+            if not entry:
+                continue
+            cells = [("--" if entry.get(m) is None else f"{entry[m]:.2f}")
+                     for m in models]
+            total = prices["totals"].get(label)
+            lines.append("| " + label + " | " + " | ".join(cells) + " | " +
+                         ("--" if total is None else f"{total:.2f}") + " |")
+        if prices["missing"]:
+            lines.append("")
+            lines.append("> warning: missing prices for " +
+                         ", ".join(prices["missing"]))
     return "\n".join(lines) + "\n"
-
-
-def _prices_md(ds: Dataset, ctx: ReportContext) -> str:
-    currency = ctx.prices.get("currency", "USD")
-    per_million = ctx.prices.get("per_million", {})
-    lines = [f"| Arm | {currency} |", "| --- | --- |"]
-    for label in GROUP_ORDER:
-        cells = ds.included(label)
-        total = 0.0
-        missing = False
-        for cell in cells:
-            price = per_million.get(cell.model_id)
-            if not price:
-                missing = True
-                break
-            cached = cell.raw.get("calls") or []
-            cached_tokens = sum(
-                (call.get("usage") or {}).get("cached") or 0 for call in cached)
-            uncached = max(0, cell.input_tokens - cached_tokens)
-            total += (uncached * price.get("input", 0)
-                      + cached_tokens * price.get("cached_input", price.get("input", 0))
-                      + cell.output_tokens * price.get("output", 0)) / 1e6
-        lines.append(f"| {label} | {'--' if missing or not cells else f'{total:.2f}'} |")
-    return "\n".join(lines)
 
 
 def render_models_md(payload, ds, ctx) -> str:
@@ -1567,54 +1939,124 @@ def render_coverage_md(payload, ds, ctx) -> str:
     for row in payload["per_model"]:
         lines.append("| " + row["label"] + f" | {row['model']} | {row['n']} | " +
                      " | ".join(_pct(row[key]) for key in keys) + " |")
+    reasons = payload.get("reasons") or []
+    if reasons:
+        lines.append("")
+        lines.append("`functional_ok: null` reasons (group × reason):")
+        lines.append("")
+        lines.append("| Arm | " + " | ".join(reasons) + " |")
+        lines.append("| --- | " + " | ".join(["---"] * len(reasons)) + " |")
+        for label in sorted(payload["null_reasons"]):
+            entry = payload["null_reasons"][label]
+            lines.append("| " + label + " | " +
+                         " | ".join(str(entry.get(reason, 0))
+                                    for reason in reasons) + " |")
     return "\n".join(lines) + "\n"
 
 
 def render_lockbud_md(payload, ds, ctx) -> str:
     joined = payload["joined"]
-    lines = ["(a) Reference programs (`--fp-check`):", "",
-             "| Tool | fixed FP rate | buggy detection rate |",
-             "| --- | --- | --- |"]
-    if payload.get("reference"):
-        summary = payload["reference"].get("summary", {})
-        for name in ("clippy", "lockbud"):
-            entry = summary.get(name, {})
-            lines.append(f"| {name} | {_num(entry.get('fixed_fp_rate'))} | "
-                         f"{_num(entry.get('buggy_detection_rate'))} |")
+    ratios = payload["ratios"]
+    lines = ["(a) Reference programs (`--fp-check`), by family:", "",
+             "| Family | Tool | fixed FP | fixed n | buggy hits | buggy n |",
+             "| --- | --- | --- | --- | --- | --- |"]
+    reference_by_family = payload.get("reference_by_family", {})
+    if reference_by_family:
+        for family, entry in sorted(reference_by_family.items()):
+            for tool in ("clippy", "lockbud"):
+                row = entry[tool]
+                lines.append(f"| {family} | {tool} | {row['fixed_hits']} | "
+                             f"{row['fixed_n']} | {row['buggy_hits']} | "
+                             f"{row['buggy_n']} |")
     else:
-        lines.append("| (no --fp-check) | -- | -- |")
-    dead = joined["tp"] + joined["fn"]
-    recall = joined["tp"] / dead if dead else None
-    ok_programs = joined["fp"] + joined["tn"]
-    fp_rate = joined["fp"] / ok_programs if ok_programs else None
-    lines += ["", "(b) Experiment programs (STATIC v1 joined to the G0 oracle):", "",
-              "| | oracle deadlock | oracle not deadlock |",
-              "| --- | --- | --- |",
-              f"| lockbud fail | {joined['tp']} | {joined['fp']} |",
-              f"| lockbud pass | {joined['fn']} | {joined['tn']} |",
+        lines.append("| (no --fp-check) | -- | -- | -- | -- | -- |")
+    lines += ["", "(b) Experiment programs (STATIC v1 joined to the G0 oracle):",
               "",
-              f"Recall {_num(recall)}; FP on oracle-ok {_num(fp_rate)}; "
+              "| Group | tp | fp | fn | tn | recall | FP on ok | report on not-deadlock |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- |",
+              f"| pooled | {joined['tp']} | {joined['fp']} | {joined['fn']} | "
+              f"{joined['tn']} | {_num(ratios['recall'])} | "
+              f"{_num(ratios['fp_on_ok'])} | "
+              f"{_num(ratios['report_on_not_deadlock'])} |"]
+    for model, entry in sorted(payload["per_model"].items()):
+        lines.append(f"| {model} | {entry['tp']} | {entry['fp']} | {entry['fn']} | "
+                     f"{entry['tn']} | {_num(entry['recall'])} | "
+                     f"{_num(entry['fp_on_ok'])} | "
+                     f"{_num(entry['report_on_not_deadlock'])} |")
+    for family, entry in sorted(payload["per_family"].items()):
+        lines.append(f"| {family} | {entry['tp']} | {entry['fp']} | {entry['fn']} | "
+                     f"{entry['tn']} | {_num(entry['recall'])} | "
+                     f"{_num(entry['fp_on_ok'])} | "
+                     f"{_num(entry['report_on_not_deadlock'])} |")
+    lines += ["",
+              f"no_g0 (no G0 counterpart) {joined['no_g0']}; "
               f"unavailable {joined['unavailable']}; excluded (v1 did not "
               f"compile) {joined['excluded']}."]
     return "\n".join(lines) + "\n"
 
 
 def render_tests_md(payload, ds, ctx) -> str:
-    lines = ["| Family | Comparison | b | c | p | p_Holm | Δ (pp) | 95% CI |",
-             "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    lines = ["| Family | Comparison | b | c | p | p_Holm | Δ (pp) | 95% CI | n | missing (ref/ctrl) |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for row in payload["rows"]:
+        missing = (f"{row['missing_reference']}/{row['missing_control']}"
+                   if (row["missing_reference"] or row["missing_control"]) else "--")
         lines.append(f"| {row['family']} | {row['reference']} − {row['control']} | "
                      f"{row['b']} | {row['c']} | {_pval(row['p'])} | "
-                     f"{_pval(row['p_holm'])} | {_pp(row['delta'])} | "
-                     f"{_ci(row['ci_low'], row['ci_high'])} |")
+                     f"{_pval(row['p_holm'])} | {_pp_md(row['delta'])} | "
+                     f"{_ci_md(row['ci_low'], row['ci_high'])} | {row['n_units']} | "
+                     f"{missing} |")
     lines.append("")
-    lines.append("| Metric | Wilcoxon p | method | n | A12 | Cliff's δ |")
+    lines.append("Per comparison × model (paired Δ, within-model task-cluster "
+                 "bootstrap 95% CI, b, c):")
+    lines.append("")
+    lines.append("| Comparison | Model | Δ (pp) | 95% CI | b | c |")
     lines.append("| --- | --- | --- | --- | --- | --- |")
-    for name, metric in payload["metrics"].items():
-        if metric:
-            lines.append(f"| {name} | {_pval(metric['p'])} | {metric['method']} | "
-                         f"{metric['n']} | {_num(metric['a12'])} | "
-                         f"{_num(metric['cliffs'])} |")
+    for row in payload["rows"]:
+        for model, entry in row["per_model_stats"].items():
+            lines.append(
+                f"| {row['reference']} − {row['control']} | {model} | "
+                f"{_pp_md(entry['delta'])} | "
+                f"{_ci_md(entry['ci_low'], entry['ci_high'])} | "
+                f"{entry['b']} | {entry['c']} |")
+    lines.append("")
+    lines.append("Per comparison × tier (pooled models, paired Δ and "
+                 "task-cluster bootstrap 95% CI):")
+    lines.append("")
+    lines.append("| Comparison | L1 | L2 | L3 | unclassified |")
+    lines.append("| --- | --- | --- | --- | --- |")
+    for row in payload["rows"]:
+        cells = []
+        for tier in ("L1", "L2", "L3", "unclassified"):
+            entry = row["per_tier_stats"][tier]
+            cells.append(f"{_pp_md(entry['delta'])} "
+                         f"{_ci_md(entry['ci_low'], entry['ci_high'])}")
+        lines.append(f"| {row['reference']} − {row['control']} | " +
+                     " | ".join(cells) + " |")
+    lines.append("")
+    lines.append("Cochran's Q over the 7 groups (per model; only when "
+                 "DYNAMIC_M covers every unit with all 6 main groups):")
+    lines.append("")
+    lines.append("| Model | Q | df | p | blocks | covered/total |")
+    lines.append("| --- | --- | --- | --- | --- | --- |")
+    for model, entry in payload["dynamic_m_q"].items():
+        lines.append(f"| {model} | {_num(entry['Q'])} | "
+                     f"{'--' if entry['df'] is None else entry['df']} | "
+                     f"{_pval(entry['p'])} | {entry['blocks']} | "
+                     f"{entry['covered']}/{entry['total']} |")
+    lines.append("")
+    lines.append("Wilcoxon / A12 / Cliff's δ per comparison (tokens and calls; "
+                 "X is the first group):")
+    lines.append("")
+    lines.append("| Comparison | Metric | Wilcoxon p | method | n | A12 | Cliff's δ |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
+    for key, metric in payload["metrics"].items():
+        for name in ("tokens", "calls"):
+            entry = metric.get(name)
+            if entry:
+                lines.append(
+                    f"| {key} | {name} | {_pval(entry['p'])} | {entry['method']} | "
+                    f"{entry['n']} | {_num(entry['a12'])} | {_num(entry['cliffs'])} |")
     return "\n".join(lines) + "\n"
 
 
@@ -1684,6 +2126,14 @@ def markdown_report(ds: Dataset, payloads: dict, tables, ctx: ReportContext) -> 
     lines.append("Runs: " + ", ".join(ds.run_ids) + ".")
     lines.append(f"Git: {ds.git_sha}. Pairing unit: (model, task, rep); "
                  "n = 3 unless noted.")
+    lines.append("")
+    lines.append("| Arm | included | skipped (excluded) | error (unsuccessful) |")
+    lines.append("| --- | --- | --- | --- |")
+    for label in sorted(ds.counts):
+        entry = ds.counts[label]
+        lines.append(f"| {label} | {entry['included']} | {entry['skipped']} | "
+                     f"{entry['error']} |")
+    lines.append("")
     for warning in ds.warnings:
         lines.append(f"> warning: {warning}")
     for message in ds.mixed:

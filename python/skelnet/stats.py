@@ -160,7 +160,12 @@ def chi2_sf(x: float, df: int) -> float:
         raise ValueError("df must be positive")
     if x <= 0.0:
         return 1.0
-    return 1.0 - _gamma_p(df / 2.0, x / 2.0)
+    a = df / 2.0
+    xx = x / 2.0
+    if xx < a + 1.0:
+        return 1.0 - _gamma_series(a, xx)
+    # Direct continued fraction on the upper tail avoids cancellation.
+    return _gamma_cf(a, xx)
 
 
 def cochran_q(blocks) -> dict:
@@ -224,14 +229,15 @@ def wilcoxon_signed_rank(diffs) -> dict:
     has_ties = any(t > 1 for t in ties)
 
     if n <= 25 and not has_ties:
-        count = 0
-        for mask in range(1 << n):
-            subset = 0
-            for i in range(n):
-                if mask & (1 << i):
-                    subset += i + 1
-            if subset <= statistic:
-                count += 1
+        # Dynamic programming over the distribution of W+ (ranks 1..n).
+        max_sum = n * (n + 1) // 2
+        counts = [0] * (max_sum + 1)
+        counts[0] = 1
+        for rank in range(1, n + 1):
+            for total in range(max_sum, rank - 1, -1):
+                counts[total] += counts[total - rank]
+        cut = int(round(statistic))
+        count = sum(counts[:cut + 1]) if cut >= 0 else 0
         p = min(1.0, 2.0 * count / (1 << n))
         return {"statistic": statistic, "p": p, "w_plus": w_plus,
                 "w_minus": w_minus, "n": n, "method": "exact", "z": None}
