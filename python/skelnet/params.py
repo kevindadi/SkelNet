@@ -25,7 +25,7 @@ DEFAULT_TOKEN_BUDGET = 200_000
 # Round 9 flips this one constant to ``h1``. ``LEGACY_HINT`` stays ``h0``:
 # runs recorded before the flip have no ``hint`` in MANIFEST.json, and they
 # were h0 runs.
-DEFAULT_HINT = "h0"
+DEFAULT_HINT = "h1"
 LEGACY_HINT = "h0"
 
 
