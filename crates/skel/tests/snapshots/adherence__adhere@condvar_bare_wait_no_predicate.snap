@@ -8,27 +8,27 @@ skeleton: `benchmarks/tasks/condvar/bare_wait_no_predicate/gold.skel`
 
 ## main::main
 
-matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 2
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 8 | spawn waiter | matched | 12 |
-| 8 | spawn notifier | reordered | 23 |
+| 8 | spawn waiter | matched | 31 |
+| 8 | spawn notifier | matched | 33 |
 
 ## main::waiter
 
-matched Rust fn: `<none>`; DSL lock depth 1; Rust lock calls 0
+matched Rust fn: `waiter`; DSL lock depth 1; Rust lock calls 1
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 11 | lock m | reordered | 14 |
-| 11 | wait cv | matched | 17 |
+| 11 | lock m | matched | 14 |
+| 11 | wait cv | matched | 16 |
 
 ## main::notifier
 
-matched Rust fn: `<none>`; DSL lock depth 1; Rust lock calls 0
+matched Rust fn: `notifier`; DSL lock depth 1; Rust lock calls 1
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 14 | lock m | missing | - |
-| 14 | notify_one cv | missing | - |
+| 14 | lock m | matched | 22 |
+| 14 | notify_one cv | matched | 24 |

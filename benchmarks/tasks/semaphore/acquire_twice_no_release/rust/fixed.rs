@@ -1,14 +1,42 @@
-use std::sync::mpsc;
-struct Sem { n: std::sync::Mutex<u32>, cv: std::sync::Condvar }
-impl Sem { fn new(n:u32)->Self{Self{n:std::sync::Mutex::new(n),cv:std::sync::Condvar::new()}}
-  fn acq(&self){ let mut c=self.n.lock().unwrap(); while *c==0 { c=self.cv.wait(c).unwrap(); } *c-=1; }
-  fn rel(&self){ *self.n.lock().unwrap()+=1; self.cv.notify_one(); } }
+//! Reference program for semaphore/acquire_twice_no_release.
+//!
+//! Matches gold.skel: one semaphore `s` starts with 1 permit. w1 does
+//! take/post twice, w2 does take/post once. The printed counts are how many
+//! of those pairs each worker finished.
+//!
+//! Rewritten from the hand-rolled Mutex+Condvar semaphore, which printed a
+//! constant line and was not instrumented as `s`.
+
+use concir_sync::Semaphore;
+use std::sync::Arc;
+use std::thread;
+
+fn w1(s: Arc<Semaphore>) -> u32 {
+    let mut turns = 0u32;
+    s.take();
+    s.post();
+    turns += 1;
+    s.take();
+    s.post();
+    turns += 1;
+    turns
+}
+
+fn w2(s: Arc<Semaphore>) -> u32 {
+    let mut turns = 0u32;
+    s.take();
+    s.post();
+    turns += 1;
+    turns
+}
+
 fn main() {
-    let s=std::sync::Arc::new(Sem::new(1));
-    let s1=std::sync::Arc::clone(&s);
-    let w1=std::thread::spawn(move||{ s1.acq(); s1.rel(); s1.acq(); s1.rel(); });
-    let s2=std::sync::Arc::clone(&s);
-    let w2=std::thread::spawn(move||{ s2.acq(); s2.rel(); });
-    w1.join().unwrap(); w2.join().unwrap();
-    println!("DONE done=1");
+    let s = Semaphore::new(1);
+    let s1 = Arc::clone(&s);
+    let w1 = thread::spawn(move || w1(s1));
+    let s2 = Arc::clone(&s);
+    let w2 = thread::spawn(move || w2(s2));
+    let n1 = w1.join().unwrap();
+    let n2 = w2.join().unwrap();
+    println!("DONE w1={} w2={}", n1, n2);
 }

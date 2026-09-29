@@ -8,35 +8,35 @@ skeleton: `benchmarks/tasks/structure/nested_scope_lock_order/gold.skel`
 
 ## main::main
 
-matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 4
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 7 | spawn outer | matched | 7 |
+| 7 | spawn outer | matched | 33 |
 
 ## main::outer
 
-matched Rust fn: `<none>`; DSL lock depth 0; Rust lock calls 0
+matched Rust fn: `outer`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 10 | spawn x1 | matched | 7 |
-| 10 | spawn x2 | reordered | 9 |
+| 10 | spawn x1 | matched | 22 |
+| 10 | spawn x2 | matched | 24 |
 
 ## main::x1
 
-matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+matched Rust fn: `x1`; DSL lock depth 2; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 13 | lock a | nesting_mismatch | - |
-| 13 | lock b | nesting_mismatch | - |
+| 13 | lock a | matched | 7 |
+| 13 | lock b | matched | 8 |
 
 ## main::x2
 
-matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+matched Rust fn: `x2`; DSL lock depth 2; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 16 | lock a | nesting_mismatch | - |
-| 16 | lock b | nesting_mismatch | - |
+| 16 | lock a | matched | 14 |
+| 16 | lock b | matched | 15 |

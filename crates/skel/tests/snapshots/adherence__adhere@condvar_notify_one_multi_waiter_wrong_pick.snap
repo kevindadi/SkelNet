@@ -8,42 +8,42 @@ skeleton: `benchmarks/tasks/condvar/notify_one_multi_waiter_wrong_pick/gold.skel
 
 ## main::main
 
-matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 2
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 1
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 9 | spawn w1 | matched | 7 |
-| 9 | spawn w2 | reordered | 9 |
-| 9 | spawn notifier | missing | - |
+| 9 | spawn w1 | matched | 57 |
+| 9 | spawn w2 | matched | 64 |
+| 9 | spawn notifier | matched | 66 |
 
 ## main::w1
 
-matched Rust fn: `<none>`; DSL lock depth 1; Rust lock calls 0
+matched Rust fn: `w1`; DSL lock depth 1; Rust lock calls 1
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 12 | lock m | reordered | 8 |
-| 12 | post g12 | missing | - |
-| 12 | wait cv | matched | 8 |
-| 12 | notify_all cv | reordered | 10 |
+| 12 | lock m | matched | 22 |
+| 12 | post g12 | matched | 23 |
+| 12 | wait cv | matched | 26 |
+| 12 | notify_all cv | matched | 29 |
 
 ## main::w2
 
-matched Rust fn: `<none>`; DSL lock depth 1; Rust lock calls 0
+matched Rust fn: `w2`; DSL lock depth 1; Rust lock calls 1
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 15 | take g12 | missing | - |
-| 15 | lock m | missing | - |
-| 15 | post gN | missing | - |
-| 15 | wait cv | missing | - |
+| 15 | take g12 | matched | 33 |
+| 15 | lock m | matched | 34 |
+| 15 | post gN | matched | 35 |
+| 15 | wait cv | matched | 38 |
 
 ## main::notifier
 
-matched Rust fn: `<none>`; DSL lock depth 1; Rust lock calls 0
+matched Rust fn: `notifier`; DSL lock depth 1; Rust lock calls 1
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 18 | take gN | missing | - |
-| 18 | lock m | missing | - |
-| 18 | notify_all cv | missing | - |
+| 18 | take gN | matched | 44 |
+| 18 | lock m | matched | 45 |
+| 18 | notify_all cv | matched | 47 |

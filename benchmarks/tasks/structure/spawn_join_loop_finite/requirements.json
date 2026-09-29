@@ -30,5 +30,29 @@
     ],
     "resources": []
   },
-  "contract": "structure/spawn_join_loop_finite/contract.json"
+  "contract": "structure/spawn_join_loop_finite/contract.json",
+  "terminal_v2": "DONE workers=2",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 1,
+    "thread_funcs": [
+      "worker"
+    ],
+    "sync_resources": 0,
+    "unused_resources": [],
+    "mechanisms": [],
+    "mechanism_count": 0,
+    "parameterized": false,
+    "states": 10,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L1",
+    "nearest_tier": "L1",
+    "violations": []
+  }
 }

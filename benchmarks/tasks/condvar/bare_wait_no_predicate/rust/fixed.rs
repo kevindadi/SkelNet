@@ -1,33 +1,37 @@
-//! Reference Rust for tests/e2e/signal_loss/fixed.json.
-//! Fix: the waiter re-checks the protected `ready` flag in a loop, so a
-//! notification that arrives before the wait can never be lost.
+//! Reference program for condvar/bare_wait_no_predicate.
+//!
+//! Matches gold.skel: waiter and notifier share mutex `m` and condvar `cv`.
+//! The flag `ready` lives in `m`. The waiter re-checks it after every wake,
+//! so a signal that arrives first is not lost.
+//!
+//! Rewritten from the previous Arc<(Mutex, Condvar)> `pair` program, which
+//! did not print the terminal line and did not use the entity names.
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
+fn waiter(m: Arc<Mutex<bool>>, cv: Arc<Condvar>) -> bool {
+    let mut ready = m.lock().unwrap();
+    while !*ready {
+        ready = cv.wait(ready).unwrap();
+    }
+    *ready
+}
+
+fn notifier(m: Arc<Mutex<bool>>, cv: Arc<Condvar>) {
+    let mut ready = m.lock().unwrap();
+    *ready = true;
+    cv.notify_one();
+}
+
 fn main() {
-    let pair = Arc::new((Mutex::new(false), Condvar::new()));
-
-    let pair_w = Arc::clone(&pair);
-    let waiter = thread::spawn(move || {
-        let (mtx, cv) = &*pair_w;
-        let mut ready = mtx.lock().unwrap(); // s1: lock mtx
-        while !*ready {
-            // s2: read ready, branch; s3: wait, loop back to s2
-            ready = cv.wait(ready).unwrap();
-        }
-        drop(ready); // s4: drop mtx
-    });
-
-    let pair_n = Arc::clone(&pair);
-    let notifier = thread::spawn(move || {
-        let (mtx, cv) = &*pair_n;
-        let mut ready = mtx.lock().unwrap(); // s1: lock mtx
-        *ready = true; // s2: write ready = true
-        cv.notify_all(); // s3: notify_all
-        drop(ready); // s4: drop mtx
-    });
-
-    waiter.join().unwrap();
+    let m = Arc::new(Mutex::new(false));
+    let cv = Arc::new(Condvar::new());
+    let (m_w, cv_w) = (Arc::clone(&m), Arc::clone(&cv));
+    let waiter = thread::spawn(move || waiter(m_w, cv_w));
+    let (m_n, cv_n) = (Arc::clone(&m), Arc::clone(&cv));
+    let notifier = thread::spawn(move || notifier(m_n, cv_n));
+    let ready = waiter.join().unwrap();
     notifier.join().unwrap();
+    println!("DONE ready={}", ready);
 }
