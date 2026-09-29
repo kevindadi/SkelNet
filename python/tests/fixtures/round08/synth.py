@@ -400,6 +400,8 @@ def _build_cell(model: dict, group: dict, task: dict, rep: int, plan: dict,
         "oracle": oracle,
     }
 
+    if kind == "g0":
+        cell["compile_wall_ms"] = rng.randint(100, 2000)
     if kind == "baseline":
         cell["baseline"] = _baseline_payload(group, plan, rng, n)
     elif kind in ("skel", "cir"):

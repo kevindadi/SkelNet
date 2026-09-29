@@ -570,3 +570,33 @@ def test_anytime_excludes_codegen(tmp_path):
     series = next(s for s in payload["series"] if s["label"] == "G0")
     assert series["points"][-1]["n"] == 1
     assert payload["excluded_codegen"] == 1
+
+
+def test_seven_group_q_none_without_full_dynamic_m(tmp_path):
+    root = tmp_path / "missing"
+    synth = _load_synth()
+    synth.make_runs(root, synth.planted_spec())
+    # Skip one DYNAMIC_M cell so it no longer covers every 6-group unit.
+    target = None
+    for path in sorted(root.glob("*/*")):
+        if not (path / "MANIFEST.json").exists():
+            continue
+        manifest = json.loads((path / "MANIFEST.json").read_text(encoding="utf-8"))
+        if manifest["arm"] != "DYNAMIC_M" or manifest["model_id"] != "gpt-6-luna":
+            continue
+        task = manifest["tasks"]["selected"][0]
+        result = path / "cells" / task / "0" / "result.json"
+        cell = json.loads(result.read_text(encoding="utf-8"))
+        cell["status"] = "skipped"
+        cell["skip_reason"] = "no_requirements_text"
+        result.write_text(json.dumps(cell, indent=2, sort_keys=True) + "\n",
+                          encoding="utf-8")
+        target = (manifest["model_id"], task)
+        break
+    assert target is not None
+    runs = sorted(p for p in root.glob("*/*") if (p / "MANIFEST.json").exists())
+    ds = report.load_runs(runs, root=root)
+    payload = report.table_tests(ds, _ctx(root=root, bootstrap=200, seed=1))
+    entry = payload["dynamic_m_q"]["gpt-6-luna"]
+    assert entry["Q"] is None
+    assert entry["covered"] < entry["total"] or entry["total"] == 0

@@ -29,6 +29,7 @@
     }
   ],
   "check_ok": true,
+  "compile_wall_ms": 1530,
   "error": null,
   "evidence_sufficient": true,
   "hint": "h1",
