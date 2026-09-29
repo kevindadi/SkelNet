@@ -96,6 +96,18 @@ def _validate_method_fields(cell: Any) -> list[str]:
                 for key in ("call", "stage", "reply_kind", "compiled"):
                     if key not in attempt:
                         errors.append(f"rust_attempts[{i}].{key} is required")
+                if "compile_wall_ms" in attempt and not _is_int_or_none(
+                        attempt["compile_wall_ms"]):
+                    errors.append(
+                        f"rust_attempts[{i}].compile_wall_ms must be an int or null")
+    if "compile_wall_ms" in cell and not _is_int_or_none(cell["compile_wall_ms"]):
+        errors.append("compile_wall_ms must be an int or null")
+    history = cell.get("history") if isinstance(cell, dict) else None
+    if isinstance(history, list):
+        for i, item in enumerate(history):
+            if isinstance(item, dict) and "wall_ms" in item and not _is_int_or_none(
+                    item["wall_ms"]):
+                errors.append(f"history[{i}].wall_ms must be an int or null")
     return errors
 
 
@@ -228,6 +240,18 @@ def _validate_baseline_fields(cell: dict) -> list[str]:
                     not isinstance(round_["feedback_bytes"], int)
                     or isinstance(round_["feedback_bytes"], bool)):
                 errors.append(f"baseline.rounds[{i}].feedback_bytes must be an int")
+            if "compile_wall_ms" in round_ and not _is_int_or_none(
+                    round_["compile_wall_ms"]):
+                errors.append(
+                    f"baseline.rounds[{i}].compile_wall_ms must be an int or null")
+            tools = round_.get("tools")
+            if isinstance(tools, dict):
+                for name, tool in tools.items():
+                    if isinstance(tool, dict) and "wall_ms" in tool and not _is_int_or_none(
+                            tool["wall_ms"]):
+                        errors.append(
+                            f"baseline.rounds[{i}].tools.{name}.wall_ms "
+                            "must be an int or null")
     if "accepted_at_call" in baseline and not _is_int_or_none(
             baseline["accepted_at_call"]):
         errors.append("baseline.accepted_at_call must be an int or null")

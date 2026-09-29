@@ -22,6 +22,12 @@ DEFAULT_MAX_OUTPUT_TOKENS_CAP = 65536
 DEFAULT_CALL_BUDGET = 5
 DEFAULT_TOKEN_BUDGET = 200_000
 
+# Round 9 flips this one constant to ``h1``. ``LEGACY_HINT`` stays ``h0``:
+# runs recorded before the flip have no ``hint`` in MANIFEST.json, and they
+# were h0 runs.
+DEFAULT_HINT = "h0"
+LEGACY_HINT = "h0"
+
 
 def seed_for(task: str, rep: int) -> int:
     """Deterministic per-cell seed."""
@@ -37,7 +43,7 @@ class RunParams:
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS
     call_budget: int = DEFAULT_CALL_BUDGET
     token_budget: int = DEFAULT_TOKEN_BUDGET
-    hint: str = "h0"
+    hint: str = field(default_factory=lambda: DEFAULT_HINT)
     # SKEL/CIR method knobs (round 5). Other arms reject non-default values.
     feedback_mode: str = "full"
     rust_when_unverified: str = "last"

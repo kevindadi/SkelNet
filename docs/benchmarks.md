@@ -66,8 +66,8 @@ O4 `monitor_fail` / `not_observed` / `unmapped` / `design_loss`.
 | V4 | Main tasks: `skelnet verify gold.skel contract.json --json` matches `BASELINE.json` or `BASELINE_EXT.json` (`outcome`, `complete`, per-property outcomes). A `baseline_deviation` with no `moved_to` is skipped. Boundary tasks: `concir-backend explore` on `gold.cir.json` matches the same entry; `direct.skel` must make `skelnet check` exit 1, and the error codes are reported |
 | V5 | Tasks listed in `BASELINE_EXT.json`: `skelnet lower gold.skel` equals `gold.cir.json` after key-sorted JSON |
 | V6 | Static check of `rust/fixed.rs`. A decoded string literal whose line equals the terminal line fails (escapes such as `\n` are decoded; raw strings and comments are handled; a character literal is not a string). A `println!`, `print!`, `writeln!`, or `write!` counts only outside comments. The format string is the first string literal. At least one such call must contain a Rust format hole (`{}`, `{0}`, `{name}`, `{name:?}`, `{name:>1}`, …) whose pattern matches the whole terminal line. `println!("{}", line)` and `println!("{line}")` pass. Splitting the line across two prints does not. This check cannot see constant arguments such as `println!("DONE t1={} t2={}", 1, 1)`; V8 and review cover that. Allowlisted tasks and boundary tasks skip |
-| V7 | With `--run`: build `rust/fixed.rs` outside the repository (empty `[workspace]`, dependency `runtime/concir_sync`) and run it once (10 s). The comparison uses `last_nonempty_line` (the line is not stripped). A trailing space, a non-zero exit, or `panicked` on stderr is a fail, matching oracle O2. Without `--run`, skip |
-| V8 | With `--oracle`, `expect.json` is checked first: `schema_version` is `skelnet-rust-expect-v1`; every `fixed.rs` / `buggy*.rs` has an entry and there are no extras; `fixed.rs` has `functional: true`; each buggy file has `functional: false`, `layer` ∈ O1–O4, and a `category` from that layer's set above. Then `default_oracle_factory` (unless a test supplies one) must report `functional_ok` the same way, and the named layer must be `fail` with that category. A result with no `layers` fails. Without `--oracle`, skip |
+| V7 | With `--run`: build `rust/fixed.rs` outside the repository (empty `[workspace]`, dependency `runtime/concir_sync`) and run it once (10 s). The comparison uses `last_nonempty_line` (the line is not stripped). A trailing space, a non-zero exit, or `panicked` on stderr is a fail, matching oracle O2. Without `--run`, skip (`not requested`). A boundary task skips with `boundary task has no reference program` even when `--run` is set |
+| V8 | With `--oracle`, `expect.json` is checked first: `schema_version` is `skelnet-rust-expect-v1`; every `fixed.rs` / `buggy*.rs` has an entry and there are no extras; `fixed.rs` has `functional: true`; each buggy file has `functional: false`, `layer` ∈ O1–O4, and a `category` from that layer's set above. Then `default_oracle_factory` (unless a test supplies one) must report `functional_ok` the same way, and the named layer must be `fail` with that category. A result with no `layers` fails. Without `--oracle`, skip (`not requested`). A boundary task skips with `boundary task has no reference program` even when `--oracle` is set |
 | V9 | Every `benchmarks/MANIFEST.json` record for the task hashes to the file bytes, and every `rust/` file and `REQUIREMENTS.h1.md` has a record |
 
 Lookup of a BASELINE row is by the task's directory path, then by
@@ -142,9 +142,13 @@ Declaration:
 - A task in `BASELINE.json`, or one whose `requirements.json` already has
   `tier_source: legacy` and `tier` in L1–L3, keeps that declaration.
   `condvar/two_cv_two_locks` is declared L1 that way by round 7a-2; the tool
-  does not special-case the name. `--write` does not change `tier` or
-  `tier_source` for these tasks; it only refreshes `tier_metrics`. The report
-  lists legacy declarations that are not in `BASELINE.json`.
+  does not special-case the name. `--write` does not change a `tier` or
+  `tier_source` that is already present, even when it disagrees with the
+  computed tier. When `tier` is missing it writes the declared tier (BASELINE
+  tasks are L1). When `tier_source` is missing it writes `legacy`. New keys
+  are inserted immediately before `tier_metrics`; existing key order is kept.
+  It still refreshes `tier_metrics`. The report lists legacy declarations
+  that are not in `BASELINE.json`.
 - Otherwise, when `computed_tier` is set, that is the declaration
   (`tier_source: computed`).
 - When no tier matches and `nearest_tier` misses exactly one condition, and

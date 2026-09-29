@@ -20,6 +20,7 @@ class ChannelUnavailable(TransportError):
 def build_client(spec: ModelSpec, params: Any, *, budget: Any,
                  evidence_dir: Path | str, api_key: str, timeout: float = 90.0,
                  sdk_client: Any | None = None,
+                 reasoning_log: str = "hash",
                  sleep: Callable[[float], None] = time.sleep):
     """Construct the inner client for a model, or raise ChannelUnavailable.
 
@@ -41,7 +42,8 @@ def build_client(spec: ModelSpec, params: Any, *, budget: Any,
                                 model=spec.model_id, budget=budget,
                                 evidence_dir=evidence_dir, params=params,
                                 timeout=timeout, sdk_client=sdk_client,
-                                extra_body=extra_body, sleep=sleep)
+                                extra_body=extra_body, reasoning_log=reasoning_log,
+                                sleep=sleep)
     if spec.channel == "dashscope-direct":
         from .direct import DirectChatClient
         extra_body = {"enable_thinking": bool(params.thinking)}
@@ -49,7 +51,8 @@ def build_client(spec: ModelSpec, params: Any, *, budget: Any,
                                 model=spec.model_id, budget=budget,
                                 evidence_dir=evidence_dir, params=params,
                                 timeout=timeout, sdk_client=sdk_client,
-                                extra_body=extra_body, sleep=sleep)
+                                extra_body=extra_body, reasoning_log=reasoning_log,
+                                sleep=sleep)
     if spec.channel == "moonshot-direct":
         from .direct import DirectChatClient
         # kimi-k3 always reasons; the strength is the top-level
@@ -60,6 +63,7 @@ def build_client(spec: ModelSpec, params: Any, *, budget: Any,
                                 evidence_dir=evidence_dir, params=params,
                                 timeout=timeout, sdk_client=sdk_client,
                                 reasoning_effort=getattr(params, "reasoning_effort", None),
+                                reasoning_log=reasoning_log,
                                 sleep=sleep)
     if spec.channel == "opencode-go":
         from .opencode_go import OpenCodeGoClient, OpenCodeGoResponsesClient

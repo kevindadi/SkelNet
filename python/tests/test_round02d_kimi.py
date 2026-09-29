@@ -122,7 +122,10 @@ def test_kimi_reasoning_content_recorded_separately(tmp_path, monkeypatch):
 
     log = [json.loads(line) for line in
            (out / "evidence" / "requests.jsonl").read_text().splitlines() if line.strip()]
-    assert log[0]["reasoning_content"] == "SECRET-REASONING"
+    assert "SECRET-REASONING" not in json.dumps(log[0])
+    assert log[0]["reasoning_sha256"]
+    assert log[0]["reasoning_chars"] == len("SECRET-REASONING")
+    assert "reasoning_content" not in log[0]
     assert "SECRET-REASONING" not in log[0]["content"]
 
     candidate = out.joinpath(*CELL) / "candidate.rs"
@@ -222,8 +225,9 @@ def test_models_probe_real_path_kimi_efforts(tmp_path, monkeypatch):
     out_dir = tmp_path / "probe"
     document = models_probe.probe_run(out_dir, models=[kimi])
 
+    # Default probe, low/high variants, then the nontrivial prompt at high and low.
     assert [call["reasoning_effort"] for call in sdk.chat.completions.calls] == \
-        ["high", "low", "high"]
+        ["high", "low", "high", "high", "low"]
     for call in sdk.chat.completions.calls:
         assert "thinking" not in call
         assert "temperature" not in call

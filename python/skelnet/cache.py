@@ -79,6 +79,7 @@ class CachedOutcome:
     finish_reasons: list = field(default_factory=list)
     usage_attempts: list = field(default_factory=list)
     temperature_sent: float | None = None
+    replay_mismatch: bool = False
 
 
 class ResponseCache:
@@ -111,13 +112,16 @@ class CachedClient:
     """Wrap a client; store responses and replay them offline."""
 
     def __init__(self, inner: Any, *, cache: ResponseCache, replay: ResponseCache | None,
-                 model_id: str, params: Any, first_round: str = "auto") -> None:
+                 model_id: str, params: Any, first_round: str = "auto",
+                 arm: str | None = None, replay_mode: str = "key") -> None:
         self.inner = inner
         self.cache = cache
         self.replay = replay
         self.model_id = model_id
         self.params = params
         self.first_round = first_round
+        self.arm = arm
+        self.replay_mode = replay_mode
         self.cache_hit = False
         self.task_id: str | None = None
         self.replicate = 0
@@ -146,20 +150,84 @@ class CachedClient:
                          thinking=self.params.thinking,
                          reasoning_effort=self.params.reasoning_effort)
 
+    def _request_sha256(self, system: str, user: str) -> str:
+        return hashlib.sha256(
+            (system.strip() + "\n\n" + user.strip()).encode("utf-8")).hexdigest()
+
+    def _position_id(self) -> str:
+        arm = "" if self.arm is None else str(self.arm)
+        task = "" if self.task_id is None else str(self.task_id)
+        raw = f"{self.model_id}|{arm}|{task}|{self.replicate}|{self.call_index}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _sequence_dir(self, cache: ResponseCache) -> Path | None:
+        if cache.directory is None:
+            return None
+        return cache.directory / "sequence"
+
+    def _write_sequence(self, key: str, request_sha256: str) -> None:
+        directory = self._sequence_dir(self.cache)
+        if directory is None:
+            return
+        directory.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "model_id": self.model_id,
+            "arm": self.arm,
+            "task": self.task_id,
+            "rep": self.replicate,
+            "call_index": self.call_index,
+            "key": key,
+            "request_sha256": request_sha256,
+        }
+        path = directory / f"{self._position_id()}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                        encoding="utf-8")
+
+    def _read_sequence(self) -> dict[str, Any] | None:
+        directory = self._sequence_dir(self.replay) if self.replay is not None else None
+        if directory is None or not directory.is_dir():
+            raise SystemExit(
+                "replay cache has no sequence index (recorded before round 9a)")
+        path = directory / f"{self._position_id()}.json"
+        if not path.is_file():
+            return None
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return None
+        return loaded if isinstance(loaded, dict) else None
+
+    def _miss(self) -> None:
+        if self.first_round == "require-cache" and self.call_index == 1:
+            raise FirstRoundMiss("first_round_miss")
+        raise ReplayMiss("replay_miss")
+
     def complete(self, system: str, user: str):
         self.call_index += 1
         key = self._key(system, user)
+        request_sha256 = self._request_sha256(system, user)
+        if self.replay is not None and self.replay_mode == "sequence":
+            index = self._read_sequence()
+            if index is None:
+                self._miss()
+            cached = self.replay.get(str(index.get("key") or ""))
+            if cached is None:
+                self._miss()
+            self.cache_hit = True
+            outcome = CachedOutcome(**cached)
+            if index.get("request_sha256") != request_sha256:
+                outcome.replay_mismatch = True
+            return outcome
         if self.replay is not None:
             cached = self.replay.get(key)
             if cached is None:
-                if self.first_round == "require-cache" and self.call_index == 1:
-                    raise FirstRoundMiss("first_round_miss")
-                raise ReplayMiss("replay_miss")
+                self._miss()
             self.cache_hit = True
             return CachedOutcome(**cached)
         cached = self.cache.get(key)
         if cached is not None:
             self.cache_hit = True
+            self._write_sequence(key, request_sha256)
             return CachedOutcome(**cached)
         if self.first_round == "require-cache" and self.call_index == 1:
             raise FirstRoundMiss("first_round_miss")
@@ -186,4 +254,5 @@ class CachedClient:
             "temperature_sent": getattr(outcome, "temperature_sent", None),
         }
         self.cache.put(key, payload)
+        self._write_sequence(key, request_sha256)
         return outcome

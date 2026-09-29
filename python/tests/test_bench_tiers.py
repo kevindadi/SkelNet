@@ -153,7 +153,7 @@ def test_tier_repo_legacy_declaration_and_extension_task(tmp_path):
     assert fresh["tier_source"] == "computed"
 
 
-def test_write_appends_only_the_tier_keys(tmp_path):
+def test_write_fills_missing_legacy_tier(tmp_path):
     root = tmp_path / "repo"
     cir = _cir(["main::t1"], [_res("a", "Mutex")])
     _task(root, "fam/legacy", cir, states=10, extra_reqs={"note": "keep-me"})
@@ -162,8 +162,8 @@ def test_write_appends_only_the_tier_keys(tmp_path):
     text = path.read_text(encoding="utf-8")
     data = json.loads(text)
     assert data["note"] == "keep-me"
-    assert "tier" not in data and "tier_source" not in data
-    assert list(data)[-1] == "tier_metrics"
+    assert data["tier"] == "L1" and data["tier_source"] == "legacy"
+    assert list(data)[-3:] == ["tier", "tier_source", "tier_metrics"]
     assert data["tier_metrics"]["computed_tier"] == "L1"
     assert text.endswith("\n")
     assert (root / "benchmarks" / "TIERS.md").is_file()
@@ -429,7 +429,39 @@ def test_legacy_tier_is_not_rewritten(tmp_path):
     data = json.loads((root / "benchmarks/tasks/fam/kept/requirements.json").read_text())
     assert data["tier"] == "L2" and data["tier_source"] == "legacy"
     assert data["note"] == "stay"
+    before_keys = ["terminal", "keep", "tier", "tier_source", "note"]
+    assert [key for key in data if key != "tier_metrics"] == before_keys
     assert "fam/kept" in tier_repo(root, "fam/kept", tools=FallbackTools())["legacy_outside_baseline"]
+
+
+def test_write_fills_only_a_missing_tier_source(tmp_path):
+    root = tmp_path / "repo"
+    cir = _cir(["main::t"], [_res("a", "Mutex")])
+    _task(root, "fam/src", cir, states=10, extra_reqs={"tier": "L2", "note": "stay"})
+    tier_repo(root, "fam/src", write=True, tools=FallbackTools())
+    data = json.loads((root / "benchmarks/tasks/fam/src/requirements.json").read_text())
+    assert data["tier"] == "L2"
+    assert data["tier_source"] == "legacy"
+    assert data["note"] == "stay"
+    assert list(data)[-2:] == ["tier_source", "tier_metrics"]
+
+
+def test_legacy_write_makes_strict_v2_pass(tmp_path):
+    from skelnet.bench import validate_repo
+    root = tmp_path / "repo"
+    cir = _cir(["main::t1"], [_res("a", "Mutex")])
+    _task(root, "fam/legacy", cir, states=10, extra_reqs={
+        "entities": {"roles": ["t1"], "resources": []},
+    })
+    task = root / "benchmarks" / "tasks" / "fam" / "legacy"
+    before = json.loads((task / "requirements.json").read_text())
+    assert "tier" not in before
+    report = validate_repo(root, "fam/legacy", checks=("V2",), strict=True)
+    assert report["tasks"][0]["checks"][0]["status"] == "fail"
+    tier_repo(root, "fam/legacy", write=True, tools=FallbackTools())
+    report = validate_repo(root, "fam/legacy", checks=("V2",), strict=True)
+    assert report["tasks"][0]["checks"][0]["status"] == "pass"
+    assert report["fail_count"] == 0
 
 
 def _tier_binaries() -> bool:

@@ -10,6 +10,7 @@ its usage.
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import time
@@ -53,6 +54,7 @@ class DirectChatClient:
                  sdk_client: Any | None = None,
                  extra_body: dict[str, Any] | None = None,
                  reasoning_effort: str | None = None,
+                 reasoning_log: str = "hash",
                  sleep: Callable[[float], None] = time.sleep) -> None:
         self.model = model
         self.base_url = base_url
@@ -66,6 +68,7 @@ class DirectChatClient:
         self.log_path = self.evidence_dir / "requests.jsonl"
         self.timeout = float(timeout)
         self.extra_body = extra_body or {}
+        self.reasoning_log = reasoning_log
         self.sleep = sleep
         self.stream = bool(getattr(params, "stream", False))
         self.task_id: str | None = None
@@ -209,9 +212,9 @@ class DirectChatClient:
                 "stream": self.stream, "seed": self._seed(),
                 "truncation_retry": truncation_retry,
                 "content_sha256": _sha(parsed["text"]), "content": parsed["text"],
-                # Reasoning is recorded separately and never merged into the
-                # reply text (same rule as the DashScope streaming path).
-                "reasoning_content": parsed["reasoning"],
+                # Reasoning stays out of the reply text. The jsonl stores a
+                # hash and lengths; gzip mode also writes the body once.
+                **self._reasoning_record(parsed["reasoning"]),
                 "wall_ms": int((time.monotonic() - started) * 1000),
             })
             if not truncated:
@@ -235,6 +238,22 @@ class DirectChatClient:
             seed=self._seed(), truncation_retry=truncation_retry,
             finish_reasons=finish_reasons, usage_attempts=usage_attempts,
             temperature_sent=self._temperature_sent())
+
+    def _reasoning_record(self, reasoning: str | None) -> dict[str, Any]:
+        """Hash and lengths only. The reply object still carries the full text."""
+        if not isinstance(reasoning, str) or reasoning == "":
+            return {"reasoning_sha256": None, "reasoning_chars": None,
+                    "reasoning_bytes": None}
+        raw = reasoning.encode("utf-8")
+        digest = hashlib.sha256(raw).hexdigest()
+        if self.reasoning_log == "gzip":
+            directory = self.evidence_dir / "reasoning"
+            directory.mkdir(parents=True, exist_ok=True)
+            path = directory / f"{digest}.txt.gz"
+            if not path.exists():
+                path.write_bytes(gzip.compress(raw))
+        return {"reasoning_sha256": digest, "reasoning_chars": len(reasoning),
+                "reasoning_bytes": len(raw)}
 
     def _record_error(self, messages, prompt_sha, exc, started, kwargs) -> None:
         self._record({"status": "error", "model": self.model, "base_url": self.base_url,

@@ -283,6 +283,8 @@ Atom        = IntLit | "true" | "false" | Name | "(", Expr, ")" ;
 | `break;` / `continue;`                  | `goto 出口` / `goto 头`                                                                                    |
 | `return e;`                             | `return {value: e}`                                                                                        |
 | `compute "d" reads(..) writes(..);`     | `seq_hole {id: "h<k>", desc: "d", reads, writes}`（k 为全程序递增）                                        |
+
+已由 D9 改为 nop，见 docs/lowering.md。
 | `extern fn f();`                        | 函数 `f`，body 为空                                                                                        |
 
 局部变量：每个 `let` 产生一个 `locals` 条目，`modeled: true`；类型取显式注解，否则由右值推断

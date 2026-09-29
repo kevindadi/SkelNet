@@ -59,9 +59,12 @@ def _rate(hits: int, total: int) -> float | None:
 
 
 def cmd_fp_check(args) -> int:
-    from .cli import _select_tasks
+    from .cli import _report_unmatched_patterns, select_task_patterns
     root = repo_root()
-    tasks = _select_tasks(root, args.tasks)
+    tasks, unmatched = select_task_patterns(root, args.tasks)
+    if unmatched or not tasks:
+        _report_unmatched_patterns(unmatched, args.tasks)
+        return 2
     tools = ToolRunner()
     rows = []
     counts = {
