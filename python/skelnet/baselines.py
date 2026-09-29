@@ -45,7 +45,8 @@ def _nbytes(text: str | None) -> int:
 
 def _round(call: int, stage: str, reply_kind: str, version: int,
            compiled: bool | None, feedback: str | None, *,
-           compile: str | None = None, truncated: bool = False,
+           compile: str | None = None, compile_wall_ms: int | None = None,
+           truncated: bool = False,
            tools: dict | None = None, seeds: dict | None = None) -> dict:
     text = feedback or ""
     return {
@@ -55,6 +56,7 @@ def _round(call: int, stage: str, reply_kind: str, version: int,
         "version": version,
         "compiled": compiled,
         "compile": compile,
+        "compile_wall_ms": compile_wall_ms,
         "tools": tools or {},
         "seeds": seeds or {},
         "feedback_sha256": _sha(text),
@@ -101,8 +103,10 @@ def _static_feedback(tools, directory, source, *, timeout: float) -> _Feedback:
         passed=not clippy.blocking and not lockbud.blocking,
         reason="static_clean",
         feedback=text, truncated=truncated,
-        tools={"clippy": {"status": clippy_status, "category": clippy_cat},
-               "lockbud": {"status": lock_status, "category": lock_cat}},
+        tools={"clippy": {"status": clippy_status, "category": clippy_cat,
+                          "wall_ms": clippy.wall_ms},
+               "lockbud": {"status": lock_status, "category": lock_cat,
+                           "wall_ms": lockbud.wall_ms}},
     )
 
 
@@ -111,7 +115,8 @@ def _dynamic_feedback(tools, directory, source, *, terminal, timeout, miri_seed_
     result = run_dynamic(
         tools, directory, source, terminal=terminal, timeout=timeout,
         miri_seed_count=miri_seed_count)
-    tools_map = {s.name: {"status": s.status, "category": s.category}
+    tools_map = {s.name: {"status": s.status, "category": s.category,
+                          "wall_ms": s.wall_ms}
                  for s in result.slices}
     return _Feedback(passed=result.passed, reason="dynamic_pass",
                      feedback=result.feedback, truncated=result.truncated,
@@ -278,7 +283,8 @@ def run_rust_iter_cell(*, arm, task, requirements, provider, oracle, workdir,
         if compiled is None:
             # The compiler did not run. Stop; do not ask for rust_fix.
             rounds.append(_round(call, stage, "program", version, None, None,
-                                 compile=compile_kind))
+                                 compile=compile_kind,
+                                 compile_wall_ms=getattr(compiled_result, "wall_ms", None)))
             result.history.append({"call": call, "stage": stage,
                                    "reply_kind": "program", "version": version,
                                    "compiled": None})
@@ -292,7 +298,8 @@ def run_rust_iter_cell(*, arm, task, requirements, provider, oracle, workdir,
             any_compiled = True
         outgoing = "" if compiled else render_compile_errors(compiled_result)
         rounds.append(_round(call, stage, "program", version, compiled, outgoing,
-                             compile=compile_kind))
+                             compile=compile_kind,
+                             compile_wall_ms=getattr(compiled_result, "wall_ms", None)))
         result.history.append({"call": call, "stage": stage,
                                "reply_kind": "program", "version": version,
                                "compiled": compiled})

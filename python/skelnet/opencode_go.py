@@ -57,6 +57,11 @@ class OpenCodeOutcome:
     finish_reasons: list[str | None] = field(default_factory=list)
     usage_attempts: list[dict[str, Any]] = field(default_factory=list)
     temperature_sent: float | None = None
+    # Probe-only observations. Experiment calls leave these unset.
+    responses_reasoning_echo: Any = None
+    responses_reasoning_items: int | None = None
+    responses_output_tokens_details: Any = None
+    responses_reasoning_summary_present: bool | None = None
 
 
 class _OpenCodeBase:
@@ -76,6 +81,9 @@ class _OpenCodeBase:
         self.task_id: str | None = None
         self.replicate = 0
         self.session = str(uuid.uuid4())
+        # Set only by the model probe. Experiment runs leave this None, so
+        # ``reasoning.summary`` is never sent.
+        self.reasoning_summary: str | None = None
         if sdk_client is not None:
             self._client = sdk_client
         else:
@@ -226,19 +234,27 @@ class OpenCodeGoResponsesClient(_OpenCodeBase):
         if self.params.temperature_policy == "fixed":
             kwargs["temperature"] = self.params.temperature
         if self.params.reasoning_effort:
-            kwargs["reasoning"] = {"effort": self.params.reasoning_effort}
+            reasoning: dict[str, Any] = {"effort": self.params.reasoning_effort}
+            if self.reasoning_summary:
+                reasoning["summary"] = self.reasoning_summary
+            kwargs["reasoning"] = reasoning
         return kwargs
 
     def _create(self, kwargs: dict) -> Any:
         return self._client.responses.create(**kwargs)
 
     def _parse(self, response: Any) -> dict[str, Any]:
+        echo = _plain(getattr(response, "reasoning", None))
         return {"text": getattr(response, "output_text", None) or "",
                 "finish_reason": _responses_finish_reason(response),
                 "usage": _as_dict(getattr(response, "usage", None)),
                 "response_model": getattr(response, "model", None),
                 "request_id": getattr(response, "id", None),
-                "cost": getattr(response, "cost", None)}
+                "cost": getattr(response, "cost", None),
+                "responses_reasoning_echo": echo if isinstance(echo, dict) else None,
+                "responses_reasoning_items": _reasoning_item_count(response),
+                "responses_output_tokens_details": _output_token_details(response),
+                "responses_reasoning_summary_present": _summary_present(response, echo)}
 
     def complete(self, system_prompt: str, user_prompt: str) -> OpenCodeOutcome:
         messages = [{"role": "system", "content": system_prompt},
@@ -297,7 +313,12 @@ class OpenCodeGoResponsesClient(_OpenCodeBase):
             wall_ms=wall_ms, transport_attempt=transport_attempt, prompt_sha256=prompt_sha,
             cost=parsed["cost"], session=self.session, truncation_retry=truncation_retry,
             finish_reasons=finish_reasons, usage_attempts=usage_attempts,
-            temperature_sent=self._temperature_sent())
+            temperature_sent=self._temperature_sent(),
+            responses_reasoning_echo=parsed.get("responses_reasoning_echo"),
+            responses_reasoning_items=parsed.get("responses_reasoning_items"),
+            responses_output_tokens_details=parsed.get("responses_output_tokens_details"),
+            responses_reasoning_summary_present=parsed.get(
+                "responses_reasoning_summary_present"))
 
     def _record_error(self, messages, prompt_sha, exc, started, kwargs) -> None:
         self._record({"status": "error", "model": self.model, "surface": "responses",
@@ -307,6 +328,59 @@ class OpenCodeGoResponsesClient(_OpenCodeBase):
                       "finish_reason": None, "error": str(exc),
                       "error_type": type(exc).__name__,
                       "wall_ms": int((time.monotonic() - started) * 1000)})
+
+
+def _plain(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _plain(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(item) for item in value]
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump()
+        return _plain(dumped)
+    if hasattr(value, "__dict__"):
+        return {key: _plain(item) for key, item in vars(value).items()
+                if not str(key).startswith("_")}
+    return None
+
+
+def _reasoning_item_count(response: Any) -> int:
+    output = getattr(response, "output", None)
+    if output is None and isinstance(response, dict):
+        output = response.get("output")
+    count = 0
+    for item in output or []:
+        kind = item.get("type") if isinstance(item, dict) else getattr(item, "type", None)
+        if kind == "reasoning":
+            count += 1
+    return count
+
+
+def _output_token_details(response: Any) -> Any:
+    usage = getattr(response, "usage", None)
+    if isinstance(usage, dict):
+        return _plain(usage.get("output_tokens_details"))
+    if usage is None:
+        return None
+    return _plain(getattr(usage, "output_tokens_details", None))
+
+
+def _summary_present(response: Any, echo: Any) -> bool:
+    if isinstance(echo, dict):
+        summary = echo.get("summary")
+        if isinstance(summary, str) and summary.strip():
+            return True
+        if isinstance(summary, (list, dict)) and summary:
+            return True
+    output = getattr(response, "output", None) or []
+    for item in output:
+        kind = item.get("type") if isinstance(item, dict) else getattr(item, "type", None)
+        summary = item.get("summary") if isinstance(item, dict) else getattr(item, "summary", None)
+        if kind == "reasoning" and summary:
+            return True
+    return False
 
 
 def _responses_finish_reason(response: Any) -> str | None:

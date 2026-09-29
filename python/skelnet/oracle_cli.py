@@ -40,13 +40,12 @@ def _safe(name: str) -> str:
     return name.replace("/", "__").replace(":", "-")
 
 
-def _task_dirs(args) -> list[Path]:
+def _task_dirs(args) -> tuple[list[Path], list[str]]:
     from . import cli
     if args.fixtures:
         base = Path(args.fixtures)
-        return sorted(p for p in base.iterdir() if p.is_dir())
-    root = cli.repo_root()
-    return cli._select_tasks(root, args.tasks)
+        return sorted(p for p in base.iterdir() if p.is_dir()), []
+    return cli.select_task_patterns(cli.repo_root(), args.tasks)
 
 
 def _programs(task_dir: Path, *, with_mutants: bool) -> list[dict]:
@@ -111,9 +110,12 @@ def _first_fail_layer(result) -> str | None:
 def cmd_calibrate(args: argparse.Namespace, *, runner=None) -> int:
     from . import cli
     layers = _parse_layers(args.layers)
+    tasks, unmatched = _task_dirs(args)
+    if not args.fixtures and (unmatched or not tasks):
+        cli._report_unmatched_patterns(unmatched, args.tasks)
+        return 2
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    tasks = _task_dirs(args)
 
     report_tasks: list[dict] = []
     shuttle_unsupported: list[str] = []

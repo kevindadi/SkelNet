@@ -451,7 +451,15 @@ def test_cmd_run_refine_real_path(tmp_path):
     assert any("build" in " ".join(argv) for argv in runner.argvs)
 
 
-def test_cmd_run_static_real_path(tmp_path):
+def _stub_lockbud(tmp_path, monkeypatch):
+    """Point LOCKBUD_BIN at an empty file so locate_lockbud succeeds offline."""
+    stub = tmp_path / "lockbud-stub"
+    stub.write_bytes(b"")
+    monkeypatch.setenv("LOCKBUD_BIN", str(stub))
+
+
+def test_cmd_run_static_real_path(tmp_path, monkeypatch):
+    _stub_lockbud(tmp_path, monkeypatch)
     rc, cell, client, runner, _out = _cmd(
         tmp_path, "STATIC", [FIRST, CLEAN])
     assert rc == 0
@@ -466,8 +474,9 @@ def test_cmd_run_static_real_path(tmp_path):
     assert joined  # feedback was recorded
 
 
-def test_cmd_run_static_lockbud_failed_does_not_block(tmp_path):
+def test_cmd_run_static_lockbud_failed_does_not_block(tmp_path, monkeypatch):
     """N1: a lockbud build failure is unavailable, and the version is accepted."""
+    _stub_lockbud(tmp_path, monkeypatch)
     src = _rust(f'println!("{TERMINAL}");', "LOCKBUD_FAIL")
     rc, cell, _client, runner, _out = _cmd(
         tmp_path, "STATIC", [src], name="lock-fail")
@@ -481,8 +490,9 @@ def test_cmd_run_static_lockbud_failed_does_not_block(tmp_path):
     assert any(env.get("RUSTC_WRAPPER") for env in runner.envs)
 
 
-def test_cmd_run_static_lockbud_conflict_blocks_until_clean(tmp_path):
+def test_cmd_run_static_lockbud_conflict_blocks_until_clean(tmp_path, monkeypatch):
     """N4: a ConflictLock blocks; the next user prompt carries the record."""
+    _stub_lockbud(tmp_path, monkeypatch)
     hit = _rust(f'println!("{TERMINAL}");', "LOCKBUD_HIT")
     clean = _rust(f'println!("{TERMINAL}");')
     rc, cell, client, _runner, _out = _cmd(

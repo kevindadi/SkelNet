@@ -21,6 +21,14 @@ from .transport import CHANNELS, experimental_models
 
 PROBE_SYSTEM = "You are a probe."
 PROBE_USER = "Reply with the single word OK."
+# A small concurrency question with one correct answer (YES). The trivial
+# "OK" prompt can report zero reasoning tokens even when the model reasons.
+PROBE_NONTRIVIAL_USER = (
+    "Thread A locks X then Y; thread B locks Y then X; thread C locks X then Y. "
+    "Each thread releases both locks before exiting. Can this program deadlock "
+    "under some schedule? Think it through, then answer with exactly one word: "
+    "YES or NO."
+)
 
 
 def _api_key_present(spec) -> bool:
@@ -134,6 +142,92 @@ def _fill_basic(record: dict, outcome) -> None:
     record["seed_sent"] = getattr(outcome, "seed", None) is not None
 
 
+def _answer_ok(text: str) -> bool:
+    words = (text or "").strip().split()
+    if not words:
+        return False
+    return words[-1].strip(".,;:").upper() == "YES"
+
+
+def _output_tokens(usage) -> int | None:
+    return normalize_token_usage(usage).get("output")
+
+
+def _echo_has_effort(echo) -> bool:
+    if not isinstance(echo, dict):
+        return False
+    effort = echo.get("effort")
+    return isinstance(effort, str) and bool(effort.strip())
+
+
+def _reasoning_diagnosis(spec, record: dict) -> str:
+    """Why a probe did or did not observe reasoning on the nontrivial prompt."""
+    if record.get("error"):
+        return "probe_error"
+    tokens = record.get("reasoning_tokens_nontrivial")
+    if not isinstance(tokens, int):
+        tokens = 0
+    if tokens > 0:
+        return "model_reasons"
+    if spec.surface == "responses":
+        echo = record.get("responses_reasoning_echo")
+        if echo is None or not _echo_has_effort(echo):
+            return "gateway_dropped_reasoning_param"
+        return "reasoning_not_reported_or_not_used"
+    if tokens == 0 and not record.get("nontrivial_reasoning_content"):
+        return "no_reasoning_observed"
+    return "no_reasoning_observed"
+
+
+def _complete_probe(client, user: str):
+    if hasattr(client, "set_cell"):
+        client.set_cell("probe", 0)
+    return client.complete(PROBE_SYSTEM, user)
+
+
+def _append_nontrivial(record: dict, spec, build, params) -> None:
+    """One default-effort nontrivial call, plus low and a summary probe."""
+    try:
+        client = build(params)
+        outcome = _complete_probe(client, PROBE_NONTRIVIAL_USER)
+    except Exception as exc:  # noqa: BLE001
+        record["error"] = type(exc).__name__
+        record["error_message"] = str(exc)
+        record["reasoning_diagnosis"] = "probe_error"
+        return
+    record["reasoning_tokens_nontrivial"] = _reasoning_tokens(
+        getattr(outcome, "usage", None))
+    record["nontrivial_output_tokens"] = _output_tokens(getattr(outcome, "usage", None))
+    record["nontrivial_answer_ok"] = _answer_ok(getattr(outcome, "text", "") or "")
+    record["nontrivial_reasoning_content"] = _reasoning_content_present(outcome)
+    if spec.surface == "responses":
+        record["responses_reasoning_echo"] = getattr(
+            outcome, "responses_reasoning_echo", None)
+        record["responses_reasoning_items"] = getattr(
+            outcome, "responses_reasoning_items", None)
+        record["responses_output_tokens_details"] = getattr(
+            outcome, "responses_output_tokens_details", None)
+    if spec.reasoning_effort:
+        try:
+            low = build(params_for_model(spec, reasoning_effort="low"))
+            low_out = _complete_probe(low, PROBE_NONTRIVIAL_USER)
+            record["reasoning_tokens_nontrivial_low"] = _reasoning_tokens(
+                getattr(low_out, "usage", None))
+        except Exception:  # noqa: BLE001
+            record["reasoning_tokens_nontrivial_low"] = None
+    if spec.surface == "responses":
+        try:
+            summary_client = build(params)
+            summary_client.reasoning_summary = "auto"
+            summary_out = _complete_probe(summary_client, PROBE_NONTRIVIAL_USER)
+            record["responses_reasoning_summary_present"] = bool(
+                getattr(summary_out, "responses_reasoning_summary_present", False))
+        except Exception:  # noqa: BLE001
+            record["responses_reasoning_summary_present"] = None
+    record["reasoning_diagnosis"] = _reasoning_diagnosis(spec, record)
+    record.pop("nontrivial_reasoning_content", None)
+
+
 def _probe_one(spec, build) -> dict[str, Any]:
     record = {**_policy(spec), "probed": True, "error": None,
               "thinking_accepted": None, "output_includes_reasoning": None,
@@ -162,6 +256,10 @@ def _probe_one(spec, build) -> dict[str, Any]:
         record["error_message"] = str(exc)
         if spec.channel == "dashscope-direct":
             _probe_stream_fallback(record, spec, build)
+        if record.get("error"):
+            record["reasoning_diagnosis"] = "probe_error"
+            return record
+        _append_nontrivial(record, spec, build, params)
         return record
 
     # Reasoning-effort variation for the reasoning models. Moonshot/Kimi uses
@@ -184,6 +282,7 @@ def _probe_one(spec, build) -> dict[str, Any]:
                 record[key] = _reasoning_tokens(getattr(out, "usage", None))
             except Exception:  # noqa: BLE001
                 record[key] = None
+    _append_nontrivial(record, spec, build, params)
     return record
 
 

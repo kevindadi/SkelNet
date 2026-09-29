@@ -75,6 +75,10 @@ baseline.
 
 ## O4 resource mapping
 
+The instrumented runtime's `sync` module aliases `MutexGuard` to its `Guard`,
+and rewrites `use std::sync::MutexGuard` the same way as `Mutex` and `Condvar`,
+so a signature that names `MutexGuard` still type-checks after instrumentation.
+
 `concir-instrument` renames each concurrency object to a runtime-unique
 `<binding>_<kind><n>#<site>` (e.g. `a_mutex0#86`, `t1#200`). The oracle derives
 the alignment mapping automatically: strip the `#<site>` suffix and the
@@ -178,6 +182,11 @@ python -m skelnet oracle calibrate --fixtures python/tests/fixtures/round03 \
     --out /tmp/cal --mutants
 python -m skelnet oracle calibrate --tasks all --out /tmp/cal-all --report-only
 ```
+
+`--tasks` is `all` or a comma-separated union of fnmatch patterns (the same
+rule as `run` and `bench`). A pattern that matches nothing prints
+`unmatched task patterns: ...` on stderr and exits 2 before the output
+directory is created. `--fixtures` does not use `--tasks`.
 
 For each task the reference `rust/fixed.rs` must pass and every `rust/buggy*.rs`
 must fail (an optional `rust/expect.json` pins the expected layer/category).
