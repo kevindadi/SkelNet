@@ -30,7 +30,8 @@ def register(sub) -> None:
     parser.add_argument("run_dirs", nargs="+")
     parser.add_argument("--look", type=int, required=True, choices=[0, 1, 2, 3])
     parser.add_argument("--planned-units", type=int, default=880)
-    parser.add_argument("--previous-look-units", type=int, default=528)
+    parser.add_argument("--previous-look-units", type=int, default=None)
+    parser.add_argument("--previous-look-from", default=None)
     parser.add_argument("--prices", default=None)
     parser.add_argument("--budget-file", default=None)
     parser.add_argument("--stage", type=int, default=0)
@@ -40,11 +41,32 @@ def register(sub) -> None:
     parser.set_defaults(func=cmd_stop_check)
 
 
-def _ctx(args, prices) -> report.ReportContext:
+def _ctx(args, prices, previous_look_units) -> report.ReportContext:
     return report.ReportContext(
         root=Path(args.root), look=args.look, planned_units=args.planned_units,
-        previous_look_units=args.previous_look_units, prices=prices,
+        previous_look_units=previous_look_units, prices=prices,
         call_budget=5)
+
+
+def _resolve_previous(args) -> tuple[int | None, str | None]:
+    """Resolve the previous look's units for Look 3 (D9-8).
+
+    Returns ``(units, error)``. Look 3 must be told the previous look's units
+    explicitly (``--previous-look-units`` or ``--previous-look-from``); no
+    silent default is allowed.
+    """
+    if args.look != 3:
+        units = args.previous_look_units
+        return (units if units is not None else 528), None
+    if args.previous_look_from:
+        try:
+            return report.read_previous_look_units(args.previous_look_from), None
+        except report.ReportInputError as exc:
+            return None, str(exc)
+    if args.previous_look_units is None:
+        return None, ("--look 3 requires --previous-look-units or "
+                      "--previous-look-from")
+    return args.previous_look_units, None
 
 
 def cmd_stop_check(args) -> int:
@@ -55,7 +77,11 @@ def cmd_stop_check(args) -> int:
         except (OSError, json.JSONDecodeError) as exc:
             print(f"stop-check: cannot read --prices: {exc}", file=sys.stderr)
             return 2
-    ctx = _ctx(args, prices)
+    previous, error = _resolve_previous(args)
+    if error:
+        print(f"stop-check: {error}", file=sys.stderr)
+        return 2
+    ctx = _ctx(args, prices, previous)
     try:
         ds = report.load_runs(args.run_dirs, root=Path(args.root))
     except report.ReportInputError as exc:
@@ -472,7 +498,13 @@ def look23(ds: report.Dataset, ctx) -> dict:
     futility = ctx.look == 2 and bool(reasons)
     success = all(criteria[key]["ok"] for key in
                   ("1_holm", "2_per_model", "3_l2l3", "4_sensitivity", "5_ci"))
-    verdict = "futility" if futility else ("success" if success else "continue")
+    if ctx.look == 2:
+        verdict = "futility" if futility else (
+            "success" if success else "continue")
+    else:
+        # Look 3 is the final analysis: no further look exists, so a
+        # non-significant result is a finished "no_success" (D9-10).
+        verdict = "success" if success else "no_success"
     result = {"look": ctx.look, "criteria": criteria, "verdict": verdict,
               "alpha": alpha, "units": units, "futility": futility,
               "futility_reasons": reasons, "margin": rule["margin"],

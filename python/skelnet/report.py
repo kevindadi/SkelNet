@@ -642,6 +642,29 @@ def _main_paired_units(ds: Dataset) -> int:
     return len(common)
 
 
+def _final_nominal_alpha(t_prev: float, t_final: float,
+                         alpha: float = 0.05) -> float:
+    """Nominal two-sided alpha of the final look (D9-9).
+
+    The final look spends all of the alpha still unspent by the previous look
+    (``alpha - obf_alpha_spent(t_prev)``) and uses the real information fraction
+    ``t_final`` (not an assumed ``1.0``). The O'Brien-Fleming recursion is
+    reused: one step from ``t_prev`` to ``t_final`` with the conditional
+    correlation ``sqrt(t_prev / t_final)``.
+    """
+    t_prev = min(max(t_prev, 1e-6), 1.0)
+    t_final = min(max(t_final, t_prev), 1.0)
+    spent = stats.obf_alpha_spent(t_prev, alpha)
+    c_prev = stats.normal_ppf(1.0 - spent / 2.0)
+    grid = [-c_prev + 2.0 * c_prev * i / stats._OBF_NODES
+            for i in range(stats._OBF_NODES + 1)]
+    density = [stats.normal_pdf(z) for z in grid]
+    rho = math.sqrt(t_prev / t_final)
+    sigma = math.sqrt(max(1e-12, 1.0 - t_prev / t_final))
+    c = stats._solve_boundary(density, grid, c_prev, rho, sigma, alpha - spent)
+    return 2.0 * (1.0 - stats.normal_cdf(c))
+
+
 def nominal_alpha(ds: Dataset, ctx: ReportContext):
     """The sequential nominal alpha at this look, or None (look 0/1)."""
     if ctx.look not in (2, 3):
@@ -653,8 +676,21 @@ def nominal_alpha(ds: Dataset, ctx: ReportContext):
     t = min(max(t, 1e-6), 1.0)
     if ctx.look == 2:
         return stats.obf_nominal_boundaries([t, 1.0])[0]
-    t2 = min(max(ctx.previous_look_units / ctx.planned_units, 1e-6), 1.0)
-    return stats.obf_nominal_boundaries([t2, 1.0])[1]
+    t_prev = min(max(ctx.previous_look_units / ctx.planned_units, 1e-6), 1.0)
+    return _final_nominal_alpha(t_prev, t)
+
+
+def read_previous_look_units(path) -> int:
+    """Read the paired-unit count from a Look-2 stop-check JSON (D9-8)."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ReportInputError(f"cannot read --previous-look-from: {exc}")
+    units = data.get("units")
+    if not isinstance(units, int) or isinstance(units, bool) or units <= 0:
+        raise ReportInputError(
+            "--previous-look-from JSON has no positive integer 'units'")
+    return units
 
 
 def _comparison(ds: Dataset, reference: str, control: str,
