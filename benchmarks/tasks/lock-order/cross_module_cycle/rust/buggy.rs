@@ -1,16 +1,12 @@
-//! Reference Rust for lock-order/cross_module_cycle (SkelNet R7a-2a).
+//! Defect program for lock-order/cross_module_cycle (SkelNet R7a-2a).
 //!
-//! Design: `gold.skel` splits the protocol over two modules. Module `main`
-//! owns lock `a` and task `t1`; module `other` owns lock `b` and task `t2`.
-//! Both tasks take `a` then `b`, so every schedule terminates. Each lock
-//! protects its owner task's completion count, which `main` prints.
+//! Source: ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f
+//! `benchmarks/families/lock-order/cross_module_cycle/rust/buggy.rs`.
 //!
-//! Both locks are constructed in `main` (the instrumenter names resources from
-//! the `let` bindings there); the `other` module contains only `t2`.
-//!
-//! Rewritten from the ConcPlanVerify reference: bindings renamed to the
-//! contract entities, `t2` moved into `other` and both tasks written as named
-//! functions, and the terminal line computed.
+//! Changes: unnecessary imports dropped, `t2` moved into the `other` module and
+//! both tasks written as named functions, bindings renamed to the contract
+//! entities, and the computed terminal line added. The defect is unchanged:
+//! `other::t2` takes the locks in the opposite order to `main::t1`.
 
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -29,12 +25,13 @@ mod other {
     use std::sync::{Arc, Mutex};
 
     pub fn t2(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
-        let ga = a.lock().unwrap();
+        // DEFECT: opposite lock order across the module boundary.
         let mut gb = b.lock().unwrap();
+        let ga = a.lock().unwrap();
         *gb += 1;
         let n = *gb;
-        drop(gb);
         drop(ga);
+        drop(gb);
         n
     }
 }

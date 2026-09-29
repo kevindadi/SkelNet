@@ -106,5 +106,34 @@
       }
     ]
   },
-  "contract": "lock-order/two_independent_cycles/contract.json"
+  "contract": "lock-order/two_independent_cycles/contract.json",
+  "terminal_v2": "DONE t1=1 t2=1 t3=1 t4=1",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 4,
+    "thread_funcs": [
+      "t1",
+      "t2",
+      "t3",
+      "t4"
+    ],
+    "sync_resources": 4,
+    "unused_resources": [],
+    "mechanisms": [
+      "Mutex"
+    ],
+    "mechanism_count": 1,
+    "parameterized": false,
+    "states": 1371,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L2",
+    "nearest_tier": "L2",
+    "violations": []
+  }
 }

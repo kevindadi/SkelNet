@@ -64,5 +64,32 @@
       }
     ]
   },
-  "contract": "lock-order/cross_module_cycle/contract.json"
+  "contract": "lock-order/cross_module_cycle/contract.json",
+  "terminal_v2": "DONE t1=1 t2=1",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 2,
+    "thread_funcs": [
+      "main::t1",
+      "other::t2"
+    ],
+    "sync_resources": 2,
+    "unused_resources": [],
+    "mechanisms": [
+      "Mutex"
+    ],
+    "mechanism_count": 1,
+    "parameterized": false,
+    "states": 39,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L1",
+    "nearest_tier": "L1",
+    "violations": []
+  }
 }
