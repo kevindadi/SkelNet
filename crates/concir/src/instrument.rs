@@ -227,6 +227,10 @@ pub mod sync {
         }
     }
 
+    /// Same type as [`Guard`]. Programs that name `std::sync::MutexGuard`
+    /// keep compiling after the import rewrite.
+    pub type MutexGuard<'a, T> = Guard<'a, T>;
+
     pub struct Condvar {
         inner: StdCondvar,
         name: &'static str,
@@ -1254,14 +1258,14 @@ fn sync_use_tree(tree: &syn::UseTree, prefix: &str, wrapped: &mut Vec<String>) -
             (!kept.is_empty()).then(|| format!("{{{}}}", kept.join(", ")))
         }
         syn::UseTree::Name(n) => {
-            if prefix == "std::sync::" && matches!(n.ident.to_string().as_str(), "Mutex" | "Condvar") {
+            if prefix == "std::sync::" && matches!(n.ident.to_string().as_str(), "Mutex" | "Condvar" | "MutexGuard") {
                 wrapped.push(n.ident.to_string());
                 None
             } else { Some(n.ident.to_string()) }
         }
         syn::UseTree::Rename(n) => {
             let text = format!("{} as {}", n.ident, n.rename);
-            if prefix == "std::sync::" && matches!(n.ident.to_string().as_str(), "Mutex" | "Condvar") {
+            if prefix == "std::sync::" && matches!(n.ident.to_string().as_str(), "Mutex" | "Condvar" | "MutexGuard") {
                 wrapped.push(text);
                 None
             } else { Some(text) }
@@ -1449,7 +1453,11 @@ pub fn wrap(src: &str) -> Result<Wrapped, String> {
         header.push_str("mod cir_trace;\n");
     }
     if uses_sync && !src.contains("use cir_trace::sync") && !src.contains("use crate::cir_trace::sync") {
-        header.push_str("use cir_trace::sync::{Mutex, Condvar};\n");
+        let mut names = vec!["Mutex", "Condvar"];
+        if src.contains("MutexGuard") {
+            names.push("MutexGuard");
+        }
+        header.push_str(&format!("use cir_trace::sync::{{{}}};\n", names.join(", ")));
     }
     edits.push(Edit { start: leading_header_len(src), end: leading_header_len(src), text: header });
 
