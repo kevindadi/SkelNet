@@ -127,7 +127,18 @@ run is not a finding.
 
 Accept when every repeated run exits 0, none times out, and the last
 non-empty line equals the terminal line; Shuttle passes (including
-`no_concurrency`); and miri passes. `shuttle_unsupported` and
+`no_concurrency`); and miri passes. Shuttle passing includes the round-9b
+rules of the oracle's O3 (`docs/oracle.md`), under the feedback seed: every
+explored schedule's last non-empty line must equal the terminal line
+(`wrong_output` otherwise), PCT abandons iterations above 10 000 steps, and
+random above 1 000 000 steps is `livelock`. Both block acceptance like any
+other Shuttle failure. The `wrong_output` feedback is `category:
+wrong_output`, the `schedule <k>/<n> (<scheduler>): <line>` detail and the
+`failure.txt` text (expected and observed last lines and the first 40 lines
+of that schedule). The `livelock` feedback is only `category: livelock` and
+Shuttle's `exceeded max_steps bound …` line: the failing schedule of a
+million-step run is hundreds of kilobytes of hex. Schedule marker lines never
+appear in feedback. `shuttle_unsupported` and
 `miri_unsupported` do not block, and the feedback says the tool could not
 run. `miri_unavailable` and a build failure do block.
 
@@ -190,8 +201,10 @@ Shuttle 0.8.1 reads `SHUTTLE_RANDOM_SEED` inside `check_random` /
 `RandomScheduler::new` and `check_pct` / `PctScheduler::new` (both call
 `new_from_seed` and override the constructor seed when the variable is a
 valid `u64`). The same failing program and the same seed reproduce the same
-failing schedule, so `shuttle.py` is unchanged. The seed still travels in
-the environment, not in the generated source.
+failing schedule. Round 9b builds PCT through
+`shuttle::Runner::new(PctScheduler::new(depth, iterations), cfg)` instead of
+`check_pct` (only `cfg.max_steps` differs), so the seed still applies. The
+seed still travels in the environment, not in the generated source.
 
 ## Installing tools
 

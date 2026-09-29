@@ -10,7 +10,7 @@ exploration, and each layer's result is recorded separately.
 | --- | --- | --- |
 | **O1** build & policy | `cargo build` (std + `concir_sync` only); policy scan: no `unsafe`, `static mut`, `thread::sleep`/`yield_now`, `process::exit`/`abort`, `extern crate`, `#![feature]`, or crates other than `std`/`core`/`alloc`/`concir_sync`/`crate`/`self`/`super`/local `mod` | `no_build` / `policy_violation` |
 | **O2** termination & output | run the built binary `R=20` times (10 s watchdog each); every exit code 0, and the **last non-empty line equals** the expected terminal line | `hang` / `crash` / `wrong_output` / `no_output` |
-| **O3** schedule exploration | Shuttle (`check_pct` + `check_random`) with the oracle's reserved seed, plus miri multi-seed | `deadlock` / `panic` / `thread_leak` / `ub`; `shuttle_unsupported` / `miri_unsupported` |
+| **O3** schedule exploration | Shuttle PCT (step bound `ContinueAfter(10_000)`: an over-long PCT iteration is abandoned) then random (default `FailAfter(1_000_000)`) with the oracle's reserved seed; every explored Shuttle schedule must end with the terminal line; plus miri multi-seed | `deadlock` / `livelock` / `wrong_output` / `panic` / `thread_leak` / `ub`; `shuttle_unsupported` / `miri_unsupported` |
 | **O4** structural fidelity | `concir-instrument --wrappers` + `concir-backend monitor` against the task contract: safety never violated, preserved observed at least once, and at least the reference number of worker threads | `monitor_fail` / `not_observed` / `unmapped` / `design_loss` |
 
 Main metric `functional_ok = O1 ∧ O2 ∧ O3 ∧ O4`. Sensitivity metric
@@ -53,25 +53,76 @@ seed range, and reserves a disjoint range for the round-4 feedback baselines:
   `0xF00D1000..0xF00D1040` (64 seeds).
 
 Shuttle is made reproducible through `SHUTTLE_RANDOM_SEED` (honoured by both the
-PCT and random schedulers). `check_pct` runs `iterations=2000`, `depth=3`;
-`check_random` runs `iterations=2000`.
+PCT and random schedulers). The generated `main` runs PCT as
+`shuttle::Runner::new(shuttle::scheduler::PctScheduler::new(3, 2000), cfg)`
+with `cfg.max_steps = MaxSteps::ContinueAfter(10_000)`, then
+`shuttle::check_random(…, 2000)` with Shuttle's default `Config`
+(`FailAfter(1_000_000)`). Iterations, depth and seeds are unchanged from round
+3, and for a program that never reaches 10 000 steps the PCT schedules are the
+ones `check_pct` explored.
 
-O3 classifies from the **tool's** exit code and diagnostics, never from the
-program's own output: a program that prints `deadlock`/`panic` still passes.
-Only a non-zero exit is classified (Shuttle `deadlock! blocked tasks` →
-`deadlock`, other panic → `panic`; miri `error: Undefined Behavior` → `ub`,
-`error: deadlock` → `deadlock`, `the main thread terminated without waiting for
-all remaining threads` → `thread_leak`, `panicked at` → `panic`). A program with
-no concurrency makes Shuttle PCT assert `did not exercise any concurrency`: this
-is recorded as O3 `pass` with `data["no_concurrency"] = true` (there is nothing
-to explore; O4's thread count decides). When a half is `unsupported`
-(`shuttle_unsupported`/`miri_unsupported`) the other half decides, with
-`oracle_complete = false`; when both are unsupported O3 is `unsupported`.
+PCT is deliberately unfair: a thread with the highest priority keeps being
+picked, so a correct busy-wait (`while !flag.load(SeqCst) {}`) can spin until
+the step bound. An iteration that exceeds 10 000 steps is therefore stopped
+and discarded without a verdict. Random picks a runnable task uniformly at
+every step, so exceeding its 1 000 000-step bound means the program would not
+finish under a fair scheduler either (for example two workers wait on each
+other forever while a third thread spins). That is `livelock`, not `deadlock`
+(it is not a global deadlock; `partial_deadlock_bystander` pre-registers
+`deadlock_free: PASS`) and not `panic`. The detail is Shuttle's
+`exceeded max_steps bound …` line and `data["schedule"]` is parsed as usual.
+The cost: a correct program whose executions exceed 10 000 steps loses PCT
+coverage (random still explores it fully). The Shuttle half records
+`pct_completed`, `random_completed` and `pct_abandoned` (= iterations −
+completed PCT schedules; `null` when PCT did not finish or under
+`no_concurrency`). They do not affect the verdict or `oracle_complete`;
+calibration lists them per program as `o3_shuttle`.
 
-On a Shuttle failure the full output is written to
-`<workdir>/shuttle/failure.txt` (kept through cleanup) and the serialized
-`failing schedule` is recorded in `data["schedule"]` for the round-4 dynamic
-baseline.
+O3 classifies from the **tool's** exit code and diagnostics. The one exception
+is the terminal check: when the oracle checks the terminal line (not in
+codegen mode, and only for tasks that have one), each schedule prints a marker
+line after the program body (`__SKELNET_SHUTTLE_END_PCT__` /
+`__SKELNET_SHUTTLE_END_RANDOM__`, preceded by a newline so a trailing `print!`
+is still split off). The text before a marker is one completed schedule (a
+residue after the last marker is dropped), and its last non-empty line must
+equal the terminal line exactly (not stripped), as in O2. The first schedule
+that differs makes the Shuttle half `fail` / `wrong_output`, with detail
+`schedule <k>/<n> (<pct|random>): <line>` and `data["first_wrong"]`,
+`schedules_checked`, `schedules_wrong`, `output_check` (`pass` / `fail` /
+`no_schedules` / `not_run`). Output is never searched for keywords: a program
+that prints `deadlock`/`panic` still passes.
+
+A non-zero exit keeps its tool-derived category, in this order: Shuttle
+`deadlock! blocked tasks` → `deadlock`, a timeout → `deadlock`,
+`exceeded max_steps bound` → `livelock`, other panic → `panic`. Wrong schedules
+seen before that failure are counted in `schedules_wrong` but do not change the
+category. miri: `error: Undefined Behavior` → `ub`, `error: deadlock` →
+`deadlock`, `the main thread terminated without waiting for all remaining
+threads` → `thread_leak`, `panicked at` → `panic`. A program with no
+concurrency makes Shuttle PCT assert `did not exercise any concurrency` after
+one complete execution: that single schedule is still checked against the
+terminal line (so O3 agrees with O2 on a sequential program), and when it
+matches O3 is `pass` with `data["no_concurrency"] = true` (O4's thread count
+decides). Exit code 0 without any marker (only fake runners do this) is
+`pass` with `output_check: "no_schedules"`.
+
+miri does not check output: `-Zmiri-many-seeds` runs the seeds in parallel and
+interleaves their stdout, so a line cannot be attributed to a seed, and the
+default preemption rate (0.01) did not expose the three lost-update defects in
+16 seeds. When a half is `unsupported` (`shuttle_unsupported`/
+`miri_unsupported`) the other half decides, with `oracle_complete = false`;
+when both are unsupported O3 is `unsupported`.
+
+On a Shuttle deadlock, livelock or panic the tool output (stderr, then stdout
+without marker lines) is written to `<workdir>/shuttle/failure.txt` (kept
+through cleanup) and the serialized `failing schedule` is recorded in
+`data["schedule"]` for the round-4 dynamic baseline. On `wrong_output`,
+`failure.txt` holds `output mismatch in schedule <k>/<n> (<scheduler>)`, the
+expected and observed last lines (`repr`), and the first 40 lines of that
+schedule's output; `data["schedule"]` is `null` (an output mismatch has no
+Shuttle failing schedule). Marker lines are printed by the main task after the
+body returns, so output from a thread still running after `main` would fall
+into the next schedule; O1 requires every spawned thread to be joined.
 
 ## O4 resource mapping
 
