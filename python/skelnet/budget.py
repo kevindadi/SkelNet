@@ -3,18 +3,32 @@
 The ledger is a JSON file keyed by stage; it accumulates across process
 restarts and is written atomically after every call. Cache hits and transport /
 truncation retries never touch it.
+
+Round 9 (D9-7): every ``reserve`` / ``add_tokens`` / ``check`` re-reads the
+ledger and writes it back inside a POSIX file lock (``fcntl.flock`` on
+``<budget>.lock``), so several model runs writing the same stage cannot
+overwrite one another's counts. The file format is unchanged.
 """
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 from .models import billable_tokens
 from .transport import BudgetExceeded
+
+# Test-only hook, invoked while holding the ledger lock, after the ledger has
+# been re-read and before it is modified. ``None`` in production, so it costs a
+# single ``is None`` check. Tests set it to a sleeping callable to widen the
+# read/modify/write window (a lost update is then visible if the lock is
+# removed).
+_CRITICAL_HOOK = None
 
 
 class BudgetLedger:
@@ -22,13 +36,16 @@ class BudgetLedger:
                  limits: dict[str, dict[str, int]] | None = None) -> None:
         self.path = Path(path)
         self.stage = str(stage)
+        self._limits_arg = limits
         self.data = self._load()
         if limits is None:
             # Limits are configured in the ledger file itself.
             self.limits = dict(self.data.get("limits") or {})
         else:
             self.limits = limits
-            self.data["limits"] = limits
+
+    def _lock_path(self) -> Path:
+        return Path(str(self.path) + ".lock")
 
     def _load(self) -> dict[str, Any]:
         if self.path.exists():
@@ -37,6 +54,24 @@ class BudgetLedger:
             except json.JSONDecodeError:
                 return {"stages": {}}
         return {"stages": {}}
+
+    @contextmanager
+    def _locked(self):
+        """Re-read, yield, then atomically write back under ``<budget>.lock``."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self._lock_path()
+        with open(lock_path, "a+", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                self.data = self._load()
+                if self._limits_arg is not None:
+                    self.data["limits"] = self._limits_arg
+                self.limits = dict(self.data.get("limits") or {})
+                if _CRITICAL_HOOK is not None:
+                    _CRITICAL_HOOK()
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def _stage_data(self) -> dict[str, int]:
         stages = self.data.setdefault("stages", {})
@@ -56,8 +91,7 @@ class BudgetLedger:
             if os.path.exists(tmp):
                 os.unlink(tmp)
 
-    def check(self) -> None:
-        """Raise BudgetExceeded when the stage is already at/over its limits."""
+    def _check_locked(self) -> None:
         data = self._stage_data()
         limits = self.limits.get(self.stage, {})
         max_requests = limits.get("max_requests")
@@ -72,24 +106,32 @@ class BudgetLedger:
             raise BudgetExceeded(
                 f"stage {self.stage}: token budget exhausted ({tokens}/{max_tokens})")
 
+    def check(self) -> None:
+        """Raise BudgetExceeded when the stage is already at/over its limits."""
+        with self._locked():
+            self._check_locked()
+
     def reserve(self) -> None:
         """Count one real request (called by the clients before sending)."""
-        self.check()
-        self._stage_data()["requests"] += 1
-        self._save()
+        with self._locked():
+            self._check_locked()
+            self._stage_data()["requests"] += 1
+            self._save()
 
     def add_tokens(self, tokens: dict[str, int | None] | None) -> None:
         if not tokens:
             return
-        data = self._stage_data()
-        for key in ("input", "output", "reasoning"):
-            value = tokens.get(key)
-            if isinstance(value, int):
-                data[key] += value
-        self._save()
+        with self._locked():
+            data = self._stage_data()
+            for key in ("input", "output", "reasoning"):
+                value = tokens.get(key)
+                if isinstance(value, int):
+                    data[key] += value
+            self._save()
 
     def snapshot(self) -> dict[str, Any]:
-        return dict(self._stage_data())
+        with self._locked():
+            return dict(self._stage_data())
 
 
 class CellBudget:
