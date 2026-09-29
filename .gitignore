@@ -27,6 +27,17 @@ experiments/**/exit.txt
 experiments/**/wall_ms.txt
 experiments/**/proj/
 experiments/**/env.json
+# Experiments: everything is local-only except the frozen protocol, the
+# deviations log, and the Stage-0 command list/template.
+experiments/**
+!experiments/README.md
+!experiments/PROTOCOL.md
+!experiments/protocol.json
+!experiments/DEVIATIONS.md
+!experiments/stage0/
+!experiments/stage0/COMMANDS.md
+!experiments/stage0/budget.template.json
+
 # Global budget ledger and model-probe output
 experiments/budget.json
 experiments/probe-*/

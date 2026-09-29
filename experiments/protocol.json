@@ -1,0 +1,819 @@
+{
+  "analysis": {
+    "alpha": 0.05,
+    "bootstrap": 10000,
+    "family1": [
+      [
+        "SKEL",
+        "G0"
+      ],
+      [
+        "SKEL",
+        "REFINE"
+      ],
+      [
+        "SKEL",
+        "STATIC"
+      ],
+      [
+        "SKEL",
+        "DYNAMIC"
+      ]
+    ],
+    "family2": [
+      [
+        "CIR",
+        "G0"
+      ],
+      [
+        "CIR",
+        "REFINE"
+      ],
+      [
+        "CIR",
+        "STATIC"
+      ],
+      [
+        "CIR",
+        "DYNAMIC"
+      ],
+      [
+        "SKEL",
+        "CIR"
+      ],
+      [
+        "SKEL",
+        "DYNAMIC_M"
+      ]
+    ],
+    "futility_margin": 0.03,
+    "multiplicity": "holm",
+    "planned_units": 880,
+    "seed": 20260928,
+    "sided": 2,
+    "success_criteria": [
+      "(1) all four main-family Holm p below the O'Brien-Fleming nominal alpha at the current information fraction",
+      "(2) SKEL better than every main baseline in at least 3 of 4 models",
+      "(3) positive SKEL - baseline paired delta on L2 union L3",
+      "(4) the four sensitivity deltas (O1 & O2 & O3) share the main direction",
+      "(5) every main cluster-bootstrap 95% CI lies strictly above zero"
+    ]
+  },
+  "arms": {
+    "main": [
+      "G0",
+      "SKEL",
+      "CIR",
+      "REFINE",
+      "STATIC",
+      "DYNAMIC"
+    ],
+    "routes": {
+      "CIR": {
+        "feedback": {
+          "assets": [
+            "concir_generation_v4.md",
+            "concir_feedback_v1.md"
+          ],
+          "sha256": [
+            "6ef31102fc66fa8dab5eef62d8b1a52956822a8f59c6825e360141c1e1fba27b",
+            "c6e7496655616ce50c2cb2c4cb9c5014826166e48c4a545ad579a766ab34c47b"
+          ],
+          "system_sha256": "2743e2f4e5ae4da07fe74b05e8a97e3f773940d1b2036a77e86d6caeebdcbc7b"
+        },
+        "generate": {
+          "assets": [
+            "concir_generation_v4.md"
+          ],
+          "sha256": [
+            "6ef31102fc66fa8dab5eef62d8b1a52956822a8f59c6825e360141c1e1fba27b"
+          ],
+          "system_sha256": "6ef31102fc66fa8dab5eef62d8b1a52956822a8f59c6825e360141c1e1fba27b"
+        },
+        "rust": {
+          "assets": [
+            "rust_from_cir_v3.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "f3ee5803255fdfa419e19c8b7b588732417606cafd03222f09007c7a302af24d",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "38034f445193358d7a0f3f7686e8d23104dbd4b2c8e293db06e091f0af52c186"
+        },
+        "rust_fix": {
+          "assets": [
+            "rust_compile_fix_v1.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+        }
+      },
+      "DYNAMIC": {
+        "generate": {
+          "assets": [
+            "rust_generation_v2.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "0e93c8c8dc4715654ec335e43cdc7514cfd0c1eb839b693287477aed3fb17873",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f"
+        },
+        "rust_fix": {
+          "assets": [
+            "rust_compile_fix_v1.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+        },
+        "tool_feedback": {
+          "assets": [
+            "rust_dynamic_feedback_v1.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "e274bcf5f1c245111678d7f9881b2f7602605238feb8beb4fe10b2f30597a43c",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "32a953121f8187701afcf7ecd504bb72e946f1728018f5fd1ff50e02e825e8d2"
+        }
+      },
+      "DYNAMIC_M": {
+        "generate": {
+          "assets": [
+            "rust_generation_v2.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "0e93c8c8dc4715654ec335e43cdc7514cfd0c1eb839b693287477aed3fb17873",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f"
+        },
+        "rust_fix": {
+          "assets": [
+            "rust_compile_fix_v1.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+        },
+        "tool_feedback": {
+          "assets": [
+            "rust_dynamic_monitor_feedback_v1.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "2dcfc1816a9ac9be87cf2517474f8021197e251e37b0f0b1efc6b9f646b73063",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "bbf10295a3c24179a479f6f4fbca1af1eff8041a19a8e3cde2717e93218eb832"
+        }
+      },
+      "G0": {
+        "generate": {
+          "assets": [
+            "rust_generation_v2.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "0e93c8c8dc4715654ec335e43cdc7514cfd0c1eb839b693287477aed3fb17873",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f"
+        }
+      },
+      "REFINE": {
+        "generate": {
+          "assets": [
+            "rust_generation_v2.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "0e93c8c8dc4715654ec335e43cdc7514cfd0c1eb839b693287477aed3fb17873",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f"
+        },
+        "review": {
+          "assets": [
+            "rust_self_refine_v1.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "c64f2e200c1e2a91601499e1c070065507b07f6a76b6b6e658e9370a989cbee1",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "b2e2d45a6f273b7e34eda3b05f886e7a5e96bb617aadfe731d2d012724f6bf7f"
+        },
+        "rust_fix": {
+          "assets": [
+            "rust_compile_fix_v1.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+        }
+      },
+      "SKEL": {
+        "feedback": {
+          "assets": [
+            "skel_generation_v1.md",
+            "skel_feedback_v1.md"
+          ],
+          "sha256": [
+            "88f784ab8b00b7489553aa6da4d28344713c48b081251ed13bacf84fac1149f0",
+            "c861aa6b16970bab17404204b4424131e61cb49d21469acdce37ae5d89b8f44b"
+          ],
+          "system_sha256": "1f9527b333a2c446a45a2e5235a6a1622b9db53e8523e6fee7c9ecb800f69189"
+        },
+        "generate": {
+          "assets": [
+            "skel_generation_v1.md"
+          ],
+          "sha256": [
+            "88f784ab8b00b7489553aa6da4d28344713c48b081251ed13bacf84fac1149f0"
+          ],
+          "system_sha256": "88f784ab8b00b7489553aa6da4d28344713c48b081251ed13bacf84fac1149f0"
+        },
+        "rust": {
+          "assets": [
+            "rust_from_skel_v2.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "db3831355ebca21ee43f42a52be148430eb4529157baa5b9235b8f44e4981e4d",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "8945fdc362a3eb1b180b318ec3be422072969d1500076a9653674f5744c53923"
+        },
+        "rust_fix": {
+          "assets": [
+            "rust_compile_fix_v1.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+        }
+      },
+      "STATIC": {
+        "generate": {
+          "assets": [
+            "rust_generation_v2.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "0e93c8c8dc4715654ec335e43cdc7514cfd0c1eb839b693287477aed3fb17873",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f"
+        },
+        "rust_fix": {
+          "assets": [
+            "rust_compile_fix_v1.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+        },
+        "tool_feedback": {
+          "assets": [
+            "rust_static_feedback_v1.md",
+            "rust_runtime_api_v1.md"
+          ],
+          "sha256": [
+            "6726a994c199d3a2376dfd3195f03441649207ba572514db4bcdb2c69909032e",
+            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+          ],
+          "system_sha256": "db8c3acb1fcd4d36be5835ea08d3d8fd49b72468f841c3bb6a7ed175fc4e5b59"
+        }
+      }
+    },
+    "secondary": [
+      "DYNAMIC_M"
+    ]
+  },
+  "benchmark": {
+    "tasks": [
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "a5ca3dc35b358b504e4c42465866f094d751cba5990fb2f36950885e327a8438",
+          "contract.json": "989006ad5869078f9728e51cff2759d01fef579b04fe9a15e51dc9a1c8e94334",
+          "gold.skel": "46b674588fe2a47ceace8cd533989270a1da1d9b2f6c6aaea1bcafc4db56c909",
+          "requirements.json": "527f1a2ebdae7e0f27e04e1609e7bb36024b1cd9f0d94b65b186f036e3a7317d",
+          "rust/fixed.rs": "9ab8b8ad8c1ab99efa9222155a5b6d0637f0f974e02df8c117a9d44c6ab5f4ea"
+        },
+        "task": "atomic-data/atomic_lost_update",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "4a52f5009bea7e20632e1baba4577bbdf9129678ad798231954d0993cf57fc49",
+          "contract.json": "6890b51e593972303a2ae0408368f4c410b028922b11a2d87f657e4013cca58b",
+          "gold.skel": "387763d94ade270409b84b56d0424fe9ba41982ad48d57fc2c92bd64c1e0a5a4",
+          "requirements.json": "ceb81404b34fc6e5c07fe6efc36015d9d415e3aead983ecc920e22ec3ec9c325",
+          "rust/fixed.rs": "b61d88238d15b30d0a3fafcbaf55db4614e8d653fb9a56468e12a4e9186450d0"
+        },
+        "task": "atomic-data/bounded_counter_invariant",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "41c365739cf2e4060563237e84f77827a61298d3aa2e28379e6b87400e3dd9cf",
+          "contract.json": "4019ae2cc2fc8ea6c5ddce2ce63bbab1311a36722b7772f54f781a0cf75067a0",
+          "gold.skel": "a7a13550112a2b3fb79b8a6e6b82bde7ceeaf071ada9c456657350413ebe8082",
+          "requirements.json": "c44e0a544fb8d5d3c7ebd9e99cc5de659bdbd57636d5d270021b7e3470737e75",
+          "rust/fixed.rs": "206ac89907b49016df68d2c8333b514672c95308388e331b44b7addf3ac195aa"
+        },
+        "task": "atomic-data/counter_overflow_safety",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": null,
+          "contract.json": "00b165643013257a4c1d9209583d97ab21ce757684fb6d77fc530a7838c736e0",
+          "gold.skel": null,
+          "requirements.json": null,
+          "rust/fixed.rs": null
+        },
+        "task": "boundary/async_select_unsupported",
+        "tier": null,
+        "tier_source": null
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": null,
+          "contract.json": "00b165643013257a4c1d9209583d97ab21ce757684fb6d77fc530a7838c736e0",
+          "gold.skel": null,
+          "requirements.json": null,
+          "rust/fixed.rs": null
+        },
+        "task": "boundary/rwlock_unsupported",
+        "tier": null,
+        "tier_source": null
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": null,
+          "contract.json": "17d0da5b27d2d13855208429fcbfde01394319604875aa11fb9e8a7d2e13409c",
+          "gold.skel": null,
+          "requirements.json": "60ffd3f3b3c0c3797f516636bed054ab8cb533b7ef94199c5888919b91d4d34b",
+          "rust/fixed.rs": null
+        },
+        "task": "boundary/same_cv_different_locks",
+        "tier": null,
+        "tier_source": null
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": null,
+          "contract.json": "f0587619135bcb5752e24acb9880d2ace520cee868e06ea0ddbee1c2f243df5a",
+          "gold.skel": "a78324d649f9e9888b324bd293c8c1a99c2b1735ac7afdd8d0f020a0dfe4afe7",
+          "requirements.json": null,
+          "rust/fixed.rs": null
+        },
+        "task": "boundary/unbounded_int_unknown",
+        "tier": null,
+        "tier_source": null
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "4b8898df8465df2afd621ef3055c820c6686c681bdc98505e1eb9600e531d2ee",
+          "contract.json": "43cc8a8f116df636bb8815c56cadf49601419b81f92ed01f82afdead36e1ca35",
+          "gold.skel": "a239289819e710b5b9134491e98a51b4cfd8650ac58cbceb3f83c4b9f1248e4a",
+          "requirements.json": "23f641eb324c0b0429baed6ab2e72e1fcdd861a91cfcc29e35775f600bf6641c",
+          "rust/fixed.rs": "24f4dd193bcb9c723e8e3925962d3985e9f9139df538ca1efce517628cf83d3f"
+        },
+        "task": "channel/bounded_backpressure_lock_held",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "e9c8ffc15fa6a29930508da6a8539adade6fa38e37a73e1b929bc414e2fe8c01",
+          "contract.json": "7a207f911a3b4b4836712dec88a2c12c73f255581ee9955a9c76d0413b35c6fe",
+          "gold.skel": "e314bb7a9e07ed6de99cbe6e47cb2d5362cf55e1c91f20a4ade98998b1bb675c",
+          "requirements.json": "1b9bb03f8acdea24536364ead0a666f1512564a82d86d23e3ef9542fed54d83c",
+          "rust/fixed.rs": "388672309812a88a54017765c0563770388fd832cf69cc43b7de88b17a0c0d09"
+        },
+        "task": "channel/rendezvous_both_send",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "a1239c270f23afcf6e7a501f564841c93f7fa4c6b9091eb261fdc86aa7887572",
+          "contract.json": "5c03493f10f5dbfa185b0c938baf4cb1e28dedc303751a3060813fbabf910f72",
+          "gold.skel": "9671fc5c7faa91c2210634e89b0de941a8d123370de7f1abacfe3f72337f0bfc",
+          "requirements.json": "45279ec734c06e8c39bdef3c7cf8e7cc89d98a2860b5863d4ab4f792aea149f0",
+          "rust/fixed.rs": "fc698bacb6978877af430f2ddba152fad638bba73b3a7437b9021c9bdd9ff966"
+        },
+        "task": "channel/send_while_holding_mutex",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "df908883dc711a970ce1afdc7678f5b35f1383809377922497a954ae9f79c066",
+          "contract.json": "9917c289d3138a759f2c7be2606e95afc8e5091e096f4bb5f6805d58abede4ea",
+          "gold.skel": "5e6aadc122053c0cd367fa90d7c68a80402d5e39dc7f7c8d75700cb78c1f2e50",
+          "requirements.json": "c270f2ba824cebace13647882fe02f2379015891b3fde731c5438ba1be2ac70f",
+          "rust/fixed.rs": "a070ae6faac0683223e40a5a23b5d15d3e12293171cc018d51f859dc6f6d53d8"
+        },
+        "task": "condvar/bare_wait_no_predicate",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "7ffd842d620f66201f8d4859e457ef510638c02e75b7c19323d67db271478b88",
+          "contract.json": "293d32e0182f5088179d38d079b54f0f6c0b359262385cc24446af42be27bffa",
+          "gold.skel": "08d9090ade31489b11a9906c32e174f31fe1840dd524537737c3c8c4956e021b",
+          "requirements.json": "2a16908c6257f9dcf2c09468892687a3587dac0e107b79bafa94baa3c9a9c586",
+          "rust/fixed.rs": "8f7eb5729ecf5b5c74f7d50c9bb2b0ba4ab8bb501ec5a4ce556aa9515f4e4557"
+        },
+        "task": "condvar/lost_wakeup_notify_before_wait",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "7e0762124a1a6d96b237da66c44cf502e9a78c4063a69bc98713d43938f8db61",
+          "contract.json": "6b04d2c2e1b03eebef5ecb8eeb3334c9d359dc6eb8785aa1e2a61392224cfe7f",
+          "gold.skel": "487296fddf805f72cd418a49d3ce0422d26f2bf0dd1c9eea935b9127efcb2b73",
+          "requirements.json": "0646c15b53cbf5874ae67a57fad29e35d27c0a67fec6f575ada4d1fd2262e6a6",
+          "rust/fixed.rs": "984366fdcbd97e23279183546e9320916faf0d4f50e9fe26f400fcc686d41900"
+        },
+        "task": "condvar/notify_one_multi_waiter_wrong_pick",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "6bc568d73b48ad89d0b1659c681c9ac9dce0c39fe1289872f14b8c32044fe050",
+          "contract.json": "17d0da5b27d2d13855208429fcbfde01394319604875aa11fb9e8a7d2e13409c",
+          "gold.skel": "f3997b72dd388c4f64075ac99b6b46d43293ada0257312f5eb6db908b8993922",
+          "requirements.json": "c5ec3112cc46c21cfa9a3a3aee2000634b6ef52e13532929932f933ccfc058ce",
+          "rust/fixed.rs": "f41bcf4b2cc7711631063281960f9f4fc62c2cdd2dfe404cf6b09483c4868965"
+        },
+        "task": "condvar/two_cv_two_locks",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "b282f21b7510d692b601b7c4210717327d7343bd67ddc2066c11d4744d8f2cee",
+          "contract.json": "702317b1850c42fca2e8819fcf189664ee2ad6964cb0f413561bcb3d99d17f33",
+          "gold.skel": "021d663dd1512c7d8b7b29260f57e570d7a7525c81b4f0624e68d4a68fa9dd8f",
+          "requirements.json": "7922ba7f17c9afb4575235edbec91c6380b9141f4c7d125f916d3eeda0ba1fe2",
+          "rust/fixed.rs": "b94681280fc2bb3197eaa27fc8b69b15c5863a9d62688809f0e69580b1798057"
+        },
+        "task": "lock-order/abba_2lock",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "7fc72345e1857103e2c9a1fc71f99ba749be68dabcb16a6e02abd0fc4efb282a",
+          "contract.json": "4899299240793991f1843b59c00d00790c71280f16e4955bcec001007a66ad25",
+          "gold.skel": "1034e62c58e6271dac0a330cd1755a9848ffdac73e009723a6274852e2cd7650",
+          "requirements.json": "d13d2a8ef39ca4ff59f93dbfd12a993d5cbb37f2de91d772c0034c88234baa8c",
+          "rust/fixed.rs": "cf9434abdf93c6a7e234549aa3b56ba1c2a8702dc9e8a74ce7997c3cb426be03"
+        },
+        "task": "lock-order/cross_module_cycle",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "1c5540ed651a08e368de1785cdcf692c3920f280cbf67aa3311108a6c14bdfb4",
+          "contract.json": "bc7a0e843b47e6838cc949737292a646ead9ad12c6dc2065ff0596b3c763a42b",
+          "gold.skel": "8a0dabcd3863a0abed39c95194b9ed1c6d82e70656b0ffc7490acbbe126c8a8b",
+          "requirements.json": "8b51e0907a09a99ef5b94976f712311cb284ccef5f5d8ae85b2ea7ce75f2aa8b",
+          "rust/fixed.rs": "15e6757a90599d66de551e3559529d54257cb69e0e3840376fa4a6e7544db756"
+        },
+        "task": "lock-order/cycle_3lock",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "d595c4806865b885624280960c49a4d1121c8786f8ec1c3c28f3c4055049714e",
+          "contract.json": "e8c636becce7aeebbe2ce37097eba11f5418bb82a88faf625a5dbc6759775c50",
+          "gold.skel": "d1f34f1ab51eb3f0f5dc8db8f678be77cb1a6e2796027fcb6b353522025a4892",
+          "requirements.json": "60f76dad25691bb626075889efb1676e5a4d329de3315c0fd114ec65d4314228",
+          "rust/fixed.rs": "be623d0582f1d61da6e7ec2c7621bcf2da9b022722d9bdd15c9092f4a6657fc2"
+        },
+        "task": "lock-order/partial_deadlock_bystander",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "c0c4cbb384f5db6d12ce5cca5a58a3aedae917f2c3790f40e61c50d70b6bfd5f",
+          "contract.json": "4273504d2945063aa80526d9ed2d6945307afb3be76a43f697d30fae26814af4",
+          "gold.skel": "090718cad76b26349d4d81b5fa613bb5a69d8d67532d23e15de5b99748136468",
+          "requirements.json": "cc2f121a8a734151a2243493cd1a51988f2567ee1255284af116373456305f78",
+          "rust/fixed.rs": "c20d82fe322ca6ab511bafca7e063bfb7f311982e77471c41df688efbc7d3803"
+        },
+        "task": "lock-order/two_independent_cycles",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "2c7ccde266af3f6b207a1281960d67350a31d498a8a3e40ac5ce12a53be76a07",
+          "contract.json": "fabe5d3f81c10e0c7ea77790df05fc77f6524ca63320480b817febae080c286a",
+          "gold.skel": "d5d650a6d945948b703ec8366b41aebebcdf7f4ad60222be1404fa0502a8bcad",
+          "requirements.json": "76f9a7fdd64e3e496210005dede45daf58c7195b3f0d3e63a7b68fa22080e32e",
+          "rust/fixed.rs": "2bcd8f3d4fb32aefdfa3f3dcdb76a389d0fa4710bc615a2212140ffdb48a724d"
+        },
+        "task": "semaphore/acquire_twice_no_release",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "8674a6bcdc9f93fa3890dc851f1f01b437974d3042c0ffa1ea55b6a1c0869d5f",
+          "contract.json": "962b693a2d5728366ad178308d250825ee7b6e558e18be85bca62b032c6de3c2",
+          "gold.skel": "eae1ad5bf7b1a0e86cbda246d7df935e03c02aa8e6eb813e3c274145889613bc",
+          "requirements.json": "f6d7fe5560420f5c6cfd4b0fbacf613832c2914a9ac56b0f4d53e5cfafe3edbf",
+          "rust/fixed.rs": "a1b674bdec214db76d31578e0fad481bb3061892be182852e3be4f365d8319fb"
+        },
+        "task": "semaphore/permit_leak",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "9cb066355ee51fc370da1fd1d50a6ff9e5ba93542579a83eca8213bf35afba76",
+          "contract.json": "f1127d8b9b83a712e854ecb661df0b7d2d8dd7f1066977f97e3edcce0302f2ed",
+          "gold.skel": "21a07ab6611f452d79564cd89568f4c755c080dd95fd04e17b17761fad7365c9",
+          "requirements.json": "e91772a61afced58977875b147bb6740b24685f666fba5af447fdfaf069f99a4",
+          "rust/fixed.rs": "458a50e73bc7f312ef142847c0d707463bb51685b7ab7c0a0e7e8641528d997d"
+        },
+        "task": "semaphore/throttle_n_permits",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "941014269642770c8551645ad5623cfd76e2acfe76279fdc97156b557b47cca5",
+          "contract.json": "7b211f8df0c6661f63e98fb71ce5e3d3825fdc389e9393eab09e0b106ff69089",
+          "gold.skel": "9cbcb0bc33fb42764bd39615e1b8c1f11eef48795292be1303551dbfcd8457aa",
+          "requirements.json": "f1f285e4ed36e890449cd5267d9f80216e335a5f50c37019dded3df9068759c3",
+          "rust/fixed.rs": "644dab3263ebf28f2e51d0b9ad3f867b5866e6c0a4ed5f864607115bc0f758ac"
+        },
+        "task": "structure/finite_call_loop",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "2772b03808863ff7e9dc707c4e04bd2ee99c09a6927a2c48798e2a7466308af7",
+          "contract.json": "aaef1c7ac85f1c42111761a2ff24d841949d2ef1e28133dc519843dc039dccb6",
+          "gold.skel": "90f6046908570aa16d8aa3e5deb70ac2504ead1cf12d59c9350c0901e9839d98",
+          "requirements.json": "068e3260a58e74cbfcd3a6d2bd0b6f2242c29cde726cf2ff6d3ba413abfe140e",
+          "rust/fixed.rs": "555d20c1d11e8b74995543e0d5105139bdb17f24c86236365f500b7834f7fc30"
+        },
+        "task": "structure/nested_scope_lock_order",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "e5c18c6b0a8461eab6bfcc4835247bb833005a404c317ff8dc28bdf3baec972a",
+          "contract.json": "36705f432cc918dce6bd88936196a3d5251fa94fc388c25f1fe4788f8b14d723",
+          "gold.skel": "764c652727851c63d7102e838bfca9b6254cdbfb8b66bd799306bdb2ad3b2906",
+          "requirements.json": "ddf8512a74d9f9aad1e883bdab251305a15bdf345cd62ae16d8de09055dee4fb",
+          "rust/fixed.rs": "78b5ca6faa15507088ef23c97c808f3213364ee7d34a3b3e7618f10c881d5734"
+        },
+        "task": "structure/scope_bound_k_workers",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "63a3709122256b38b42418e27aebfb3ea04fc79fe1088066ca37ccaf8b2d6528",
+          "contract.json": "2c5df140bb9592efeadb6bfb4a10e25cf8192cb15d577b4899111d5c97f4865a",
+          "gold.skel": "20abea4ef7efc88b1fb2e0aa9f34f82e04d75d60ac606392dd575fe0e8cbbcbf",
+          "requirements.json": "e67a3c625cdb5583fe015bc7a396e3a62ed71c15cd1d5de3754d324fde18ab7e",
+          "rust/fixed.rs": "95fb9aeed6ea5c682349500c642f8725f1e9e731f1471e4027880b8afa26d174"
+        },
+        "task": "structure/scope_worker_abba",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "d2dcb24f9f34c297df4c45f164ebb91954f807bc7278b03e3c818f87d05fa067",
+          "contract.json": "b8f6667377bd4b27c912935249f51c35cf6360077e2e60db239b379770c607c5",
+          "gold.skel": "0d970568878d33013f3ac951d1f5d2c09a1870197e0dce9855cee5b54313af6e",
+          "requirements.json": "81129ac60c794afe9fe06c2aca0f15f30890ae3ab8747f5c9153acfe49436381",
+          "rust/fixed.rs": "3a55340bc774b46c6e1ecff4ead52640d2e10417cb3295ce85d4fad066b754b5"
+        },
+        "task": "structure/spawn_join_loop_finite",
+        "tier": "L1",
+        "tier_source": "legacy"
+      },
+      {
+        "sha256": {
+          "REQUIREMENTS.h1.md": "39f08dbee9b5836c7be9889f324cb33f73f1ad01761cb738d47b254055c24763",
+          "contract.json": "e9931a050fae90a449b62a1b48a7954543174bbbe592c0d4ba0a7d813fcc3c0a",
+          "gold.skel": "b84d36e43f7171a0d070a114b5282ce82856cdada2961a4a27f17f606685b8d1",
+          "requirements.json": "7ab78ae8999f22cc0289f484e78d20a261509c901966511d404b12fc7fefe223",
+          "rust/fixed.rs": "377ae765a41a97184e61fb94f6861b0402b3a0c24f3e15afe6114716b5953c53"
+        },
+        "task": "structure/worker_with_payload",
+        "tier": "L1",
+        "tier_source": "legacy"
+      }
+    ],
+    "tiers_sha256": "a3d23a4aad082c9649cf467ac1f1b8b37bb9c28a1c1c069973dcadc6ddb04468"
+  },
+  "deviations_policy": "Any deviation from this frozen protocol after it is frozen must be recorded in experiments/DEVIATIONS.md (file header only at freeze time).",
+  "frozen_at": "2026-09-29T22:03:24Z",
+  "frozen_at_commit": "dad9776",
+  "models": [
+    {
+      "channel": "opencode-go",
+      "display_name": "GPT 6 Luna",
+      "model_id": "gpt-6-luna",
+      "reasoning_effort": "medium",
+      "temperature_policy": "provider_default",
+      "thinking": true
+    },
+    {
+      "channel": "moonshot-direct",
+      "display_name": "Kimi",
+      "model_id": "kimi-k3",
+      "reasoning_effort": "high",
+      "temperature_policy": "provider_default",
+      "thinking": "always"
+    },
+    {
+      "channel": "deepseek-direct",
+      "display_name": "DeepSeek Flash",
+      "model_id": "deepseek-flash",
+      "reasoning_effort": null,
+      "temperature_policy": "provider_default",
+      "thinking": true
+    },
+    {
+      "channel": "dashscope-direct",
+      "display_name": "Qwen",
+      "model_id": "qwen3.8-flash",
+      "reasoning_effort": null,
+      "temperature_policy": "provider_default",
+      "thinking": true
+    }
+  ],
+  "oracle": {
+    "monitor_runs": 5,
+    "oracle_miri_seed_count": 16,
+    "oracle_miri_seed_start": 1592594432,
+    "oracle_shuttle_seed": 1592590337,
+    "pct_max_steps": 10000,
+    "random_max_steps": 1000000,
+    "shuttle_depth": 3,
+    "shuttle_iterations": 2000,
+    "stress_runs": 20,
+    "stress_timeout": 10.0
+  },
+  "run_params": {
+    "call_budget": 5,
+    "hint": "h1",
+    "max_output_tokens": 32768,
+    "max_output_tokens_cap": 65536,
+    "seed_policy": "per_cell",
+    "temperature_policy": "provider_default",
+    "token_budget": 200000
+  },
+  "schema_version": "skelnet-protocol-v1",
+  "stages": {
+    "0": {
+      "cells": 100,
+      "expected_paired_units": 16,
+      "groups": [
+        "G0",
+        "SKEL",
+        "CIR",
+        "REFINE",
+        "STATIC",
+        "DYNAMIC"
+      ],
+      "ledger_limits": {
+        "max_requests": 800,
+        "max_tokens": 15000000
+      },
+      "models": [
+        "gpt-6-luna",
+        "kimi-k3",
+        "deepseek-flash",
+        "qwen3.8-flash"
+      ],
+      "reps": 1,
+      "secondary_smoke": {
+        "arm": "DYNAMIC_M",
+        "reps": 1,
+        "task": "lock-order/abba_2lock"
+      },
+      "tasks": [
+        "lock-order/abba_2lock",
+        "condvar/lost_wakeup_notify_before_wait",
+        "atomic-data/atomic_lost_update",
+        "lock-order/partial_deadlock_bystander"
+      ]
+    },
+    "1": {
+      "expected_paired_units": 288,
+      "groups": [
+        "G0",
+        "SKEL",
+        "CIR",
+        "REFINE",
+        "STATIC",
+        "DYNAMIC"
+      ],
+      "ledger_limits": null,
+      "models": [
+        "gpt-6-luna",
+        "kimi-k3",
+        "deepseek-flash",
+        "qwen3.8-flash"
+      ],
+      "note": "task selection fixed by the experiment plan (coordinator)",
+      "reps": 3,
+      "tasks": null
+    },
+    "2": {
+      "expected_paired_units": 528,
+      "groups": [
+        "G0",
+        "SKEL",
+        "CIR",
+        "REFINE",
+        "STATIC",
+        "DYNAMIC",
+        "DYNAMIC_M"
+      ],
+      "ledger_limits": null,
+      "models": [
+        "gpt-6-luna",
+        "kimi-k3",
+        "deepseek-flash",
+        "qwen3.8-flash"
+      ],
+      "note": "task selection fixed by the experiment plan (coordinator)",
+      "reps": null,
+      "tasks": null
+    },
+    "3": {
+      "expected_paired_units": 880,
+      "groups": [
+        "G0",
+        "SKEL",
+        "CIR",
+        "REFINE",
+        "STATIC",
+        "DYNAMIC",
+        "DYNAMIC_M"
+      ],
+      "ledger_limits": null,
+      "models": [
+        "gpt-6-luna",
+        "kimi-k3",
+        "deepseek-flash",
+        "qwen3.8-flash"
+      ],
+      "note": "task selection fixed by the experiment plan (coordinator)",
+      "reps": null,
+      "tasks": null
+    }
+  }
+}
