@@ -4,7 +4,7 @@ expression: md
 ---
 # Skeleton adherence report (human review only)
 
-skeleton: `benchmarks/tasks/semaphore/acquire_twice_no_release/gold.skel`
+skeleton: `benchmarks/tasks/semaphore/permit_leak/gold.skel`
 
 ## main::main
 
@@ -21,10 +21,7 @@ matched Rust fn: `w1`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 9 | take s | matched | 16 |
-| 9 | post s | matched | 17 |
-| 9 | take s | matched | 19 |
-| 9 | post s | matched | 20 |
+| 9 | permit s | matched | 13 |
 
 ## main::w2
 
@@ -32,5 +29,4 @@ matched Rust fn: `w2`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 12 | take s | matched | 27 |
-| 12 | post s | matched | 28 |
+| 12 | permit s | matched | 18 |

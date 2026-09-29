@@ -1,11 +1,10 @@
-//! Reference program for semaphore/acquire_twice_no_release.
+//! Defect program for semaphore/acquire_twice_no_release.
 //!
-//! Matches gold.skel: one semaphore `s` starts with 1 permit. w1 does
-//! take/post twice, w2 does take/post once. The printed counts are how many
-//! of those pairs each worker finished.
-//!
-//! Rewritten from the hand-rolled Mutex+Condvar semaphore, which printed a
-//! constant line and was not instrumented as `s`.
+//! Source: ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/semaphore/acquire_twice_no_release/rust/buggy.rs
+//! The defect is unchanged: w1 takes the only permit twice before posting
+//! once, so it blocks forever on the second take and w2 cannot proceed.
+//! Adapted to `concir_sync::Semaphore` named `s`, role functions, and the
+//! same completion-count print as fixed.rs.
 
 use concir_sync::Semaphore;
 use std::sync::Arc;
@@ -14,8 +13,6 @@ use std::thread;
 fn w1(s: Arc<Semaphore>) -> u32 {
     let mut turns = 0u32;
     s.take();
-    s.post();
-    turns += 1;
     s.take();
     s.post();
     turns += 1;

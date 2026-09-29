@@ -1,13 +1,11 @@
-//! Reference program for condvar/notify_one_multi_waiter_wrong_pick.
+//! Defect program for condvar/notify_one_multi_waiter_wrong_pick.
 //!
-//! Matches gold.skel. `g12` and `gN` (both start at 0) order entry: w1 posts
-//! `g12` and waits; w2 takes `g12`, posts `gN`, and waits; the notifier takes
-//! `gN` and then, holding `m`, marks `go` and wakes every waiter with
-//! notify_all. `w1` also notify_all after it proceeds, as in the skeleton.
-//! The printed waiter count is the `waiting` field left in `m`.
-//!
-//! Rewritten from the Arc<(Mutex, Condvar)> loop that printed a constant and
-//! omitted `g12` and `gN`.
+//! Source: ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/condvar/notify_one_multi_waiter_wrong_pick/rust/buggy.rs
+//! The defect is unchanged: the notifier uses notify_one, so one of the two
+//! waiters can be left asleep. Adapted onto the gold handshake (`g12`, `gN`,
+//! separate `m` and `cv`, role functions) and the same waiter count as
+//! fixed.rs. `w1` still notify_all after it wakes, matching the skeleton; the
+//! only difference from fixed.rs is notify_one in the notifier.
 
 use concir_sync::Semaphore;
 use std::sync::{Arc, Condvar, Mutex};
@@ -44,7 +42,7 @@ fn notifier(m: Arc<Mutex<Gate>>, cv: Arc<Condvar>, g_n: Arc<Semaphore>) {
     g_n.take();
     let mut gate = m.lock().unwrap();
     gate.go = true;
-    cv.notify_all();
+    cv.notify_one();
 }
 
 fn main() {

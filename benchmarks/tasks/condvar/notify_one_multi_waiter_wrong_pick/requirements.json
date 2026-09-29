@@ -61,5 +61,35 @@
       }
     ]
   },
-  "contract": "condvar/notify_one_multi_waiter_wrong_pick/contract.json"
+  "contract": "condvar/notify_one_multi_waiter_wrong_pick/contract.json",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 3,
+    "thread_funcs": [
+      "notifier",
+      "w1",
+      "w2"
+    ],
+    "sync_resources": 4,
+    "unused_resources": [],
+    "mechanisms": [
+      "Condvar",
+      "Semaphore"
+    ],
+    "mechanism_count": 2,
+    "parameterized": false,
+    "states": 74,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": null,
+    "nearest_tier": "L1",
+    "violations": [
+      "sync_resources<=2 and mechanisms<=1"
+    ]
+  }
 }
