@@ -1,0 +1,49 @@
+{
+  "arm": "STATIC",
+  "baseline_tools": {
+    "clippy": null,
+    "lockbud": null,
+    "missing": [],
+    "shuttle": null
+  },
+  "hint": "h1",
+  "model": "GPT 6 Luna",
+  "model_id": "gpt-6-luna",
+  "model_policy": {
+    "channel": "opencode-go",
+    "display_name": "GPT 6 Luna",
+    "max_output_tokens": 32768,
+    "max_output_tokens_cap": 65536,
+    "model_id": "gpt-6-luna",
+    "reasoning_effort": "medium",
+    "stream": false,
+    "supports_seed": false,
+    "surface": "responses",
+    "thinking": true
+  },
+  "reps": 3,
+  "rounds": 4,
+  "run_id": "gpt-static",
+  "run_params": {
+    "call_budget": 5,
+    "feedback_mode": "full",
+    "hint": "h1",
+    "max_output_tokens": 32768,
+    "property_ids": "keep",
+    "rust_when_unverified": "last",
+    "seed_policy": "per_cell",
+    "temperature": null,
+    "temperature_policy": "provider_default",
+    "token_budget": 200000
+  },
+  "stage": 2,
+  "status": "complete",
+  "tasks": {
+    "pattern": "all",
+    "selected": [
+      "lock-order/abba_2lock",
+      "condvar/lost_wakeup",
+      "semaphore/permits"
+    ]
+  }
+}

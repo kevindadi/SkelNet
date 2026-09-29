@@ -1,0 +1,95 @@
+{
+  "accepted": true,
+  "arm": "G0",
+  "budget_used": {
+    "calls": 1,
+    "tokens": 2654
+  },
+  "calls": [
+    {
+      "attempt": 1,
+      "cache_hit": false,
+      "error": null,
+      "finish_reason": "stop",
+      "finish_reasons": [
+        "stop"
+      ],
+      "request_sha256": "abb15fedfa7df58f8857714b227b1ece89328d9e3e022b736cc9f3c7ad8e5878",
+      "stage": "generate",
+      "system_sha256": "c9533021ce75a22c15f3ba183d03592ed1eaf7197bf088674b54336af9777601",
+      "transport_attempt": 1,
+      "truncation_retry": false,
+      "usage": {
+        "cached": 494,
+        "input": 1977,
+        "output": 677,
+        "reasoning": 0
+      },
+      "wall_ms": 1839
+    }
+  ],
+  "check_ok": true,
+  "error": null,
+  "evidence_sufficient": true,
+  "hint": "h1",
+  "history": [],
+  "ledger": {},
+  "model": "DeepSeek Flash",
+  "model_id": "deepseek-flash",
+  "oracle": {
+    "built": true,
+    "functional_ok": true,
+    "functional_ok_no_o4": true,
+    "layers": {
+      "O1": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 38
+      },
+      "O2": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 8
+      },
+      "O3": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 346
+      },
+      "O4": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 283
+      }
+    },
+    "o3_tools": {
+      "miri": {
+        "category": null,
+        "status": "pass"
+      },
+      "no_concurrency": false,
+      "shuttle": {
+        "category": null,
+        "status": "pass"
+      }
+    },
+    "oracle_complete": true,
+    "ran": true,
+    "run_ok": true,
+    "terminal_check": "pass"
+  },
+  "parse_ok": true,
+  "rep": 0,
+  "rounds_used": 1,
+  "rust_mode": "llm",
+  "schema_version": "skelnet-cell-v1",
+  "seed": 13332414430263114044,
+  "skip_reason": null,
+  "status": "ok",
+  "task": "semaphore/permits",
+  "tier": "L3"
+}

@@ -1,0 +1,112 @@
+{
+  "accepted": false,
+  "arm": "SKEL",
+  "budget_used": {
+    "calls": 1,
+    "tokens": 949
+  },
+  "calls": [
+    {
+      "attempt": 1,
+      "cache_hit": false,
+      "error": null,
+      "finish_reason": "stop",
+      "finish_reasons": [
+        "stop"
+      ],
+      "request_sha256": "abb15fedfa7df58f8857714b227b1ece89328d9e3e022b736cc9f3c7ad8e5878",
+      "stage": "generate",
+      "system_sha256": "c9533021ce75a22c15f3ba183d03592ed1eaf7197bf088674b54336af9777601",
+      "transport_attempt": 1,
+      "truncation_retry": false,
+      "usage": {
+        "cached": null,
+        "input": 742,
+        "output": 207,
+        "reasoning": 0
+      },
+      "wall_ms": 3954
+    }
+  ],
+  "check_ok": false,
+  "error": null,
+  "evidence_sufficient": false,
+  "feedback_mode": "full",
+  "hint": "h1",
+  "history": [
+    {
+      "attempt": 1,
+      "complete": true,
+      "outcome": "PASS",
+      "stage": "verify",
+      "unmapped": []
+    }
+  ],
+  "ledger": {},
+  "model": "GPT 6 Luna",
+  "model_id": "gpt-6-luna",
+  "oracle": {
+    "built": true,
+    "functional_ok": false,
+    "functional_ok_no_o4": false,
+    "layers": {
+      "O1": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 18
+      },
+      "O2": {
+        "category": "hang",
+        "detail": null,
+        "status": "fail",
+        "wall_ms": 26
+      },
+      "O3": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 330
+      },
+      "O4": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 45
+      }
+    },
+    "o3_tools": {
+      "miri": {
+        "category": null,
+        "status": "pass"
+      },
+      "no_concurrency": false,
+      "shuttle": {
+        "category": null,
+        "status": "pass"
+      }
+    },
+    "oracle_complete": true,
+    "ran": false,
+    "run_ok": false,
+    "terminal_check": "fail"
+  },
+  "parse_ok": false,
+  "property_ids": "keep",
+  "rep": 2,
+  "rounds_used": 1,
+  "rust_attempts": [],
+  "rust_calls": 0,
+  "rust_compiled": true,
+  "rust_mode": "llm",
+  "rust_skipped": null,
+  "rust_when_unverified": "last",
+  "schema_version": "skelnet-cell-v1",
+  "seed": 12385733717933111495,
+  "skel_status": "FAIL",
+  "skel_verified": false,
+  "skip_reason": null,
+  "status": "ok",
+  "task": "semaphore/permits",
+  "tier": "L3"
+}

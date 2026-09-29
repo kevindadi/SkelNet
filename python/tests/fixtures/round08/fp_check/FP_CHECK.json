@@ -1,0 +1,112 @@
+{
+  "lints": [
+    "clippy::mutex_atomic",
+    "clippy::mutex_integer",
+    "clippy::significant_drop_in_scrutinee",
+    "clippy::significant_drop_tightening",
+    "clippy::arc_with_non_send_sync",
+    "clippy::readonly_write_lock"
+  ],
+  "tasks": [
+    {
+      "task": "lock-order/abba_2lock",
+      "programs": [
+        {
+          "path": "rust/fixed.rs",
+          "role": "fixed",
+          "clippy": {
+            "status": "ok",
+            "findings": []
+          },
+          "lockbud": {
+            "status": "ok",
+            "records": []
+          }
+        },
+        {
+          "path": "rust/buggy1.rs",
+          "role": "buggy",
+          "clippy": {
+            "status": "ok",
+            "findings": [
+              {
+                "level": "warning",
+                "code": "clippy::mutex_atomic",
+                "message": "Mutex<bool>",
+                "rendered": "warning: Mutex<bool>"
+              }
+            ]
+          },
+          "lockbud": {
+            "status": "ok",
+            "records": [
+              {
+                "bug_kind": "ConflictLock",
+                "raw": "{\"bug_kind\": \"ConflictLock\"}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "task": "semaphore/permits",
+      "programs": [
+        {
+          "path": "rust/fixed.rs",
+          "role": "fixed",
+          "clippy": {
+            "status": "ok",
+            "findings": []
+          },
+          "lockbud": {
+            "status": "ok",
+            "records": []
+          }
+        },
+        {
+          "path": "rust/buggy1.rs",
+          "role": "buggy",
+          "clippy": {
+            "status": "ok",
+            "findings": [
+              {
+                "level": "warning",
+                "code": "clippy::mutex_atomic",
+                "message": "Mutex<bool>",
+                "rendered": "warning: Mutex<bool>"
+              }
+            ]
+          },
+          "lockbud": {
+            "status": "ok",
+            "records": [
+              {
+                "bug_kind": "ConflictLock",
+                "raw": "{\"bug_kind\": \"ConflictLock\"}"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "clippy": {
+      "fixed_fp_rate": 0.0,
+      "buggy_detection_rate": 1.0,
+      "fixed_hits": 0,
+      "fixed_n": 2,
+      "buggy_hits": 2,
+      "buggy_n": 2
+    },
+    "lockbud": {
+      "fixed_fp_rate": 0.0,
+      "buggy_detection_rate": 1.0,
+      "fixed_hits": 0,
+      "fixed_n": 2,
+      "buggy_hits": 2,
+      "buggy_n": 2
+    }
+  }
+}

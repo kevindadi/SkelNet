@@ -1,0 +1,49 @@
+{
+  "arm": "STATIC",
+  "baseline_tools": {
+    "clippy": null,
+    "lockbud": null,
+    "missing": [],
+    "shuttle": null
+  },
+  "hint": "h1",
+  "model": "DeepSeek Flash",
+  "model_id": "deepseek-flash",
+  "model_policy": {
+    "channel": "deepseek-direct",
+    "display_name": "DeepSeek Flash",
+    "max_output_tokens": 32768,
+    "max_output_tokens_cap": 65536,
+    "model_id": "deepseek-flash",
+    "reasoning_effort": null,
+    "stream": false,
+    "supports_seed": true,
+    "surface": "chat",
+    "thinking": true
+  },
+  "reps": 3,
+  "rounds": 4,
+  "run_id": "deepseek-static",
+  "run_params": {
+    "call_budget": 5,
+    "feedback_mode": "full",
+    "hint": "h1",
+    "max_output_tokens": 32768,
+    "property_ids": "keep",
+    "rust_when_unverified": "last",
+    "seed_policy": "per_cell",
+    "temperature": null,
+    "temperature_policy": "provider_default",
+    "token_budget": 200000
+  },
+  "stage": 2,
+  "status": "complete",
+  "tasks": {
+    "pattern": "all",
+    "selected": [
+      "lock-order/abba_2lock",
+      "condvar/lost_wakeup",
+      "semaphore/permits"
+    ]
+  }
+}
