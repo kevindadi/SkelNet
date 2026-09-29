@@ -2,7 +2,7 @@
 
 R1. A main task starts two waiter roles and one notifier role that run at the same time.
 R2. Each waiter blocks on a shared condition variable until it is told to proceed.
-R3. The notifier must wake every waiter that is still blocked, so no waiter is left waiting forever.
+R3. No waiter may be left waiting forever.
 R4. A waiter must hold the lock while it waits on the condition variable.
 R5. The notifier must take the lock before it wakes the waiters and release the lock afterwards.
 R6. The waiters and the notifier use a separate permit counter so that the notifier only wakes the waiters after both are ready to wait.

@@ -1,9 +1,9 @@
 //! Defect program for semaphore/throttle_n_permits.
 //!
-//! w3 takes three permits and posts none. w1 and w2 each take one and post
-//! it back. The pool starts at two, so w3's third take can never be filled
-//! and a worker blocks forever. The completion-count print matches fixed.rs.
-//! New program (SkelNet R7a-2).
+//! Same as fixed.rs except w1 and w2 each take a second permit while still
+//! holding the first. The pool has only two permits, so each of those workers
+//! holds one and waits for another, and they wait on each other. w3 is unchanged.
+//! Review measured O2 hang (run 8/20) and O3 deadlock.
 
 use concir_sync::Semaphore;
 use std::sync::Arc;
@@ -11,25 +11,30 @@ use std::thread;
 
 fn w1(s: Arc<Semaphore>) -> u32 {
     let permit = s.acquire();
+    let second = s.acquire();
     let mut done = 0u32;
     done += 1;
+    drop(second);
     drop(permit);
     done
 }
 
 fn w2(s: Arc<Semaphore>) -> u32 {
     let permit = s.acquire();
+    let second = s.acquire();
     let mut done = 0u32;
     done += 1;
+    drop(second);
     drop(permit);
     done
 }
 
 fn w3(s: Arc<Semaphore>) -> u32 {
-    s.take();
-    s.take();
-    s.take();
-    0
+    let permit = s.acquire();
+    let mut done = 0u32;
+    done += 1;
+    drop(permit);
+    done
 }
 
 fn main() {

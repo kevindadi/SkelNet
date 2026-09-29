@@ -1,18 +1,17 @@
 //! Defect program for semaphore/permit_leak.
 //!
-//! w1 takes one permit and never posts it back. w2 still acquires and
-//! releases once. Together with the single initial permit, w1's second
-//! unmatched take cannot be satisfied, so some worker blocks forever.
-//! The remaining-permit count is the same computation as fixed.rs.
-//! New program (SkelNet R7a-2).
+//! Same as fixed.rs except w1 never returns its permit: `permit.forget()`
+//! consumes the permit instead of dropping it. If w1 runs first, w2 waits
+//! forever for the only permit. If w2 runs first, both workers finish, but
+//! the pool is left empty and the program prints `DONE permits=0`.
 
 use concir_sync::Semaphore;
 use std::sync::Arc;
 use std::thread;
 
 fn w1(s: Arc<Semaphore>) {
-    s.take();
-    s.take();
+    let permit = s.acquire();
+    permit.forget();
 }
 
 fn w2(s: Arc<Semaphore>) {

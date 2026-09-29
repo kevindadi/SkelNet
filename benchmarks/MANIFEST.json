@@ -517,7 +517,7 @@
     {
       "task": "condvar/notify_one_multi_waiter_wrong_pick",
       "file": "REQUIREMENTS.h1.md",
-      "sha256": "0a9f06d1ad1b794a016f037323a8a384ec333a79fd89af99644cd856a41e1346",
+      "sha256": "7e0762124a1a6d96b237da66c44cf502e9a78c4063a69bc98713d43938f8db61",
       "source": "new (SkelNet R7a-2)"
     },
     {
@@ -920,7 +920,7 @@
     {
       "task": "semaphore/acquire_twice_no_release",
       "file": "REQUIREMENTS.h1.md",
-      "sha256": "f6f2282a435257f16f45fdc1a38f5a38770fb1f5395c801676464ba0671f93bc",
+      "sha256": "2c7ccde266af3f6b207a1281960d67350a31d498a8a3e40ac5ce12a53be76a07",
       "source": "new (SkelNet R7a-2)"
     },
     {
@@ -981,7 +981,7 @@
     {
       "task": "semaphore/permit_leak",
       "file": "REQUIREMENTS.h1.md",
-      "sha256": "385941f342ba8622236e421248551f17c71490852ee73d8926135aaaaf113b2d",
+      "sha256": "8674a6bcdc9f93fa3890dc851f1f01b437974d3042c0ffa1ea55b6a1c0869d5f",
       "source": "new (SkelNet R7a-2)"
     },
     {
@@ -993,7 +993,7 @@
     {
       "task": "semaphore/permit_leak",
       "file": "rust/buggy.rs",
-      "sha256": "1091e3a61e0ac26720e56f6ca1f904282fe5aac54dd933803ed3312921832c9b",
+      "sha256": "2df17bfab4c1cb1a71e2d98c774d5641e15876907856adf6e1a01356bcd15192",
       "source": "new (SkelNet R7a-2)"
     },
     {
@@ -1047,7 +1047,7 @@
     {
       "task": "semaphore/throttle_n_permits",
       "file": "REQUIREMENTS.h1.md",
-      "sha256": "a930c0372a4f358f58efcb16dade54c4f05a3523f654ec23a5dfcbc0b2ef9d50",
+      "sha256": "9cb066355ee51fc370da1fd1d50a6ff9e5ba93542579a83eca8213bf35afba76",
       "source": "new (SkelNet R7a-2)"
     },
     {
@@ -1059,7 +1059,7 @@
     {
       "task": "semaphore/throttle_n_permits",
       "file": "rust/buggy.rs",
-      "sha256": "0f4947d516569f6b4cc9e38bc078c761e49185f0b31e656699df1b97aaa1c973",
+      "sha256": "2d23ca6f62cf8d23345ca112298f1bfd8358da86873a3a2e340e192469844db8",
       "source": "new (SkelNet R7a-2)"
     },
     {
