@@ -116,6 +116,25 @@ def test_anytime_keeps_the_axes_and_colours(planted):
     assert "PhBack" not in text
 
 
+PLACEHOLDER_SHA256 = {
+    "main.tex": "6ec95308fa966ec2bf8e96bb87c51aba39785f50e4d919e01a5ee6df0d47707c",
+    "tiers.tex": "2bdb80cadaccc9c58e497a45f425c71343405ff6c0b6df74336f98ffccfc9c50",
+    "ingredients.tex": "4f69708d34a38e4fcda253d5d2e831739ce08b932a28b4a42429fd6efb53d436",
+    "failures.tex": "faa0de665dae08ffcb3d2b8f5f1a61f0bd1d30eea9bb97563e7065737f79922a",
+    "cost.tex": "19e2d27ef51ff65bace2f8517d867f06282ba2f196a2130899fd9cf608f2da65",
+    "models.tex": "2350a2279327096205e4893140518999bdbeecfdcba0dffd46203b14ac65783f",
+    "benchmark.tex": "1517b0fd070b7d1ef12e55bb193bce86f0ce326b513268bf58b2852be40045ad",
+    "anytime.tex": "277e3391dca801b675d93bd9fcacbdb9fe165102e45f3dc831ffc231ab426a43",
+}
+
+
+def test_placeholder_sha256_matches_appendix_a():
+    import hashlib
+    for name, expected in PLACEHOLDER_SHA256.items():
+        digest = hashlib.sha256((PAPER / name).read_bytes()).hexdigest()
+        assert digest == expected, name
+
+
 def test_tiny_main_matches_the_committed_golden():
     runs = sorted(p for p in (FIXTURES / "tiny").glob("*/*")
                   if (p / "MANIFEST.json").exists())
