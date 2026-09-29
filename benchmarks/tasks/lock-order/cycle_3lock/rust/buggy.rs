@@ -1,14 +1,12 @@
-//! Reference Rust for lock-order/cycle_3lock (SkelNet R7a-2a).
+//! Defect program for lock-order/cycle_3lock (SkelNet R7a-2a).
 //!
-//! Design: `gold.skel` has workers `t1` (a, b), `t2` (b, c) and `t3` (a, c).
-//! Every worker takes its two locks in the global order a < b < c, so no
-//! circular wait can form. Each lock protects the completion count of the
-//! worker that owns it; the workers return those counts.
+//! Source: ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f
+//! `benchmarks/families/lock-order/cycle_3lock/rust/buggy.rs`.
 //!
-//! Rewritten from the ConcPlanVerify reference (whose bindings were
-//! `mtx_a`/`mtx_b`/`mtx_c` and `w1`/`w2`/`w3`): renamed to the contract
-//! entities `a`/`b`/`c` and `t1`/`t2`/`t3`, restructured as named worker
-//! functions, and given a computed terminal line.
+//! Changes: bindings renamed to the contract entities, the workers are named
+//! functions, and the computed terminal line is added. The defect is unchanged:
+//! `t1` takes a->b, `t2` takes b->c and `t3` takes c->a, forming a circular
+//! wait, so all three can hold one lock and wait forever for the next.
 
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -36,12 +34,14 @@ fn t2(b: Arc<Mutex<u32>>, c: Arc<Mutex<u32>>) -> u32 {
 }
 
 fn t3(a: Arc<Mutex<u32>>, c: Arc<Mutex<u32>>) -> u32 {
-    let ga = a.lock().unwrap();
+    // DEFECT: t3 takes c then a, closing the cycle a -> b -> c -> a.
     let mut gc = c.lock().unwrap();
     *gc += 1;
     let n = *gc;
-    drop(gc);
+    let ga = a.lock().unwrap();
+    let _ = &*ga;
     drop(ga);
+    drop(gc);
     n
 }
 

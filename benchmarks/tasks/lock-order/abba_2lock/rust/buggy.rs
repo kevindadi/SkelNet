@@ -1,13 +1,12 @@
-//! Reference Rust for lock-order/abba_2lock (SkelNet R7a-2a).
+//! Defect program for lock-order/abba_2lock (SkelNet R7a-2a).
 //!
-//! Design: `gold.skel` has two workers `t1`, `t2` that both take the same two
-//! locks `a` and `b` in a single global order. Each lock protects the count of
-//! critical sections its owner ran; the workers return those counts so `main`
-//! prints a computed terminal line.
+//! Source: ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f
+//! `benchmarks/families/lock-order/abba_2lock/rust/buggy.rs`.
 //!
-//! Rewritten from the ConcPlanVerify reference: the bindings are renamed to the
-//! contract entities (`a`, `b`, `t1`, `t2`), the workers are named functions,
-//! and the terminal line is computed instead of omitted.
+//! Changes: bindings renamed to the contract entities (`a`, `b`, `t1`, `t2`),
+//! the workers are named functions, and the computed terminal line is added.
+//! The defect is unchanged: `t2` takes the locks in the opposite order, so the
+//! two workers can each hold one lock and wait forever for the other.
 
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -24,12 +23,14 @@ fn t1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
 }
 
 fn t2(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
-    let ga = a.lock().unwrap();
+    // DEFECT: opposite lock order.
     let mut gb = b.lock().unwrap();
     *gb += 1;
     let n = *gb;
-    drop(gb);
+    let ga = a.lock().unwrap();
+    let _ = &*ga;
     drop(ga);
+    drop(gb);
     n
 }
 

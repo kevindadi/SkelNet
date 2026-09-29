@@ -90,5 +90,9 @@
       }
     ]
   },
-  "contract": "lock-order/partial_deadlock_bystander/contract.json"
+  "contract": "lock-order/partial_deadlock_bystander/contract.json",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

@@ -106,5 +106,10 @@
       }
     ]
   },
-  "contract": "lock-order/two_independent_cycles/contract.json"
+  "contract": "lock-order/two_independent_cycles/contract.json",
+  "terminal_v2": "DONE t1=1 t2=1 t3=1 t4=1",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

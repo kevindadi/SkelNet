@@ -79,5 +79,10 @@
       }
     ]
   },
-  "contract": "lock-order/cycle_3lock/contract.json"
+  "contract": "lock-order/cycle_3lock/contract.json",
+  "terminal_v2": "DONE t1=1 t2=1 t3=1",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

@@ -61,5 +61,9 @@
       }
     ]
   },
-  "contract": "lock-order/abba_2lock/contract.json"
+  "contract": "lock-order/abba_2lock/contract.json",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

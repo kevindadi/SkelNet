@@ -8,27 +8,27 @@ skeleton: `benchmarks/tasks/lock-order/abba_2lock/gold.skel`
 
 ## main::main
 
-matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 4
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 7 | spawn t1 | matched | 12 |
-| 7 | spawn t2 | reordered | 20 |
+| 7 | spawn t1 | matched | 41 |
+| 7 | spawn t2 | matched | 43 |
 
 ## main::t1
 
-matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+matched Rust fn: `t1`; DSL lock depth 2; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 10 | lock a | reordered | 13 |
-| 10 | lock b | matched | 14 |
+| 10 | lock a | matched | 16 |
+| 10 | lock b | matched | 19 |
 
 ## main::t2
 
-matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+matched Rust fn: `t2`; DSL lock depth 2; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 13 | lock a | nesting_mismatch | - |
-| 13 | lock b | nesting_mismatch | - |
+| 13 | lock a | matched | 27 |
+| 13 | lock b | matched | 28 |

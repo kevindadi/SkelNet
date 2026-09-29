@@ -8,28 +8,28 @@ skeleton: `benchmarks/tasks/lock-order/partial_deadlock_bystander/gold.skel`
 
 ## main::main
 
-matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 4
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 10 | spawn a | matched | 14 |
-| 10 | spawn b | reordered | 22 |
-| 10 | spawn bystander | reordered | 30 |
+| 10 | spawn a | matched | 62 |
+| 10 | spawn b | matched | 63 |
+| 10 | spawn bystander | matched | 65 |
 
 ## main::a
 
-matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+matched Rust fn: `a`; DSL lock depth 2; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 13 | lock a | reordered | 15 |
-| 13 | lock b | matched | 16 |
+| 13 | lock a | matched | 28 |
+| 13 | lock b | matched | 31 |
 
 ## main::b
 
-matched Rust fn: `<none>`; DSL lock depth 2; Rust lock calls 0
+matched Rust fn: `b`; DSL lock depth 2; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 16 | lock a | nesting_mismatch | - |
-| 16 | lock b | nesting_mismatch | - |
+| 16 | lock a | matched | 39 |
+| 16 | lock b | matched | 40 |

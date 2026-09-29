@@ -64,5 +64,10 @@
       }
     ]
   },
-  "contract": "lock-order/cross_module_cycle/contract.json"
+  "contract": "lock-order/cross_module_cycle/contract.json",
+  "terminal_v2": "DONE t1=1 t2=1",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }
