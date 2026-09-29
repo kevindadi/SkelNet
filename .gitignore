@@ -31,6 +31,9 @@ experiments/**/env.json
 experiments/budget.json
 experiments/probe-*/
 experiments/**/cache/
+experiments/**/evidence/
+experiments/**/raw/
+experiments/**/audit.jsonl
 
 # Generic transient logs
 *.log
