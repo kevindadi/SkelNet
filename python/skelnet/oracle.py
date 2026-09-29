@@ -105,6 +105,26 @@ class OracleResult:
     details: dict[str, Any] = field(default_factory=dict)
 
 
+def _o3_tools(result: OracleResult) -> dict[str, Any] | None:
+    """The Shuttle/miri sub-results recorded on the O3 layer's data (round 8).
+
+    ``_combine_o3`` stores the two half-layer dicts (and the ``no_concurrency``
+    marker) in the combined O3 layer's ``data``.  Without O3, or before it ran,
+    there is nothing to report.
+    """
+    layer = result.layers.get("O3")
+    data = getattr(layer, "data", None) if layer is not None else None
+    if not isinstance(data, dict) or "shuttle" not in data or "miri" not in data:
+        return None
+
+    def pair(name: str) -> dict[str, Any]:
+        sub = data.get(name) or {}
+        return {"status": sub.get("status"), "category": sub.get("category")}
+
+    return {"shuttle": pair("shuttle"), "miri": pair("miri"),
+            "no_concurrency": bool(data.get("no_concurrency"))}
+
+
 def oracle_result_dict(result: OracleResult) -> dict[str, Any]:
     """The frozen ``oracle`` sub-dict shared with the cell schema."""
     return {
@@ -116,6 +136,7 @@ def oracle_result_dict(result: OracleResult) -> dict[str, Any]:
         "terminal_check": result.terminal_check,
         "oracle_complete": result.oracle_complete,
         "layers": {name: layer.to_dict() for name, layer in result.layers.items()},
+        "o3_tools": _o3_tools(result),
     }
 
 
