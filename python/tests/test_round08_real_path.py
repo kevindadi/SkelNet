@@ -49,7 +49,13 @@ def _run_cmd(tmp_path, arm, replies, *, cache_dir=None, runner=None,
     return out, client
 
 
-def test_report_over_real_cmd_run(tmp_path):
+def test_report_over_real_cmd_run(tmp_path, monkeypatch):
+    # F7: independent of whether lockbud/clippy are installed.
+    lockbud = tmp_path / "lockbud"
+    lockbud.write_text("", encoding="utf-8")
+    monkeypatch.setenv("LOCKBUD_BIN", str(lockbud))
+    monkeypatch.setattr(cli, "_clippy_version", lambda: "clippy 0.0 (test)")
+    monkeypatch.setattr(cli, "_clippy_probe", lambda: {})
     cache = tmp_path / "cache"
     clean = _rust(f'println!("{TERMINAL}");')
     g0_run, _ = _run_cmd(tmp_path, "G0", [clean], cache_dir=cache,
@@ -97,7 +103,9 @@ def test_report_over_real_cmd_run(tmp_path):
     assert cost["SKEL"]["n"] == 1
     # D8-12: STATIC's cache-hit first call still carries G0's usage.
     assert cost["STATIC"]["input"] == cost["G0"]["input"] == 1000
-    assert cost["STATIC"]["tool_n"] == 0
+    # R9a records baseline.rounds[].compile_wall_ms, so STATIC has tool time.
+    assert cost["STATIC"]["tool_n"] == 1
+    assert cost["STATIC"]["tool_ms"] is not None
 
     lockbud = document["tables"]["lockbud"]
     joined = lockbud["joined"]
