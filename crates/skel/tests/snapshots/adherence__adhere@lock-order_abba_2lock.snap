@@ -12,8 +12,8 @@ matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 7 | spawn t1 | matched | 41 |
-| 7 | spawn t2 | matched | 43 |
+| 7 | spawn t1 | matched | 40 |
+| 7 | spawn t2 | matched | 42 |
 
 ## main::t1
 
@@ -22,7 +22,7 @@ matched Rust fn: `t1`; DSL lock depth 2; Rust lock calls 2
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
 | 10 | lock a | matched | 16 |
-| 10 | lock b | matched | 19 |
+| 10 | lock b | matched | 17 |
 
 ## main::t2
 
@@ -30,5 +30,5 @@ matched Rust fn: `t2`; DSL lock depth 2; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 13 | lock a | matched | 27 |
-| 13 | lock b | matched | 28 |
+| 13 | lock a | matched | 26 |
+| 13 | lock b | matched | 27 |

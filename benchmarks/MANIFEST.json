@@ -318,7 +318,7 @@
     {
       "task": "channel/bounded_backpressure_lock_held",
       "file": "REQUIREMENTS.h1.md",
-      "sha256": "be2a98498947099ecaabd190ec4ee377bc78940c6d4157426d6d0a5790f459ae",
+      "sha256": "4b8898df8465df2afd621ef3055c820c6686c681bdc98505e1eb9600e531d2ee",
       "source": "new (SkelNet R7a-2)"
     },
     {
@@ -457,14 +457,14 @@
     {
       "task": "channel/send_while_holding_mutex",
       "file": "rust/buggy.rs",
-      "sha256": "7a1264e40ffadb604956afa75d12b3126f767ca395b3b37231ad2031e63a84a4",
+      "sha256": "011a131d4a750b33077584c8905813ad7989b295aa5ebcb27139266e6fef7ef0",
       "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/channel/send_while_holding_mutex/rust/buggy.rs (modified)",
       "source_sha256": "43806b614bb334d3b46af4deed139341e5cf7cabd5d5c7dd2b9192354c8f3b8f"
     },
     {
       "task": "channel/send_while_holding_mutex",
       "file": "rust/expect.json",
-      "sha256": "a46eeb984432c7043f5fec1872b25d664f7b33807ec3709de731d992cdfbeb54",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
       "source": "new (SkelNet R7a-2)"
     },
     {
@@ -808,7 +808,7 @@
     {
       "task": "lock-order/abba_2lock",
       "file": "rust/fixed.rs",
-      "sha256": "59eef6bf6e6d2e40cb1cba4ee4b5c20f7299dff225354fc1ca8f7f62cd2ed5fb",
+      "sha256": "b94681280fc2bb3197eaa27fc8b69b15c5863a9d62688809f0e69580b1798057",
       "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/abba_2lock/rust/fixed.rs"
     },
     {
@@ -820,13 +820,13 @@
     {
       "task": "lock-order/abba_2lock",
       "file": "REQUIREMENTS.h1.md",
-      "sha256": "692020b0a51454a045023812d14fe791eb4a6ac18cbaa771a9adef626f577bb5",
+      "sha256": "b282f21b7510d692b601b7c4210717327d7343bd67ddc2066c11d4744d8f2cee",
       "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/abba_2lock",
       "file": "rust/buggy.rs",
-      "sha256": "390e0824df3f5d006a76306712154d97703d961f5901df7f4d51d4f7d26c169f",
+      "sha256": "348a317e97274091b132c92f2797c55e3d13d0a0461e7b61145a36aa6c2e78aa",
       "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/lock-order/abba_2lock/rust/buggy.rs (modified)",
       "source_sha256": "ce946300ec53e50326d3dc56d51c3496408cf6d95bea4802043980a5e771d13a"
     },
@@ -875,7 +875,7 @@
     {
       "task": "lock-order/cross_module_cycle",
       "file": "rust/fixed.rs",
-      "sha256": "55cbb7f11f44aa43cff77bcca9a6c06f1460a870f95a7ca6b55785776ef0c06c",
+      "sha256": "cf9434abdf93c6a7e234549aa3b56ba1c2a8702dc9e8a74ce7997c3cb426be03",
       "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cross_module_cycle/rust/fixed.rs"
     },
     {
@@ -887,13 +887,13 @@
     {
       "task": "lock-order/cross_module_cycle",
       "file": "REQUIREMENTS.h1.md",
-      "sha256": "13e272832a4fd8784308f7f9827b2055b4d4af62fd93d86d417da91e63843cfa",
+      "sha256": "7fc72345e1857103e2c9a1fc71f99ba749be68dabcb16a6e02abd0fc4efb282a",
       "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/cross_module_cycle",
       "file": "rust/buggy.rs",
-      "sha256": "cf5f70a5af033d809847e26625a58c1a3a2681c13df1fe5912afa491e437b0af",
+      "sha256": "4662d28a6a54512ae685bc4f94a5f40c5ecf9f3d8b9a722f147c25f7f2d2e813",
       "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/lock-order/cross_module_cycle/rust/buggy.rs (modified)",
       "source_sha256": "01e9baed641d979280318dbdd5ae3de7e0942a3c9f8fbd378fd863beee4682f4"
     },
@@ -942,7 +942,7 @@
     {
       "task": "lock-order/cycle_3lock",
       "file": "rust/fixed.rs",
-      "sha256": "978041657007ec740b2a69b6b462ff2f079c0ea964e5301786da4ce69e6f68cc",
+      "sha256": "15e6757a90599d66de551e3559529d54257cb69e0e3840376fa4a6e7544db756",
       "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/cycle_3lock/rust/fixed.rs"
     },
     {
@@ -954,13 +954,13 @@
     {
       "task": "lock-order/cycle_3lock",
       "file": "REQUIREMENTS.h1.md",
-      "sha256": "80a251d3f07e22d8751f6e4a0118a1646b58d4b22c3e60f9da4c30035337487b",
+      "sha256": "1c5540ed651a08e368de1785cdcf692c3920f280cbf67aa3311108a6c14bdfb4",
       "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/cycle_3lock",
       "file": "rust/buggy.rs",
-      "sha256": "73333d1162eb2bbe9a0602098d99de21d6a7d6e5762b2c965e7197bbba90208c",
+      "sha256": "c55ce167e5fb19bc06b839d484b77880a3cf0b4dc73ab843686e023a37bd189c",
       "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/lock-order/cycle_3lock/rust/buggy.rs (modified)",
       "source_sha256": "8e25677b26d2014c731a13da23d163cb96a558a896f8e36d7fb32da633cdcd88"
     },
@@ -1009,7 +1009,7 @@
     {
       "task": "lock-order/partial_deadlock_bystander",
       "file": "rust/fixed.rs",
-      "sha256": "76c4edf2ba3ca5fd48090bf020f32d5dc23b7a0d8d4925e140befe564722df53",
+      "sha256": "be623d0582f1d61da6e7ec2c7621bcf2da9b022722d9bdd15c9092f4a6657fc2",
       "source": "rewritten from /Users/kevin/local-repos/ConcPlanVerify/benchmarks/families/lock-order/partial_deadlock_bystander/rust/fixed.rs"
     },
     {
@@ -1021,20 +1021,20 @@
     {
       "task": "lock-order/partial_deadlock_bystander",
       "file": "REQUIREMENTS.h1.md",
-      "sha256": "e94353dc1cb178833efbf97798f08cd040381913c8fb59465b10cb9222299f29",
+      "sha256": "d595c4806865b885624280960c49a4d1121c8786f8ec1c3c28f3c4055049714e",
       "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/partial_deadlock_bystander",
       "file": "rust/buggy.rs",
-      "sha256": "23962d793c442e184ec7abe66ebeb25e61330b109184089049a7a09a49acbd4d",
+      "sha256": "7c88358e00a7977bd0fdfa6f9c0ae725c11f400e1600c6fb4e3b947cc0dbb63e",
       "source": "ConcPlanVerify@8bf9fa49b0300e8be00fc5c0b61a98cd8d5aa53f:benchmarks/families/lock-order/partial_deadlock_bystander/rust/buggy.rs (modified)",
       "source_sha256": "fd8efdba862186b48388f77c175dd095be231564e273057aa8d252b3f078978c"
     },
     {
       "task": "lock-order/partial_deadlock_bystander",
       "file": "rust/expect.json",
-      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "sha256": "22038ca37051395b48b84ecb64dd342bdc35759a504181c05f43582cf17c7276",
       "source": "new (SkelNet R7a-2)"
     },
     {
@@ -1082,19 +1082,19 @@
     {
       "task": "lock-order/two_independent_cycles",
       "file": "REQUIREMENTS.h1.md",
-      "sha256": "04ef9cbf834fb71cb0b660349240bdbc37c00c1ba37e857c69722a9b0e5697eb",
+      "sha256": "c0c4cbb384f5db6d12ce5cca5a58a3aedae917f2c3790f40e61c50d70b6bfd5f",
       "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/two_independent_cycles",
       "file": "rust/fixed.rs",
-      "sha256": "4c2db93fed6b6561ad2debb1caa8de9125c96fab0142f4bd9df389759f379423",
+      "sha256": "c20d82fe322ca6ab511bafca7e063bfb7f311982e77471c41df688efbc7d3803",
       "source": "new (SkelNet R7a-2)"
     },
     {
       "task": "lock-order/two_independent_cycles",
       "file": "rust/buggy.rs",
-      "sha256": "a433893d6c1405f3db42c3e9a36bd1382f7d41339f794b3c33da37957d431a5d",
+      "sha256": "49f6b99da6305a2a203ccf6d8f2502cfadea540248632d510cf3e7d20f2e3122",
       "source": "new (SkelNet R7a-2)"
     },
     {

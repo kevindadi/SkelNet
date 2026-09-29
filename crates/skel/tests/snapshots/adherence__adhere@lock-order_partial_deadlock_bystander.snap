@@ -22,8 +22,8 @@ matched Rust fn: `a`; DSL lock depth 2; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 13 | lock a | matched | 28 |
-| 13 | lock b | matched | 31 |
+| 13 | lock a | matched | 31 |
+| 13 | lock b | matched | 32 |
 
 ## main::b
 
@@ -31,5 +31,5 @@ matched Rust fn: `b`; DSL lock depth 2; Rust lock calls 2
 
 | dsl line | statement | status | rust line |
 | --- | --- | --- | --- |
-| 16 | lock a | matched | 39 |
-| 16 | lock b | matched | 40 |
+| 16 | lock a | matched | 41 |
+| 16 | lock b | matched | 42 |
