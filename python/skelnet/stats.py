@@ -333,50 +333,71 @@ def obf_alpha_spent(t: float, alpha: float = 0.05) -> float:
     return 2.0 * (1.0 - normal_cdf(z / math.sqrt(t)))
 
 
-def _integration_grid(limit: float = 9.0, step: float = 0.01):
-    n = int(round(limit / step))
-    grid = [i * step for i in range(-n, n + 1)]
-    return grid, step
+def _simpson(values, a: float, b: float) -> float:
+    """Composite Simpson integral of ``values`` on ``n+1`` nodes of ``[a, b]``."""
+    n = len(values) - 1
+    if n <= 0:
+        return 0.0
+    if n == 1:
+        return (values[0] + values[1]) * (b - a) / 2.0
+    if n % 2 == 1:
+        # Trapezoid on the last interval, Simpson on the rest.
+        h = (b - a) / n
+        tail = (values[-2] + values[-1]) * h / 2.0
+        return _simpson(values[:-1], a, b - h) + tail
+    h = (b - a) / n
+    total = values[0] + values[-1]
+    for i in range(1, n):
+        total += (4.0 if i % 2 else 2.0) * values[i]
+    return total * h / 3.0
 
 
-def _tail_integral(values, grid, step: float, c: float) -> float:
-    """Two-tailed trapezoid integral of ``values`` on ``grid`` outside |c|."""
-    total = 0.0
-    for x, value in zip(grid, values):
-        if x >= c or x <= -c:
-            total += value
-    return total * step
+_OBF_NODES = 1000
 
 
-def _find_boundary(values, grid, step: float, target: float) -> float:
-    low, high = 0.0, grid[-1]
-    for _ in range(80):
+def _crossing_probability(f, grid, c_prev: float, c: float, rho: float,
+                          sigma: float) -> float:
+    """P(no crossing before |Z_k| >= c) for the next analysis."""
+    values = []
+    for z, density in zip(grid, f):
+        upper = 1.0 - normal_cdf((c - rho * z) / sigma)
+        lower = normal_cdf((-c - rho * z) / sigma)
+        values.append(density * (upper + lower))
+    return _simpson(values, -c_prev, c_prev)
+
+
+def _solve_boundary(f, grid, c_prev: float, rho: float, sigma: float,
+                    target: float) -> float:
+    low, high = 0.0, 12.0
+    for _ in range(60):
         mid = (low + high) / 2.0
-        if _tail_integral(values, grid, step, mid) > target:
+        if _crossing_probability(f, grid, c_prev, mid, rho, sigma) > target:
             low = mid
         else:
             high = mid
     return (low + high) / 2.0
 
 
-def _propagate(values, grid, step: float, c: float, rho: float,
-               sd: float) -> list[float]:
-    inside = [(x, v) for x, v in zip(grid, values) if -c <= x <= c]
+def _propagate(f, grid, c_prev: float, c_new: float, rho: float,
+               sigma: float):
+    """Sub-density of Z_{k+1} on [-c_new, c_new] given the no-crossing density."""
+    new_grid = [-c_new + 2.0 * c_new * i / _OBF_NODES
+                for i in range(_OBF_NODES + 1)]
     out = []
-    for xp in grid:
-        total = 0.0
-        for x, v in inside:
-            z = (xp - rho * x) / sd
-            total += v * normal_pdf(z)
-        out.append(total * step / sd)
-    return out
+    for z_next in new_grid:
+        values = [density * normal_pdf((z_next - rho * z) / sigma) / sigma
+                  for z, density in zip(grid, f)]
+        out.append(_simpson(values, -c_prev, c_prev))
+    return out, new_grid
 
 
 def obf_nominal_boundaries(looks, alpha: float = 0.05) -> list[float]:
     """Nominal two-sided alpha at each analysis from the OBF spending function.
 
     ``looks`` are information fractions (the futility-only first look is not
-    included).  The recursive grid integration follows Armitage-McPherson-Rowe.
+    included).  The recursion follows Armitage-McPherson-Rowe with composite
+    Simpson integration and the conditional density
+    ``Z_{k+1} | Z_k = z ~ N(rho z, 1 - rho^2)``, ``rho = sqrt(t_k / t_{k+1})``.
     """
     looks = [float(t) for t in looks]
     if not looks:
@@ -384,26 +405,23 @@ def obf_nominal_boundaries(looks, alpha: float = 0.05) -> list[float]:
     spent = [obf_alpha_spent(t, alpha) for t in looks]
     increments = [spent[0]] + [spent[i] - spent[i - 1]
                                for i in range(1, len(looks))]
-    grid, step = _integration_grid(step=0.005)
-    values = [normal_pdf(x) for x in grid]
-    boundaries: list[float] = []
-    for i, t in enumerate(looks):
-        if i == 0:
-            # The first analysis has no prior look: its nominal alpha is exactly
-            # the spent alpha at t_1.
-            if increments[0] <= 0.0:
-                boundaries.append(0.0)
-                continue
-            c = normal_ppf(1.0 - increments[0] / 2.0)
-            boundaries.append(increments[0])
-        else:
-            c = _find_boundary(values, grid, step, increments[i])
-            boundaries.append(2.0 * (1.0 - normal_cdf(c)))
-        if i + 1 < len(looks):
-            t_next = looks[i + 1]
-            rho = math.sqrt(t / t_next)
-            sd = math.sqrt(max(1e-12, 1.0 - t / t_next))
-            values = _propagate(values, grid, step, c, rho, sd)
+    if increments[0] <= 0.0:
+        boundaries = [0.0]
+        c_prev = 0.0
+    else:
+        c_prev = normal_ppf(1.0 - increments[0] / 2.0)
+        boundaries = [increments[0]]
+    grid = [-c_prev + 2.0 * c_prev * i / _OBF_NODES
+            for i in range(_OBF_NODES + 1)]
+    f = [normal_pdf(z) for z in grid]
+    for k in range(1, len(looks)):
+        t_prev, t = looks[k - 1], looks[k]
+        rho = math.sqrt(t_prev / t)
+        sigma = math.sqrt(max(1e-12, 1.0 - t_prev / t))
+        c = _solve_boundary(f, grid, c_prev, rho, sigma, increments[k])
+        boundaries.append(2.0 * (1.0 - normal_cdf(c)))
+        f, grid = _propagate(f, grid, c_prev, c, rho, sigma)
+        c_prev = c
     return boundaries
 
 

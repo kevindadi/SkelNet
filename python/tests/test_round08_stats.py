@@ -154,11 +154,22 @@ def test_obf_alpha_spent():
 
 
 def test_obf_nominal_boundaries():
-    boundaries = stats.obf_nominal_boundaries([0.6, 1.0])
-    assert boundaries[0] == pytest.approx(0.011396, abs=2e-4)
-    assert boundaries[1] == pytest.approx(0.04564, abs=2e-4)
+    # Reference values from an independent SciPy computation (the reviewer used
+    # `multivariate_normal` rectangle probabilities and nested
+    # `scipy.integrate.quad`), not from this implementation.
+    cases = {
+        (0.6, 1.0): [0.0113964, 0.0456610],
+        (0.45, 0.8): [0.0034808, 0.0270731],
+        (0.3, 1.0): [0.0003457, 0.0498488],
+        (0.9, 1.0): [0.0388300, 0.0376624],
+        (0.3, 0.7, 1.0): [0.0003457, 0.0190047, 0.0429893],
+        (0.6, 0.8, 1.0): [0.0113964, 0.0243841, 0.0391598],
+    }
+    for looks, expected in cases.items():
+        got = stats.obf_nominal_boundaries(list(looks))
+        assert got == pytest.approx(expected, abs=2e-5), looks
     assert stats.obf_nominal_boundaries([1.0])[0] == pytest.approx(
-        0.05, abs=2e-4)
+        0.05, abs=2e-5)
 
 
 def test_normal_cdf_and_ppf():
