@@ -48,5 +48,10 @@
       }
     ]
   },
-  "contract": "structure/scope_bound_k_workers/contract.json"
+  "contract": "structure/scope_bound_k_workers/contract.json",
+  "terminal_v2": "DONE completed=3",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

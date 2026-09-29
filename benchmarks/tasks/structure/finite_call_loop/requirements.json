@@ -28,5 +28,10 @@
     ],
     "resources": []
   },
-  "contract": "structure/finite_call_loop/contract.json"
+  "contract": "structure/finite_call_loop/contract.json",
+  "terminal_v2": "DONE calls=2",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

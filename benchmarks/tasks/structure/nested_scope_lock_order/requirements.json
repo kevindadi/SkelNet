@@ -51,5 +51,10 @@
       }
     ]
   },
-  "contract": "structure/nested_scope_lock_order/contract.json"
+  "contract": "structure/nested_scope_lock_order/contract.json",
+  "terminal_v2": "DONE a=2 b=2",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }

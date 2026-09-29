@@ -1,0 +1,7 @@
+---
+source: crates/skel/tests/adherence.rs
+expression: md
+---
+# Skeleton adherence report (human review only)
+
+skeleton: `benchmarks/tasks/structure/finite_call_loop/gold.skel`

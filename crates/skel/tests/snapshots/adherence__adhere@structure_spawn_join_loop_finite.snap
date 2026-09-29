@@ -1,0 +1,16 @@
+---
+source: crates/skel/tests/adherence.rs
+expression: md
+---
+# Skeleton adherence report (human review only)
+
+skeleton: `benchmarks/tasks/structure/spawn_join_loop_finite/gold.skel`
+
+## main::main
+
+matched Rust fn: `main`; DSL lock depth 0; Rust lock calls 0
+
+| dsl line | statement | status | rust line |
+| --- | --- | --- | --- |
+| 4 | spawn worker | matched | 14 |
+| 4 | join h | matched | 15 |

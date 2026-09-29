@@ -51,5 +51,10 @@
       }
     ]
   },
-  "contract": "structure/worker_with_payload/contract.json"
+  "contract": "structure/worker_with_payload/contract.json",
+  "terminal_v2": "DONE acc=2",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ]
 }
