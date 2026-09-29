@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from . import report, stats
+from .backend import repo_root
 
 MAIN_BASELINES = report.MAIN_BASELINES
 STAGE1_GROUPS = ["SKEL", "CIR", "G0", "REFINE", "STATIC", "DYNAMIC"]
@@ -19,6 +20,9 @@ STAGE1_MODELS = 4
 STAGE1_TASKS = 24
 STAGE1_REPS = 3
 FUTILITY_MARGIN = 0.03
+STAGES = ["parse", "check", "verify", "rust_compile", "O1", "O2", "O3", "O4",
+          "null", "other", "ok"]
+DEFAULT_BUDGET_FILE = "experiments/budget.json"
 
 
 def register(sub) -> None:
@@ -31,7 +35,7 @@ def register(sub) -> None:
     parser.add_argument("--budget-file", default=None)
     parser.add_argument("--stage", type=int, default=0)
     parser.add_argument("--next-stage-units", type=int, default=None)
-    parser.add_argument("--root", default=str(Path.cwd()))
+    parser.add_argument("--root", default=str(repo_root()))
     parser.add_argument("--json", action="store_true")
     parser.set_defaults(func=cmd_stop_check)
 
@@ -57,9 +61,18 @@ def cmd_stop_check(args) -> int:
     except report.ReportInputError as exc:
         print(f"stop-check: {exc}", file=sys.stderr)
         return 2
+    for manifest in ds.manifests:
+        value = (manifest.get("run_params") or {}).get("call_budget")
+        if isinstance(value, int):
+            ctx.call_budget = value
+            break
+
+    budget_file = args.budget_file
+    if budget_file is None:
+        budget_file = str(Path(args.root) / DEFAULT_BUDGET_FILE)
 
     if args.look == 0:
-        result = look0(ds, ctx, args)
+        result = look0(ds, ctx, args, budget_file)
     elif args.look == 1:
         result = look1(ds, ctx)
     else:
@@ -74,7 +87,7 @@ def cmd_stop_check(args) -> int:
     return 0
 
 
-# ── spend ────────────────────────────────────────────────────────────────
+# ── spend / warnings ─────────────────────────────────────────────────────
 
 def _spend(ds: report.Dataset, ctx) -> dict:
     cells = [c for c in ds.cells if c.included]
@@ -84,6 +97,12 @@ def _spend(ds: report.Dataset, ctx) -> dict:
     return {"calls": len(calls), "billable_tokens": billable,
             "reasoning_tokens": reasoning,
             "usd": _usd(ds, ctx)}
+
+
+def _warnings_block(ds: report.Dataset) -> dict:
+    counts = {label: dict(entry) for label, entry in ds.counts.items()}
+    return {"warnings": list(ds.warnings), "mixed": list(ds.mixed),
+            "counts": counts}
 
 
 def _usd(ds: report.Dataset, ctx) -> float | None:
@@ -122,7 +141,7 @@ def _next_projection(ds: report.Dataset, ctx, units: int) -> dict:
 
 # ── Look 0 ───────────────────────────────────────────────────────────────
 
-def look0(ds: report.Dataset, ctx, args) -> dict:
+def look0(ds: report.Dataset, ctx, args, budget_file) -> dict:
     models = []
     for model in ds.models():
         cells = [c for c in ds.cells if c.model_id == model and c.included]
@@ -130,9 +149,7 @@ def look0(ds: report.Dataset, ctx, args) -> dict:
         truncated = sum(1 for call in calls
                         if call.get("truncation_retry")
                         or "length" in (call.get("finish_reasons") or []))
-        empty = sum(1 for call in calls
-                    if (call.get("usage") or {}).get("output") == 0
-                    and not call.get("error"))
+        empty = sum(1 for call in calls if _is_empty_reply(call))
         transport = sum(1 for call in calls
                         if call.get("error") and "truncat" in str(call["error"]))
         first_round_miss = sum(1 for c in cells
@@ -169,10 +186,25 @@ def look0(ds: report.Dataset, ctx, args) -> dict:
         })
     coverage = report.table_coverage(ds, ctx)
     stage1 = _stage1_extrapolation(ds, ctx)
-    ledger = _ledger_check(ds, args)
-    return {"look": 0, "models": models, "identity_error": identity,
-            "groups": groups, "coverage": coverage, "stage1": stage1,
-            "ledger": ledger}
+    ledger = _ledger_check(ds, args, budget_file)
+    result = {"look": 0, "models": models, "identity_error": identity,
+              "groups": groups, "coverage": coverage, "stage1": stage1,
+              "ledger": ledger}
+    result.update(_warnings_block(ds))
+    return result
+
+
+def _is_empty_reply(call: dict) -> bool:
+    """G9: visible output = output - reasoning <= 0 (fallback output == 0)."""
+    usage = call.get("usage") or {}
+    if call.get("error"):
+        return False
+    output = usage.get("output")
+    if not isinstance(output, int):
+        return False
+    reasoning = usage.get("reasoning")
+    visible = output - reasoning if isinstance(reasoning, int) else output
+    return visible <= 0
 
 
 def _mean_optional(values):
@@ -183,15 +215,18 @@ def _mean_optional(values):
 def _stage1_extrapolation(ds: report.Dataset, ctx) -> dict:
     n_units = STAGE1_TASKS * STAGE1_REPS
     rows = []
-    for model in ds.models() or [None]:
+    for model in report.MODEL_ORDER:
         for label in STAGE1_GROUPS:
-            cells = ds.included(label, model=model) if model else []
+            cells = ds.included(label, model=model)
             note = None
             if not cells:
                 cells = ds.included(label)
                 note = "all-model average" if cells else "no data"
             if not cells:
-                rows.append({"model_id": model, "label": label, "note": note})
+                rows.append({"model_id": model, "label": label, "note": note,
+                             "calls": 0, "billable_tokens": 0,
+                             "reasoning_tokens": 0, "llm_s": 0.0,
+                             "oracle_s": 0.0, "usd": None})
                 continue
             def mean(metric):
                 return sum(metric(c) for c in cells) / len(cells)
@@ -209,9 +244,19 @@ def _stage1_extrapolation(ds: report.Dataset, ctx) -> dict:
                 "oracle_s": oracle * n_units / 1000.0,
                 "usd": _usd_for_cells(cells, ctx, n_units),
             })
+    totals = {
+        "calls": sum(row["calls"] for row in rows),
+        "billable_tokens": sum(row["billable_tokens"] for row in rows),
+        "reasoning_tokens": sum(row["reasoning_tokens"] for row in rows),
+        "llm_s": sum(row["llm_s"] for row in rows),
+        "oracle_s": sum(row["oracle_s"] for row in rows),
+        "usd": (sum(row["usd"] for row in rows)
+                if ctx.prices and all(row["usd"] is not None for row in rows)
+                else None),
+    }
     return {"units_per_group": n_units, "models": STAGE1_MODELS,
             "tasks": STAGE1_TASKS, "reps": STAGE1_REPS,
-            "groups": STAGE1_GROUPS, "rows": rows}
+            "groups": STAGE1_GROUPS, "rows": rows, "totals": totals}
 
 
 def _usd_for_cells(cells, ctx, n_units):
@@ -232,15 +277,20 @@ def _usd_for_cells(cells, ctx, n_units):
     return total / len(cells) * n_units
 
 
-def _ledger_check(ds: report.Dataset, args) -> dict:
-    if not args.budget_file:
-        return {"checked": False}
-    path = Path(args.budget_file)
+def _ledger_check(ds: report.Dataset, args, budget_file) -> dict:
+    path = Path(budget_file)
+    warnings = []
     if not path.exists():
-        return {"checked": False, "reason": "budget file missing"}
+        return {"checked": False, "path": str(path), "warnings": [
+            f"budget file not found: {budget_file}"]}
     data = json.loads(path.read_text(encoding="utf-8"))
     stage = str(args.stage)
-    requests = ((data.get("stages") or {}).get(stage) or {}).get("requests")
+    stage_data = (data.get("stages") or {}).get(stage)
+    if stage_data is None:
+        warnings.append(f"budget file has no stage {stage}")
+        requests = None
+    else:
+        requests = stage_data.get("requests")
     lower = upper = 0
     for cell in ds.cells:
         if not cell.included:
@@ -254,12 +304,59 @@ def _ledger_check(ds: report.Dataset, args) -> dict:
             upper += max(1, len(reasons)) + max(0, transport - 1)
     consistent = requests is None or lower <= requests <= upper
     return {"checked": True, "stage": stage, "ledger_requests": requests,
-            "lower": lower, "upper": upper, "consistent": consistent}
+            "lower": lower, "upper": upper, "consistent": consistent,
+            "warnings": warnings}
 
 
-# ── Look 1 ───────────────────────────────────────────────────────────────
+# ── failure stages ───────────────────────────────────────────────────────
 
-def look1(ds: report.Dataset, ctx) -> dict:
+def _stage_of(cell: report.Cell) -> str:
+    raw = cell.raw
+    arm = cell.arm
+    if arm in ("SKEL", "CIR"):
+        if not raw.get("parse_ok"):
+            return "parse"
+        if not raw.get("check_ok"):
+            return "check"
+        if raw.get("skel_verified") is False:
+            return "verify"
+        if raw.get("rust_compiled") is False or raw.get("rust_skipped"):
+            return "rust_compile"
+    elif arm == "G0":
+        if not raw.get("check_ok"):
+            return "rust_compile"
+    else:
+        rounds = (raw.get("baseline") or {}).get("rounds") or []
+        programs = [r for r in rounds if r.get("reply_kind") == "program"]
+        if not programs or programs[-1].get("compiled") is not True:
+            return "rust_compile"
+    layers = (raw.get("oracle") or {}).get("layers") or {}
+    for name in ("O1", "O2", "O3", "O4"):
+        if (layers.get(name) or {}).get("status") == "fail":
+            return name
+    if (raw.get("oracle") or {}).get("functional_ok") is None:
+        return "null"
+    if cell.ok:
+        return "ok"
+    return "other"
+
+
+def _failure_stages(ds: report.Dataset) -> dict:
+    out = {}
+    for label in report.GROUP_ORDER + ["SKEL-outcome"] + report.EXTRA_LABELS:
+        cells = ds.included(label)
+        if not cells:
+            continue
+        stages = {stage: 0 for stage in STAGES}
+        for cell in cells:
+            stages[_stage_of(cell)] += 1
+        out[label] = stages
+    return out
+
+
+# ── futility ─────────────────────────────────────────────────────────────
+
+def _futility_3pp(ds: report.Dataset) -> dict:
     skel = ds.rate("SKEL", lambda c: c.ok)
     best = None
     best_label = None
@@ -268,30 +365,18 @@ def look1(ds: report.Dataset, ctx) -> dict:
         if rate is not None and (best is None or rate > best):
             best, best_label = rate, label
     margin = None if skel is None or best is None else skel - best
-    futility = margin is not None and margin < FUTILITY_MARGIN
-    return {"look": 1, "skel_rate": skel, "best_baseline": best_label,
-            "best_rate": best, "margin": margin, "futility": futility,
-            "failure_stages": _failure_stages(ds)}
+    return {"skel_rate": skel, "best_baseline": best_label, "best_rate": best,
+            "margin": margin,
+            "futility": margin is not None and margin < FUTILITY_MARGIN}
 
 
-def _failure_stages(ds: report.Dataset) -> dict:
-    stages = {"parse": 0, "check": 0, "verify": 0, "rust_compile": 0,
-              "oracle": 0}
-    for cell in ds.cells:
-        if not cell.included:
-            continue
-        raw = cell.raw
-        if not raw.get("parse_ok"):
-            stages["parse"] += 1
-        elif not raw.get("check_ok"):
-            stages["check"] += 1
-        elif raw.get("skel_verified") is False and raw.get("arm") in ("SKEL", "CIR"):
-            stages["verify"] += 1
-        elif raw.get("rust_compiled") is False:
-            stages["rust_compile"] += 1
-        elif cell.ok is False:
-            stages["oracle"] += 1
-    return stages
+# ── Look 1 ───────────────────────────────────────────────────────────────
+
+def look1(ds: report.Dataset, ctx) -> dict:
+    rule = _futility_3pp(ds)
+    result = {"look": 1, **rule, "failure_stages": _failure_stages(ds)}
+    result.update(_warnings_block(ds))
+    return result
 
 
 # ── Look 2 / 3 ───────────────────────────────────────────────────────────
@@ -373,17 +458,28 @@ def look23(ds: report.Dataset, ctx) -> dict:
                                and dynamic_m["ci_high"] is not None
                                and dynamic_m["ci_high"] < 0) else None)}
 
+    rule = _futility_3pp(ds)
     worst = None
     for label in MAIN_BASELINES:
         value = tiers[label]
         if value is not None and (worst is None or value < worst):
             worst = value
-    futility = ctx.look == 2 and worst is not None and worst < 0
+    reasons = []
+    if rule["margin"] is not None and rule["margin"] < FUTILITY_MARGIN:
+        reasons.append("margin<3pp")
+    if worst is not None and worst < 0:
+        reasons.append("l2l3 regression")
+    futility = ctx.look == 2 and bool(reasons)
     success = all(criteria[key]["ok"] for key in
                   ("1_holm", "2_per_model", "3_l2l3", "4_sensitivity", "5_ci"))
     verdict = "futility" if futility else ("success" if success else "continue")
-    return {"look": ctx.look, "criteria": criteria, "verdict": verdict,
-            "alpha": alpha, "units": units}
+    result = {"look": ctx.look, "criteria": criteria, "verdict": verdict,
+              "alpha": alpha, "units": units, "futility": futility,
+              "futility_reasons": reasons, "margin": rule["margin"],
+              "l2l3_worst": worst,
+              "failure_stages": _failure_stages(ds)}
+    result.update(_warnings_block(ds))
+    return result
 
 
 def _tier_units(ds, control):
@@ -407,6 +503,20 @@ def _tier_units(ds, control):
 def _markdown(result: dict, args) -> str:
     look = result["look"]
     lines = [f"# stop-check (Look {look})", ""]
+    for warning in result.get("warnings", []):
+        lines.append(f"> warning: {warning}")
+    for message in result.get("mixed", []):
+        lines.append(f"> mixed: {message}")
+    counts = result.get("counts") or {}
+    if counts:
+        lines.append("")
+        lines.append("| Arm | included | skipped | error |")
+        lines.append("| --- | --- | --- | --- |")
+        for label in sorted(counts):
+            entry = counts[label]
+            lines.append(f"| {label} | {entry['included']} | "
+                         f"{entry['skipped']} | {entry['error']} |")
+    lines.append("")
     spend = result["spend"]
     lines.append(f"Spend: calls={spend['calls']}, "
                  f"billable_tokens={spend['billable_tokens']}, "
@@ -414,56 +524,11 @@ def _markdown(result: dict, args) -> str:
                  f"usd={spend['usd']}.")
     lines.append("")
     if look == 0:
-        lines.append("| Model | cells | calls | truncation | empty | first_round_miss | transport_trunc | unavailable |")
-        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
-        for row in result["models"]:
-            flag = " **" if row["truncation_flag"] else ""
-            lines.append(f"| {row['model_id']} | {row['cells']} | {row['calls']} | "
-                         f"{_pct(row['truncation_rate'])}{flag} | "
-                         f"{_pct(row['empty_reply_rate'])} | "
-                         f"{row['first_round_miss']} | {row['transport_truncated']} | "
-                         f"{row['unavailable_layers']} |")
-        lines.append("")
-        lines.append(f"Model identity error: {result['identity_error']}.")
-        lines.append("")
-        lines.append("Stage 1 extrapolation (24 tasks x 4 models x 3 reps x 6 groups):")
-        lines.append("")
-        lines.append("| Model | Group | calls | billable | reasoning | LLM s | oracle s | USD | note |")
-        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
-        for row in result["stage1"]["rows"]:
-            if "calls" not in row:
-                lines.append(f"| {row['model_id']} | {row['label']} | -- | -- | -- | -- | -- | -- | {row.get('note')} |")
-                continue
-            usd = "--" if row["usd"] is None else f"{row['usd']:.2f}"
-            lines.append(f"| {row['model_id']} | {row['label']} | {row['calls']:.0f} | "
-                         f"{row['billable_tokens']:.0f} | {row['reasoning_tokens']:.0f} | "
-                         f"{row['llm_s']:.1f} | {row['oracle_s']:.1f} | {usd} | "
-                         f"{row.get('note') or ''} |")
-        ledger = result["ledger"]
-        lines.append("")
-        if ledger.get("checked"):
-            lines.append(f"Ledger: requests={ledger['ledger_requests']}, "
-                         f"allowed [{ledger['lower']}, {ledger['upper']}], "
-                         f"consistent={ledger['consistent']}.")
-        else:
-            lines.append(f"Ledger: not checked ({ledger.get('reason', 'no --budget-file')}).")
+        _look0_markdown(lines, result)
     elif look == 1:
-        lines.append(f"SKEL {_pct(result['skel_rate'])} vs best baseline "
-                     f"{result['best_baseline']} {_pct(result['best_rate'])}; "
-                     f"margin {_pct(result['margin'])}; "
-                     f"futility={result['futility']}.")
-        lines.append("")
-        lines.append("Failure stages: " + ", ".join(
-            f"{k}={v}" for k, v in result["failure_stages"].items()) + ".")
+        _look1_markdown(lines, result)
     else:
-        lines.append(f"Verdict: **{result['verdict']}**; units={result['units']}, "
-                     f"nominal alpha={result['alpha']}.")
-        lines.append("")
-        lines.append("| Criterion | Met | Detail |")
-        lines.append("| --- | --- | --- |")
-        for name, entry in result["criteria"].items():
-            met = entry.get("ok", entry.get("note") is None)
-            lines.append(f"| {name} | {met} | {json.dumps(entry, sort_keys=True)} |")
+        _look23_markdown(lines, result)
     if "projection" in result:
         projection = result["projection"]
         lines.append("")
@@ -474,8 +539,113 @@ def _markdown(result: dict, args) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _failure_stages_markdown(lines, result):
+    stages = result.get("failure_stages") or {}
+    if not stages:
+        return
+    lines.append("")
+    lines.append("Failure stages per group (first hit per cell):")
+    lines.append("")
+    lines.append("| Arm | " + " | ".join(STAGES) + " |")
+    lines.append("| --- | " + " | ".join(["---"] * len(STAGES)) + " |")
+    for label in sorted(stages):
+        entry = stages[label]
+        lines.append("| " + label + " | " +
+                     " | ".join(str(entry.get(stage, 0)) for stage in STAGES) +
+                     " |")
+
+
+def _look0_markdown(lines, result):
+    lines.append("| Model | cells | calls | truncation | empty | first_round_miss | transport_trunc | unavailable |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+    for row in result["models"]:
+        flag = " **" if row["truncation_flag"] else ""
+        lines.append(f"| {row['model_id']} | {row['cells']} | {row['calls']} | "
+                     f"{_pct(row['truncation_rate'])}{flag} | "
+                     f"{_pct(row['empty_reply_rate'])} | "
+                     f"{row['first_round_miss']} | {row['transport_truncated']} | "
+                     f"{row['unavailable_layers']} |")
+    lines.append("")
+    lines.append(f"Model identity error: {result['identity_error']}.")
+    lines.append("")
+    lines.append("Per group per cell (mean):")
+    lines.append("")
+    lines.append("| Arm | n | calls | billable | reasoning | LLM s | tool s | oracle s |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+    for row in result["groups"]:
+        lines.append(f"| {row['label']} | {row['n']} | {row['calls']:.2f} | "
+                     f"{row['billable']:.0f} | {row['reasoning']:.0f} | "
+                     f"{_ms(row['llm_ms'])} | {_ms(row['tool_ms'])} | "
+                     f"{_ms(row['oracle_ms'])} |")
+    lines.append("")
+    lines.append("Coverage (per group):")
+    lines.append("")
+    coverage = result["coverage"]
+    keys = coverage["keys"]
+    lines.append("| Arm | n | " + " | ".join(keys) + " |")
+    lines.append("| --- | --- | " + " | ".join(["---"] * len(keys)) + " |")
+    for row in coverage["rows"]:
+        lines.append("| " + row["label"] + f" | {row['n']} | " +
+                     " | ".join(_pct(row[key]) for key in keys) + " |")
+    lines.append("")
+    lines.append("Stage 1 extrapolation (24 tasks x 4 models x 3 reps x 6 groups):")
+    lines.append("")
+    lines.append("| Model | Group | calls | billable | reasoning | LLM s | oracle s | USD | note |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+    for row in result["stage1"]["rows"]:
+        usd = "--" if row["usd"] is None else f"{row['usd']:.2f}"
+        lines.append(f"| {row['model_id']} | {row['label']} | {row['calls']:.0f} | "
+                     f"{row['billable_tokens']:.0f} | {row['reasoning_tokens']:.0f} | "
+                     f"{row['llm_s']:.1f} | {row['oracle_s']:.1f} | {usd} | "
+                     f"{row.get('note') or ''} |")
+    totals = result["stage1"]["totals"]
+    usd = "--" if totals["usd"] is None else f"{totals['usd']:.2f}"
+    lines.append(f"| **Total** | | **{totals['calls']:.0f}** | "
+                 f"**{totals['billable_tokens']:.0f}** | "
+                 f"**{totals['reasoning_tokens']:.0f}** | "
+                 f"**{totals['llm_s']:.1f}** | **{totals['oracle_s']:.1f}** | "
+                 f"**{usd}** | |")
+    ledger = result["ledger"]
+    lines.append("")
+    for warning in ledger.get("warnings", []):
+        lines.append(f"> warning: {warning}")
+    if ledger.get("checked"):
+        lines.append(f"Ledger: requests={ledger['ledger_requests']}, "
+                     f"allowed [{ledger['lower']}, {ledger['upper']}], "
+                     f"consistent={ledger['consistent']}.")
+    else:
+        lines.append("Ledger: not checked.")
+
+
+def _look1_markdown(lines, result):
+    lines.append(f"SKEL {_pct(result['skel_rate'])} vs best baseline "
+                 f"{result['best_baseline']} {_pct(result['best_rate'])}; "
+                 f"margin {_pct(result['margin'])}; "
+                 f"futility={result['futility']}.")
+    _failure_stages_markdown(lines, result)
+
+
+def _look23_markdown(lines, result):
+    lines.append(f"Verdict: **{result['verdict']}**; units={result['units']}, "
+                 f"nominal alpha={result['alpha']}.")
+    lines.append(f"Futility rule: margin<3pp={result['margin']}; "
+                 f"l2l3 worst Δ={result['l2l3_worst']}; "
+                 f"reasons={result['futility_reasons']}.")
+    lines.append("")
+    lines.append("| Criterion | Met | Detail |")
+    lines.append("| --- | --- | --- |")
+    for name, entry in result["criteria"].items():
+        met = entry.get("ok", entry.get("note") is None)
+        lines.append(f"| {name} | {met} | {json.dumps(entry, sort_keys=True)} |")
+    _failure_stages_markdown(lines, result)
+
+
 def _pct(value):
     return "--" if value is None else f"{value * 100:.1f}"
+
+
+def _ms(value):
+    return "--" if value is None else f"{value / 1000.0:.1f}"
 
 
 if __name__ == "__main__":  # pragma: no cover
