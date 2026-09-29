@@ -722,3 +722,47 @@ def test_real_lowered_cir_matches_until_a_field_changes(tmp_path):
     data["program"] = "tampered"
     cir.write_text(json.dumps(data), encoding="utf-8")
     assert validate_repo(root, "condvar/two_cv_two_locks", checks=("V5",))["tasks"][0]["checks"][0]["status"] == "fail"
+
+
+def test_boundary_v7_v8_skip_with_run_and_oracle(tmp_path):
+    root = tmp_path / "repo"
+    make_task(root, "boundary/edge", boundary=True)
+    report = validate_repo(root, "boundary/edge", run=True, oracle=True, tools=OkTools())
+    checks = {row["id"]: row for row in report["tasks"][0]["checks"]}
+    assert checks["V7"]["status"] == "skip"
+    assert checks["V7"]["reason"] == "boundary task has no reference program"
+    assert checks["V8"]["status"] == "skip"
+    assert checks["V8"]["reason"] == "boundary task has no reference program"
+    without = validate_repo(root, "boundary/edge", tools=OkTools())
+    plain = {row["id"]: row for row in without["tasks"][0]["checks"]}
+    assert plain["V7"]["reason"] == "not requested (--run)"
+    assert plain["V8"]["reason"] == "not requested (--oracle)"
+
+
+def test_main_task_missing_fixed_still_fails_v7_v8(tmp_path):
+    root = tmp_path / "repo"
+    task = make_task(root, "fam/task")
+    (task / "rust" / "fixed.rs").unlink()
+    report = validate_repo(root, "fam/task", checks=("V7", "V8"), run=True,
+                           oracle=True, tools=OkTools())
+    rows = report["tasks"][0]["checks"]
+    assert [row["status"] for row in rows] == ["fail", "fail"]
+    assert "fixed.rs is missing" in rows[0]["reason"]
+    assert "fixed.rs is missing" in rows[1]["reason"]
+
+
+def test_only_boundary_tasks_strict_run_oracle_exits_0(tmp_path, capsys):
+    root = tmp_path / "repo"
+    task = make_task(root, "boundary/only", boundary=True)
+    _manifest(root, task, "boundary/only")
+    rc = cli.main([
+        "bench", "validate", "--root", str(root), "--tasks", "boundary/*",
+        "--run", "--oracle", "--strict", "--json",
+    ])
+    captured = capsys.readouterr()
+    assert rc == 0, captured.err
+    report = json.loads(captured.out)
+    assert report["fail_count"] == 0
+    checks = {row["id"]: row for row in report["tasks"][0]["checks"]}
+    assert checks["V7"]["status"] == "skip"
+    assert checks["V8"]["status"] == "skip"
