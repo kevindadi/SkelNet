@@ -13,10 +13,9 @@ use std::thread;
 
 fn t1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
     let mut ga = a.lock().unwrap();
+    let gb = b.lock().unwrap();
     *ga += 1;
     let n = *ga;
-    let gb = b.lock().unwrap();
-    let _ = &*gb;
     drop(gb);
     drop(ga);
     n
@@ -24,10 +23,9 @@ fn t1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
 
 fn t2(b: Arc<Mutex<u32>>, c: Arc<Mutex<u32>>) -> u32 {
     let mut gb = b.lock().unwrap();
+    let gc = c.lock().unwrap();
     *gb += 1;
     let n = *gb;
-    let gc = c.lock().unwrap();
-    let _ = &*gc;
     drop(gc);
     drop(gb);
     n
@@ -36,10 +34,9 @@ fn t2(b: Arc<Mutex<u32>>, c: Arc<Mutex<u32>>) -> u32 {
 fn t3(a: Arc<Mutex<u32>>, c: Arc<Mutex<u32>>) -> u32 {
     // DEFECT: t3 takes c then a, closing the cycle a -> b -> c -> a.
     let mut gc = c.lock().unwrap();
+    let ga = a.lock().unwrap();
     *gc += 1;
     let n = *gc;
-    let ga = a.lock().unwrap();
-    let _ = &*ga;
     drop(ga);
     drop(gc);
     n

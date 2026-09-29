@@ -13,10 +13,9 @@ use std::thread;
 
 fn t1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
     let mut ga = a.lock().unwrap();
+    let gb = b.lock().unwrap();
     *ga += 1;
     let n = *ga;
-    let gb = b.lock().unwrap();
-    let _ = &*gb;
     drop(gb);
     drop(ga);
     n
@@ -25,10 +24,9 @@ fn t1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
 fn t2(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
     // DEFECT: opposite lock order.
     let mut gb = b.lock().unwrap();
+    let ga = a.lock().unwrap();
     *gb += 1;
     let n = *gb;
-    let ga = a.lock().unwrap();
-    let _ = &*ga;
     drop(ga);
     drop(gb);
     n

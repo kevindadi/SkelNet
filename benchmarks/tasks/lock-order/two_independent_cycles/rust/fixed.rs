@@ -10,10 +10,9 @@ use std::thread;
 
 fn t1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
     let mut ga = a.lock().unwrap();
+    let gb = b.lock().unwrap();
     *ga += 1;
     let n = *ga;
-    let gb = b.lock().unwrap();
-    let _ = &*gb;
     drop(gb);
     drop(ga);
     n
@@ -31,10 +30,9 @@ fn t2(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
 
 fn t3(c: Arc<Mutex<u32>>, d: Arc<Mutex<u32>>) -> u32 {
     let mut gc = c.lock().unwrap();
+    let gd = d.lock().unwrap();
     *gc += 1;
     let n = *gc;
-    let gd = d.lock().unwrap();
-    let _ = &*gd;
     drop(gd);
     drop(gc);
     n

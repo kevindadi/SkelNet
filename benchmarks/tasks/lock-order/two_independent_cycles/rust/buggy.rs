@@ -11,10 +11,9 @@ use std::thread;
 
 fn t1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
     let mut ga = a.lock().unwrap();
+    let gb = b.lock().unwrap();
     *ga += 1;
     let n = *ga;
-    let gb = b.lock().unwrap();
-    let _ = &*gb;
     drop(gb);
     drop(ga);
     n
@@ -23,10 +22,9 @@ fn t1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
 fn t2(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
     // DEFECT: opposite order inside the first pair.
     let mut gb = b.lock().unwrap();
+    let ga = a.lock().unwrap();
     *gb += 1;
     let n = *gb;
-    let ga = a.lock().unwrap();
-    let _ = &*ga;
     drop(ga);
     drop(gb);
     n
@@ -34,10 +32,9 @@ fn t2(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
 
 fn t3(c: Arc<Mutex<u32>>, d: Arc<Mutex<u32>>) -> u32 {
     let mut gc = c.lock().unwrap();
+    let gd = d.lock().unwrap();
     *gc += 1;
     let n = *gc;
-    let gd = d.lock().unwrap();
-    let _ = &*gd;
     drop(gd);
     drop(gc);
     n
@@ -46,10 +43,9 @@ fn t3(c: Arc<Mutex<u32>>, d: Arc<Mutex<u32>>) -> u32 {
 fn t4(c: Arc<Mutex<u32>>, d: Arc<Mutex<u32>>) -> u32 {
     // DEFECT: opposite order inside the second pair.
     let mut gd = d.lock().unwrap();
+    let gc = c.lock().unwrap();
     *gd += 1;
     let n = *gd;
-    let gc = c.lock().unwrap();
-    let _ = &*gc;
     drop(gc);
     drop(gd);
     n

@@ -14,10 +14,9 @@ use std::thread;
 
 fn t1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
     let mut ga = a.lock().unwrap();
+    let gb = b.lock().unwrap();
     *ga += 1;
     let n = *ga;
-    let gb = b.lock().unwrap();
-    let _ = &*gb;
     drop(gb);
     drop(ga);
     n

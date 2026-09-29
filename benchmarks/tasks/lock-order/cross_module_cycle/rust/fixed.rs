@@ -4,16 +4,22 @@
 //! owns lock `a` and task `t1`; module `other` owns lock `b` and task `t2`.
 //! Both tasks take `a` then `b`, so every schedule terminates. Each lock
 //! protects its owner task's completion count, which `main` prints.
+//!
+//! Both locks are constructed in `main` (the instrumenter names resources from
+//! the `let` bindings there); the `other` module contains only `t2`.
+//!
+//! Rewritten from the ConcPlanVerify reference: bindings renamed to the
+//! contract entities, `t2` moved into `other` and both tasks written as named
+//! functions, and the terminal line computed.
 
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 fn t1(a: Arc<Mutex<u32>>, b: Arc<Mutex<u32>>) -> u32 {
     let mut ga = a.lock().unwrap();
+    let gb = b.lock().unwrap();
     *ga += 1;
     let n = *ga;
-    let gb = b.lock().unwrap();
-    let _ = &*gb;
     drop(gb);
     drop(ga);
     n
