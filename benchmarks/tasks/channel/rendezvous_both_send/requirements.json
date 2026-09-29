@@ -49,5 +49,32 @@
       }
     ]
   },
-  "contract": "channel/rendezvous_both_send/contract.json"
+  "contract": "channel/rendezvous_both_send/contract.json",
+  "terminal_v2": "DONE done=2",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 2,
+    "thread_funcs": [
+      "main::r",
+      "main::s1"
+    ],
+    "sync_resources": 1,
+    "unused_resources": [],
+    "mechanisms": [
+      "Channel"
+    ],
+    "mechanism_count": 1,
+    "parameterized": false,
+    "states": 9,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L1",
+    "nearest_tier": "L1",
+    "violations": []
+  }
 }

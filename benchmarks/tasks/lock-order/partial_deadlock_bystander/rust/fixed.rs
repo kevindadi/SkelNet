@@ -1,37 +1,73 @@
-//! Reference Rust for tests/e2e/partial_deadlock/fixed.json.
-//! Fix: the semaphore cross-handshake is removed and both workers take the
-//! mutexes in the same global order (a then b), so both reach return.
+//! Reference Rust for lock-order/partial_deadlock_bystander (SkelNet R7a-2a).
+//!
+//! Design: `gold.skel` has two short-lived workers `a` and `b` that each take
+//! both locks `a` and `b` (in the same order), plus an independent `bystander`
+//! that waits until `flag` is set. The semaphores `sa`/`sb` are declared but
+//! never used by the gold design (`defect_family: goal_layer`), so the
+//! reference does not construct them. `flag` is a shared atomic variable.
+//!
+//! The role names `a`/`b` clash with the lock names, so the two locks are built
+//! as fields of a struct literal (the instrumenter names them by field).
+//!
+//! Rewritten from the ConcPlanVerify reference: bindings renamed to the
+//! contract entities, `thread::sleep` removed, the bystander joined after
+//! `flag` is set, and the terminal line computed. The bystander busy-waits on
+//! the atomic, matching the gold loop.
+//!
+//! `gold.skel` (`defect_family: goal_layer`) does not implement the permit
+//! handshake of requirement R5; the reference follows the gold design and does
+//! not construct `sa` or `sb`.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+
+struct Locks {
+    a: Mutex<u32>,
+    b: Mutex<u32>,
+}
+
+fn a(locks: Arc<Locks>) -> u32 {
+    let mut ga = locks.a.lock().unwrap();
+    let gb = locks.b.lock().unwrap();
+    *ga += 1;
+    let n = *ga;
+    drop(gb);
+    drop(ga);
+    n
+}
+
+fn b(locks: Arc<Locks>) -> u32 {
+    let ga = locks.a.lock().unwrap();
+    let mut gb = locks.b.lock().unwrap();
+    *gb += 1;
+    let n = *gb;
+    drop(gb);
+    drop(ga);
+    n
+}
+
+fn bystander(flag: Arc<AtomicBool>) {
+    while !flag.load(Ordering::SeqCst) {}
+}
 
 fn main() {
-    let mtx_a = Arc::new(Mutex::new(()));
-    let mtx_b = Arc::new(Mutex::new(()));
-
-    let (ma, mb) = (Arc::clone(&mtx_a), Arc::clone(&mtx_b));
-    let worker_a = thread::spawn(move || {
-        let ga = ma.lock().unwrap(); // s1: lock mtx_a
-        let gb = mb.lock().unwrap(); // s2: lock mtx_b
-        drop(gb); // s3
-        drop(ga); // s4
+    let locks = Arc::new(Locks {
+        a: Mutex::new(0u32),
+        b: Mutex::new(0u32),
     });
+    let flag = Arc::new(AtomicBool::new(false));
 
-    let (ma2, mb2) = (Arc::clone(&mtx_a), Arc::clone(&mtx_b));
-    let worker_b = thread::spawn(move || {
-        let ga = ma2.lock().unwrap(); // s1: lock mtx_a (same order)
-        let gb = mb2.lock().unwrap(); // s2: lock mtx_b
-        drop(gb); // s3
-        drop(ga); // s4
-    });
+    let (l1, l2) = (Arc::clone(&locks), Arc::clone(&locks));
+    let a = thread::spawn(move || a(l1));
+    let b = thread::spawn(move || b(l2));
+    let f = Arc::clone(&flag);
+    let bystander = thread::spawn(move || bystander(f));
 
-    // Detached bystander keeps looping; main never joins it.
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(10)); // s1/s2: nop loop
-    });
+    let ra = a.join().unwrap();
+    let rb = b.join().unwrap();
+    flag.store(true, Ordering::SeqCst);
+    bystander.join().unwrap();
 
-    // Goals: worker_a.ret and worker_b.ret are both reachable.
-    worker_a.join().unwrap();
-    worker_b.join().unwrap();
+    println!("DONE a={} b={}", ra, rb);
 }

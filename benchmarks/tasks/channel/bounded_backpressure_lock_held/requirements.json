@@ -56,5 +56,34 @@
       }
     ]
   },
-  "contract": "channel/bounded_backpressure_lock_held/contract.json"
+  "contract": "channel/bounded_backpressure_lock_held/contract.json",
+  "terminal_v2": "DONE sender=2 receiver=2",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 2,
+    "thread_funcs": [
+      "main::receiver",
+      "main::sender"
+    ],
+    "sync_resources": 1,
+    "unused_resources": [
+      "main::m"
+    ],
+    "mechanisms": [
+      "Channel"
+    ],
+    "mechanism_count": 1,
+    "parameterized": false,
+    "states": 20,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L1",
+    "nearest_tier": "L1",
+    "violations": []
+  }
 }

@@ -90,5 +90,35 @@
       }
     ]
   },
-  "contract": "lock-order/partial_deadlock_bystander/contract.json"
+  "contract": "lock-order/partial_deadlock_bystander/contract.json",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "tier": "L1",
+  "tier_source": "legacy",
+  "tier_metrics": {
+    "threads": 3,
+    "thread_funcs": [
+      "main::a",
+      "main::b",
+      "main::bystander"
+    ],
+    "sync_resources": 2,
+    "unused_resources": [
+      "main::sa",
+      "main::sb"
+    ],
+    "mechanisms": [
+      "Mutex"
+    ],
+    "mechanism_count": 1,
+    "parameterized": false,
+    "states": 149,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L1",
+    "nearest_tier": "L1",
+    "violations": []
+  }
 }
