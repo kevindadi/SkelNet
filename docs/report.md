@@ -19,8 +19,13 @@ are ignored) and each is validated with `schema.validate_cell`.
 - The primary metric `ok` is `oracle.functional_ok is True`; a `null`
   (unavailable tool, no Rust) counts as unsuccessful and is counted separately
   (`D8-1`).  The sensitivity metric is `functional_ok_no_o4` (`O1∧O2∧O3`).
+  A non-zero count of `status == "unavailable"` layers adds a warning per
+  layer/group, and `functional_ok: null` cells get a reason
+  (`no_oracle`, `unavailable:<layer>`, `not_applicable`, `other`); coverage
+  reports the group × reason counts.
 - `status == "skipped"` cells are excluded and counted; `status == "error"`
-  cells are kept and counted as unsuccessful (`D8-2`).
+  cells are kept and counted as unsuccessful (`D8-2`).  The report header and
+  `report.json.counts` list included / skipped / error per group.
 - A duplicated `(model_id, label, task, rep)` is an error unless
   `--allow-duplicates` (keep the last, warn).
 - `hint`, `run_params.call_budget` / `token_budget` / `temperature_policy` /
@@ -31,10 +36,11 @@ are ignored) and each is validated with `schema.validate_cell`.
 Derived per cell: the first failing oracle layer (`D8-14`), the call index of
 the final program version (`D8-5`), billable tokens (`input + output`),
 reasoning tokens, LLM wall time (`calls[].wall_ms`), in-group tool time (sum of
-`history[].wall_ms`, `rust_attempts[].compile_wall_ms`,
-`baseline.rounds[].compile_wall_ms` and `baseline.rounds[].tools.*.wall_ms`;
-`null` when no such field exists, so a group with no tool timing prints `--`),
-and oracle wall time (sum of layer `wall_ms`).  Coverage flags (`D8-15`) read
+the top-level `compile_wall_ms` — G0 and SKEL/CIR — `history[].wall_ms`,
+`rust_attempts[].compile_wall_ms`, `baseline.rounds[].compile_wall_ms` and
+`baseline.rounds[].tools.*.wall_ms`; `null` when no such field exists, so a
+group with no tool timing prints `--`), and oracle wall time (sum of layer
+`wall_ms`).  Coverage flags (`D8-15`) read
 `oracle.o3_tools` when present and otherwise parse the O3 `detail` text.
 
 The task tier comes from the cell's `tier`; the task origin (`classic` /
@@ -84,8 +90,8 @@ A missing model price prints `--` and warns.
 | `models` | `tables/models.tex` | family, model id, API, reasoning, Stage-0 probe truncation/seed |
 | `benchmark` | `tables/benchmark.tex` | tasks per family and tier; boundary negatives |
 | `coverage` | `extra/coverage.tex` | per-group coverage flags (`D8-15`) |
-| `lockbud` | `extra/lockbud.tex` | reference false-positive/detection rates and the experiment 2×2 (`D8-16`) |
-| `tests` | `extra/tests.tex` | every comparison of both families, per-model/per-tier estimates, 7-group Cochran's Q, Wilcoxon/A12/Cliff's δ |
+| `lockbud` | `extra/lockbud.tex` | reference false-positive/detection rates by family and the experiment 2×2 (pooled, per model, per family) with `no_g0` and three ratios (`D8-16`) |
+| `tests` | `extra/tests.tex` | every comparison of both families, per-model and per-tier Δ/CI, the coverage-gated 7-group Cochran's Q, and Wilcoxon/A12/Cliff's δ for all ten comparisons |
 | `numbers` | `extra/numbers.tex` | `\SNunits`, `\SNcalls`, `\SNtokens`, `\SNtruncpct`, `\SNincompletepct`, `\SNshuttleunsup`, `\SNinstrunsup`, `\SNlockbudfp`, `\SNlook`, `\SNalpha` |
 
 The paper placeholders live in
@@ -118,7 +124,10 @@ later.
 `n ≤ 25` without ties, otherwise normal with tie and continuity corrections),
 `a12` / `cliffs_delta`, `cluster_bootstrap_diff` (task-cluster resampling,
 percentile CI), `obf_alpha_spent` / `obf_nominal_boundaries` (Armitage–
-McPherson–Rowe grid integration), `normal_cdf` / `normal_ppf`.
+McPherson–Rowe recursion with composite Simpson integration and the
+conditional density `Z_{k+1}|Z_k ~ N(ρ z, 1−ρ²)`), `normal_cdf` / `normal_ppf`.
+The exact Wilcoxon distribution is counted by a rank-sum dynamic program, not
+`2^n` enumeration.
 
 - Paired unit: `(model, task, rep)`; `b` counts reference-ok/control-fail, `c`
   the reverse; `p = min(1, 2·P(X ≤ min(b,c)))` for `X ~ Bin(b+c, 1/2)`.
@@ -129,16 +138,24 @@ McPherson–Rowe grid integration), `normal_cdf` / `normal_ppf`.
 
 ## Staged stopping (`stop-check`)
 
+Every look prints the loader warnings (duplicate cells, non-`complete`
+manifests, unavailable layers, unclassified failing layers) and the per-group
+included/skipped/error counts.
+
 `--look 0` reports Stage-0 diagnostics (per-model calls, truncation with a `**`
-flag above 2%, empty replies, `first_round_miss`, transport truncations, model
-identity errors, unavailable layers, the coverage table), the per-group cost
-means, the Stage-1 extrapolation (24 tasks × 4 models × 3 reps × 6 groups,
-falling back to the all-model average and noting it), and the ledger check:
-the stage's `requests` must lie in `[Σ len(finish_reasons),
+flag above 2%, empty replies — visible output `output − reasoning ≤ 0` and no
+error, `first_round_miss`, transport truncations, model identity errors,
+unavailable layers, the coverage table), the per-group per-cell means and the
+coverage table, the Stage-1 extrapolation (all four experimental models × the
+six Stage-1 groups, falling back to the all-model average and noting it, with a
+totals row), and the ledger check: the stage's `requests` (from
+`--budget-file`, default `<root>/experiments/budget.json`; a missing file or
+stage warns) must lie in `[Σ len(finish_reasons),
 Σ len(finish_reasons) + Σ(transport_attempt − 1)]` over non-cache-hit calls.
 
 `--look 1` is futility-only: it reports the SKEL-minus-best-baseline margin
-(futile below 3 pp) and the failure-stage decomposition.
+from the shared 3 pp rule (futile below 3 pp) and the per-group failure-stage
+decomposition.
 
 `--look 2/3` evaluate the six success criteria of the plan: (1) all four main
 Holm `p` below the O'Brien-Fleming nominal `α` at
@@ -146,14 +163,19 @@ Holm `p` below the O'Brien-Fleming nominal `α` at
 per baseline; (3) positive SKEL − baseline on `L2∪L3`; (4) the four sensitivity
 `Δ` share the main direction; (5) every main cluster-bootstrap 95% CI excludes
 zero; (6) `SKEL − DYNAMIC_M` is reported (and a narrower claim is suggested
-when DYNAMIC_M is significantly better).  A Look-2 `L2∪L3` regression is
-futility; otherwise the verdict is `success`, `futility`, or `continue`.
+when DYNAMIC_M is significantly better).  Look 2 is futile when the 3 pp margin
+rule or an `L2∪L3` regression fires (`futility_reasons`); Look 3 reports both
+numbers but does not judge futility.  Otherwise the verdict is `success`,
+`futility`, or `continue`.
 
 ## Decisions
 
 `D8-1`–`D8-20` are implemented as tabled in the round-8 task.  In particular:
 `ok` treats `null` as unsuccessful (`D8-1`); skipped cells are excluded and
-error cells are kept (`D8-2`); pairing only uses units present in both arms
-(`D8-3`); costs count a cache-hit first call against the group that replays it
-(`D8-12`); numbers are formatted per `D8-13`; the failure columns, coverage
-flags, and lockbud join follow `D8-14`/`D8-15`/`D8-16`.
+error cells are kept (`D8-2`); pairing only uses units present in both arms and
+its `n`/`missing` are reported (`D8-3`); costs count a cache-hit first call
+against the group that replays it (`D8-12`); numbers are rounded before the
+sign and use three significant digits for `p` (`D8-13`); the failure columns,
+coverage flags, and lockbud join (with `no_g0`, recall, false positives on
+`ok`, and per-model/per-family splits) follow `D8-14`/`D8-15`/`D8-16`; the
+`G0 pass@3` row marks `(model, task)` pairs with `n < 3` (`D8-20`).
