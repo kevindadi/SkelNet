@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkelNet 进展（截至 2026-09-30）</title>
+<style>
+.viz-root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface-1: #fcfcfb; --text-primary: #0b0b0b;
+  --text-secondary: #52514e; --muted: #898781; --grid: #e1e0d9; --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
+  --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; --good-text: #006300;
+  --wash: #f0efec;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface-1: #1a1a19; --text-primary: #ffffff;
+    --text-secondary: #c3c2b7; --muted: #898781; --grid: #2c2c2a; --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+    --good-text: #0ca30c; --wash: #242423;
+  }
+}
+:root[data-theme="dark"] .viz-root {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface-1: #1a1a19; --text-primary: #ffffff;
+  --text-secondary: #c3c2b7; --muted: #898781; --grid: #2c2c2a; --axis: #383835;
+  --border: rgba(255,255,255,0.10);
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+  --good-text: #0ca30c; --wash: #242423;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.viz-root {
+  background: var(--page); color: var(--text-primary);
+  font: 14px/1.55 system-ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif;
+  min-height: 100vh; padding: 28px clamp(16px, 4vw, 48px) 64px;
+}
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 24px; margin-bottom: 20px; }
+h1 { font-size: 22px; margin: 0; font-weight: 650; }
+h2 { font-size: 16px; margin: 0 0 4px; font-weight: 650; }
+.sub { color: var(--text-secondary); margin: 0 0 14px; }
+.small { font-size: 12.5px; color: var(--text-secondary); }
+.spacer { flex: 1; }
+button.toggle {
+  font: inherit; font-size: 12.5px; color: var(--text-secondary); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer;
+}
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr); }
+.card {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  padding: 18px 20px; grid-column: span 12; min-width: 0;
+}
+@media (min-width: 980px) { .span6 { grid-column: span 6; } .span4 { grid-column: span 4; } .span8 { grid-column: span 8; } }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.tile .v { font-size: 28px; font-weight: 650; line-height: 1.15; }
+.tile .k { color: var(--text-secondary); font-size: 12.5px; }
+.tile .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); }
+.status i { width: 14px; height: 14px; border-radius: 50%; display: inline-grid; place-items: center;
+  font-style: normal; font-size: 10px; font-weight: 700; color: #fff; }
+.st-done i { background: var(--good); }
+.st-next i { background: var(--series-1); }
+.st-wait i { background: var(--muted); }
+.st-warn i { background: var(--warning); color: #0b0b0b; }
+/* pipeline */
+.pipe { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.step { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; cursor: pointer;
+  background: var(--surface-1); text-align: left; font: inherit; color: inherit; position: relative; }
+.step:hover, .step:focus-visible { background: var(--wash); outline: none; }
+.step[aria-pressed="true"] { border-color: var(--series-1); box-shadow: inset 0 0 0 1px var(--series-1); }
+.step b { display: block; font-size: 13px; }
+.step span { color: var(--text-secondary); font-size: 12px; }
+.step .num { position: absolute; right: 10px; top: 8px; color: var(--muted); font-size: 11px; }
+.detail { margin-top: 12px; padding: 12px 14px; border-left: 2px solid var(--series-1); background: var(--wash); border-radius: 0 6px 6px 0; }
+.detail p { margin: 4px 0; }
+code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--wash); padding: 1px 4px; border-radius: 4px; }
+/* timeline */
+.tl { list-style: none; margin: 0; padding: 0; }
+.tl li { display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--grid); cursor: pointer; }
+.tl li:first-child { border-top: 0; }
+.tl li:hover, .tl li:focus-visible { background: var(--wash); outline: none; }
+.tl .when { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tl .what b { font-size: 13.5px; }
+.tl .what .body { display: none; color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+.tl li[aria-expanded="true"] .body { display: block; }
+.tag { display: inline-block; font-size: 11px; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; margin-left: 6px; }
+/* charts */
+svg text { fill: var(--muted); font-size: 11px; }
+svg .lbl { fill: var(--text-secondary); font-size: 11.5px; }
+svg .val { fill: var(--text-primary); font-size: 11.5px; font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--text-secondary); margin: 6px 0 4px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+.tip { position: fixed; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 9px; font-size: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.12); display: none; z-index: 10; max-width: 320px; }
+.tip strong { display: block; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { text-align: left; padding: 5px 8px; border-top: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--text-secondary); font-weight: 600; border-top: 0; }
+td.n { text-align: right; font-variant-numeric: tabular-nums; }
+details summary { cursor: pointer; color: var(--text-secondary); font-size: 12.5px; margin-top: 8px; }
+.next li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="viz-root" id="root">
+<header>
+  <h1>SkelNet 进展</h1>
+  <span class="small">截至 2026-09-30 · main <code>dad9776</code> · 16 个 PR 已合并 · 正式实验尚未开始</span>
+  <span class="spacer"></span>
+  <button class="toggle" id="themeBtn" type="button">切换深浅色</button>
+</header>
+
+<section class="tiles" aria-label="关键数字">
+  <div class="tile"><div class="k">已合并轮次（PR）</div><div class="v">16</div><div class="d">R1 → R7a-2e，2026-09-27 至 09-29</div></div>
+  <div class="tile"><div class="k">基准任务</div><div class="v">28</div><div class="d">24 个 L1 + 4 个 boundary；L2/L3 20 个待 7b</div></div>
+  <div class="tile"><div class="k">bench validate（--run --oracle --strict）</div><div class="v">0 fail</div><div class="d">203 pass / 49 skip，连跑两次一致</div></div>
+  <div class="tile"><div class="k">oracle 标定</div><div class="v">117/120</div><div class="d">24 参考 + 24 缺陷全部符合；3 个已知突变体</div></div>
+  <div class="tile"><div class="k">测试</div><div class="v">728 + 325</div><div class="d">pytest（含 lockbud）+ cargo，全绿</div></div>
+  <div class="tile"><div class="k">真实 LLM 调用</div><div class="v">0</div><div class="d">Stage 0 由 Kevin 本机执行</div></div>
+</section>
+
+<div class="grid" style="margin-top:16px">
+
+<section class="card" aria-labelledby="h-pipe">
+  <h2 id="h-pipe">系统怎么工作（点击每一步看行为）</h2>
+  <p class="sub">SKEL 组的一个 cell：模型写骨架 → 机械验证 → 反馈回到骨架行 → 通过后写 Rust → 独立 oracle 打分。其他组只写 Rust，但用同一个 oracle。</p>
+  <div class="pipe" id="pipe"></div>
+  <div class="detail" id="pipeDetail" aria-live="polite"></div>
+</section>
+
+<section class="card span8" aria-labelledby="h-tl">
+  <h2 id="h-tl">每一轮做了什么（点击展开）</h2>
+  <p class="sub">按合并时间排序。条形长度 = 该 PR 新增行数（线性刻度，只作相对比较；R8 含大量合成 fixture）。</p>
+  <ul class="tl" id="timeline"></ul>
+</section>
+
+<section class="card span4" aria-labelledby="h-now">
+  <h2 id="h-now">现在在哪一步</h2>
+  <p class="sub">实验路线图。每道闸门由 Kevin 确认。</p>
+  <ul class="tl" id="roadmap"></ul>
+</section>
+
+<section class="card span6" aria-labelledby="h-cal">
+  <h2 id="h-cal">第 9b 轮前后：oracle 标定（120 个程序）</h2>
+  <p class="sub">同一批参考程序、缺陷程序和突变体，在修 O3 之前和之后各跑一次。</p>
+  <div class="legend"><span style="--c:var(--series-1)">9b 之前</span><span style="--c:var(--series-3)">9b 之后</span></div>
+  <svg id="calChart" role="img" aria-label="标定结果前后对比条形图" width="100%" height="190"></svg>
+  <details><summary>表格视图</summary>
+    <table id="calTable"><thead><tr><th>程序类</th><th class="n">总数</th><th class="n">之前符合</th><th class="n">之后符合</th></tr></thead><tbody></tbody></table>
+  </details>
+</section>
+
+<section class="card span6" aria-labelledby="h-race">
+  <h2 id="h-race">为什么要修 O3：三个竞态缺陷</h2>
+  <p class="sub">O2 靠 20 次原生运行，检出率随机器负载漂移；O3 现在逐个检查 Shuttle 的 4000 个调度，结果确定。</p>
+  <div class="legend"><span style="--c:var(--series-2)">O2 检出率（空闲）</span><span style="--c:var(--series-1)">O2 检出率（满载）</span><span style="--c:var(--series-3)">O3 错误调度占比（固定种子）</span></div>
+  <svg id="raceChart" role="img" aria-label="三个竞态缺陷的检出率" width="100%" height="200"></svg>
+  <details><summary>表格视图</summary>
+    <table id="raceTable"><thead><tr><th>缺陷程序</th><th class="n">O2 空闲</th><th class="n">O2 满载</th><th class="n">O3 错误调度</th></tr></thead><tbody></tbody></table>
+  </details>
+</section>
+
+<section class="card span6" aria-labelledby="h-tier">
+  <h2 id="h-tier">24 个 L1 任务的计算层（D10a 规则）</h2>
+  <p class="sub">声明层全部保留 legacy L1；计算层用于核对。横轴 = 线程数，纵轴 = 完整探索的状态数（对数）。</p>
+  <div class="legend"><span style="--c:var(--series-1)">计算为 L1（20）</span><span style="--c:var(--series-2)">计算为 L2（1）</span><span style="--c:var(--series-3)">未分类（3）</span></div>
+  <svg id="tierChart" role="img" aria-label="任务线程数与状态数散点图" width="100%" height="260"></svg>
+  <details><summary>表格视图</summary>
+    <table id="tierTable"><thead><tr><th>任务</th><th class="n">线程</th><th class="n">资源</th><th>机制</th><th class="n">状态</th><th>计算层</th></tr></thead><tbody></tbody></table>
+  </details>
+</section>
+
+<section class="card span6" aria-labelledby="h-arms">
+  <h2 id="h-arms">七个实验组，每组做什么</h2>
+  <p class="sub">每个 cell 最多 5 次调用、20 万 token；第 1 次调用在 G0 与四条基线之间共享缓存。</p>
+  <table><thead><tr><th>组</th><th>模型写什么</th><th>拿到的反馈</th><th>组内接受条件</th></tr></thead><tbody id="armsBody"></tbody></table>
+</section>
+
+<section class="card" aria-labelledby="h-next">
+  <h2 id="h-next">接下来</h2>
+  <ol class="next">
+    <li><b>第 9 轮（执行模型）</b>：冻结实验协议 <code>experiments/PROTOCOL.md</code> + 协议校验；<code>DEFAULT_HINT</code> 改为 h1；修账本并发覆盖；Look 3 显式信息量、终看不显著判 <code>no_success</code>；准备 Stage 0 命令清单与预算账本。</li>
+    <li><b>Stage 0（Kevin 本机）</b>：四个模型 × 少量任务 × 六个主组；确认 GPT 是否真的在推理；量化 lockbud 漏报；外推 Stage 1 的调用与 token。上限：800 次请求、1500 万 token（只计 token，不计美元）。</li>
+    <li><b>第 7b 轮</b>：新建 20 个 L2/L3 任务（需要 <code>origin</code>: classic / disguised）。</li>
+    <li><b>Stage 1 → 2 → 3</b>：按 stop-check 判定是否继续。</li>
+  </ol>
+</section>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const svgNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs = {}, parent) {
+  const n = document.createElementNS(svgNS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+function txt(tag, text, attrs, parent) { const n = el(tag, attrs, parent); n.textContent = text; return n; }
+const tip = $("#tip");
+function showTip(ev, title, rows) {
+  tip.replaceChildren();
+  const s = document.createElement("strong"); s.textContent = title; tip.appendChild(s);
+  for (const r of rows) { const d = document.createElement("div"); d.textContent = r; tip.appendChild(d); }
+  tip.style.display = "block";
+  const x = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8);
+  const y = Math.min(ev.clientY + 14, innerHeight - tip.offsetHeight - 8);
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function hideTip() { tip.style.display = "none"; }
+function bindTip(node, title, rows) {
+  node.setAttribute("tabindex", "0");
+  node.addEventListener("pointermove", e => showTip(e, title, rows));
+  node.addEventListener("pointerleave", hideTip);
+  node.addEventListener("focus", () => { const b = node.getBoundingClientRect(); showTip({clientX: b.right, clientY: b.top}, title, rows); });
+  node.addEventListener("blur", hideTip);
+}
+const css = v => getComputedStyle($("#root")).getPropertyValue(v).trim();
+
+// theme toggle
+$("#themeBtn").addEventListener("click", () => {
+  const r = document.documentElement;
+  const dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark";
+  drawAll();
+});
+
+// ── pipeline ────────────────────────────────────────────────────────────
+const STEPS = [
+  ["需求文本", "h1 需求（R 编号 + 实体名）",
+   "模型只看到 REQUIREMENTS.h1.md：带 R1..Rn 编号的需求、实体名和终止行。合同（contract.json）、目标公式、不可验证子句列表都不给模型。"],
+  ["写骨架", "LLM 写 .skel",
+   "SKEL 组的模型按 DSL 写骨架：mutex/condvar/channel/semaphore、lock 块、spawn/scope、compute 占位。锁是词法作用域，没有 unlock。CIR 组直接写 ConcIR JSON。"],
+  ["前端检查", "skelnet check → S 码",
+   "手写词法/语法分析 + 前端检查（S001–S110）。超出子集的写法（rwlock、async、unlock…）直接拒绝并给提示，不留给后端。"],
+  ["降低", "skelnet lower → ConcIR + source map",
+   "机械、全函数、不优化的降低。compute 降为 nop（只允许读写局部变量）。source map 把每条 ConcIR 语句对回骨架的行列和 R 标签。"],
+  ["穷尽验证", "Petri 网探索 vs 隐藏合同",
+   "ConcIR 是唯一语义。有界模型上穷尽探索，检查无死锁、安全性、保留目标。UNKNOWN / 不完整永远不报为安全。"],
+  ["反馈回骨架", "反例映射到 DSL 行",
+   "失败的性质、反例步骤、持有/等待状态都映射回骨架行号；细节经过 sanitize，不泄露合同公式。模型最多改 4 轮（总共 5 次调用）。"],
+  ["写 Rust", "通过（或最后一版）→ Rust",
+   "骨架通过验证后，模型按骨架和需求写 Rust（只能用 std + concir_sync）。编译失败时把 rustc 错误喂回去修。骨架始终没通过时也用最后一版。"],
+  ["独立 oracle", "O1–O4，各组相同",
+   "O1 构建+策略；O2 原生跑 20 次，最后一行必须等于终止行；O3 Shuttle（PCT+random，逐调度检查终止行）+ miri；O4 插桩后用合同 monitor 检查结构。主指标 ok = 四层全过。"],
+];
+function drawPipe() {
+  const box = $("#pipe"); box.replaceChildren();
+  STEPS.forEach(([name, short, long], i) => {
+    const b = document.createElement("button");
+    b.className = "step"; b.type = "button"; b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+    const bn = document.createElement("b"); bn.textContent = name;
+    const sp = document.createElement("span"); sp.textContent = short;
+    const nm = document.createElement("span"); nm.className = "num"; nm.textContent = String(i + 1);
+    b.append(bn, sp, nm);
+    b.addEventListener("click", () => {
+      box.querySelectorAll(".step").forEach(x => x.setAttribute("aria-pressed", "false"));
+      b.setAttribute("aria-pressed", "true");
+      showStep(i);
+    });
+    box.appendChild(b);
+  });
+  showStep(0);
+}
+function showStep(i) {
+  const d = $("#pipeDetail"); d.replaceChildren();
+  const h = document.createElement("p"); const b = document.createElement("b"); b.textContent = `${i + 1}. ${STEPS[i][0]}`; h.appendChild(b);
+  const p = document.createElement("p"); p.textContent = STEPS[i][2];
+  d.append(h, p);
+}
+
+// ── timeline ────────────────────────────────────────────────────────────
+const ROUNDS = [
+  ["09-27 20:38", "#1", "R1 编排层修复", 1946, "prompt 按 (组, 阶段) 显式路由、终止行检查、codegen 模式、每次运行写 MANIFEST。"],
+  ["09-28 11:35", "#2", "R2 LLM 参数、预算、缓存", 3943, "四个模型的参数（思考开启、不发 temperature）、每格 5 次调用 / 20 万 token、全局账本、响应缓存与回放、cell 结果 schema。"],
+  ["09-28 14:53", "#3", "R3 四层独立 oracle", 4295, "O1 构建+策略，O2 20 次运行，O3 Shuttle+miri，O4 插桩+monitor；标定命令。oracle 与种子和反馈工具分开。"],
+  ["09-28 18:40", "#4", "R5 SKEL/CIR 与基线公平", 2561, "SKEL/CIR 与基线同预算、同 oracle；骨架没通过也用最后一版生成 Rust；反馈模式消融。"],
+  ["09-28 19:45", "#6", "R4 四条基线", 4286, "G0、REFINE（自查）、STATIC（rustc+clippy+lockbud）、DYNAMIC（stress+Shuttle+miri）、DYNAMIC_M（再加 monitor）。第 1 次调用共享缓存。"],
+  ["09-28 19:47", "#7", "R2d Kimi 改直连", 382, "kimi-k3 走 Moonshot 直连，reasoning_effort=high。"],
+  ["09-28 20:54", "#8", "R6 三处偏差", 761, "compute 降为 nop 且不得读写共享名字（S110）；same_cv_different_locks 移到 boundary；新建 two_cv_two_locks。"],
+  ["09-28 21:55", "#9", "R7a-1 基准工具", 2758, "bench validate（V1–V9）与 bench tiers（D10a 分层规则）。"],
+  ["09-28 22:21", "#5", "R3d/3e 插桩器", 2092, "插桩器识别更多 spawn 写法，线程命名，sync 导入改写。"],
+  ["09-29 06:20", "#10", "R7a-2b condvar + semaphore", 1445, "7 个任务的 h1 需求、参考程序、缺陷程序与期望。"],
+  ["09-29 06:49", "#12", "R7a-2c structure + atomic", 1499, "9 个任务的同类数据；记录 O3 对竞态缺陷的漏报。"],
+  ["09-29 08:57", "#14", "R9a 试点前 12 项", 2162, "MutexGuard 插桩、代码块提取、推理只存哈希、DYNAMIC 按序回放、hint 常量、非平凡 probe、--tasks 逗号并集、工具耗时字段。"],
+  ["09-29 08:59", "#11", "R7a-2a lock-order + channel", 1632, "8 个任务；bystander 按 gold 忙等（这暴露了 PCT 误报）。"],
+  ["09-29 11:10", "#13", "R8 统计与报告", 14087, "纯标准库统计（McNemar、Holm、Cochran Q、Wilcoxon、自助法、O'Brien–Fleming 边界）、论文表格、stop-check。协调方用 SciPy 独立复核，误差 ≤1e-10。"],
+  ["09-29 13:37", "#15", "R9b 修 O3", 2052, "逐调度检查终止行（抓竞态）；PCT 步数上限 1 万（忙等不再误报）；random 超 100 万步记 livelock。标定 114/120 → 117/120。"],
+  ["09-29 20:34", "#16", "R7a-2e 分层收尾", 46, "生成 benchmarks/TIERS.md；28 个任务整体验证两次全绿。"],
+];
+const MAXADD = Math.max(...ROUNDS.map(r => r[3]));
+function drawTimeline() {
+  const ul = $("#timeline"); ul.replaceChildren();
+  ROUNDS.forEach(([when, pr, title, adds, body]) => {
+    const li = document.createElement("li"); li.tabIndex = 0; li.setAttribute("aria-expanded", "false");
+    const w = document.createElement("div"); w.className = "when"; w.textContent = when;
+    const what = document.createElement("div"); what.className = "what";
+    const b = document.createElement("b"); b.textContent = title;
+    const t = document.createElement("span"); t.className = "tag"; t.textContent = `${pr} · +${adds.toLocaleString()}`;
+    const bar = document.createElement("div");
+    bar.style.cssText = `height:4px;border-radius:2px;margin-top:6px;background:var(--series-1);width:${Math.max(2, 100 * adds / MAXADD)}%`;
+    const bd = document.createElement("div"); bd.className = "body"; bd.textContent = body;
+    what.append(b, t, bar, bd);
+    li.append(w, what);
+    const toggle = () => li.setAttribute("aria-expanded", li.getAttribute("aria-expanded") === "true" ? "false" : "true");
+    li.addEventListener("click", toggle);
+    li.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    ul.appendChild(li);
+  });
+}
+const ROADMAP = [
+  ["done", "✓", "工具链与 oracle", "R1–R9b 全部合并"],
+  ["done", "✓", "L1 基准数据", "24 个任务 h1 + 参考/缺陷程序，整体验证全绿"],
+  ["next", "→", "第 9 轮：冻结协议", "PROTOCOL.md、协议校验、Stage 0 命令与上限"],
+  ["wait", "·", "Stage 0 试点", "Kevin 本机；诊断，不做检验"],
+  ["wait", "·", "第 7b 轮：20 个 L2/L3", "可与 Stage 0/1 并行准备"],
+  ["wait", "·", "Stage 1", "24 L1 × 4 模型 × n=3 × 6 组；只判无效"],
+  ["wait", "·", "Stage 2 / 3", "加入 L2/L3 与 DYNAMIC_M；可判成功"],
+  ["warn", "!", "论文", "FSE 截止 10-02 AoE 来不及完整实验；投不投由 Kevin 定"],
+];
+function drawRoadmap() {
+  const ul = $("#roadmap"); ul.replaceChildren();
+  for (const [kind, icon, title, body] of ROADMAP) {
+    const li = document.createElement("li"); li.style.cursor = "default";
+    const s = document.createElement("span"); s.className = `status st-${kind}`;
+    const i = document.createElement("i"); i.textContent = icon; s.appendChild(i);
+    const label = { done: "完成", next: "下一步", wait: "未开始", warn: "待决定" }[kind];
+    s.appendChild(document.createTextNode(label));
+    const what = document.createElement("div"); what.className = "what";
+    const b = document.createElement("b"); b.textContent = title;
+    const d = document.createElement("div"); d.className = "small"; d.textContent = body;
+    what.append(b, d);
+    li.append(s, what);
+    ul.appendChild(li);
+  }
+}
+
+// ── calibration chart (grouped horizontal bars) ─────────────────────────
+// From CALIBRATION.json of `oracle calibrate --tasks all --mutants` on main before
+// and after PR #15 (matched programs per kind).
+const CAL = [["参考程序 fixed.rs", 24, 23, 24], ["缺陷程序 buggy*.rs", 24, 22, 24], ["突变体", 72, 69, 69]];
+function drawCal() {
+  const svg = $("#calChart"); svg.replaceChildren();
+  const W = svg.clientWidth || 520, L = 132, R = 44, top = 8, band = 58, bh = 14;
+  svg.setAttribute("height", top + band * CAL.length + 22);
+  const x = v => L + (W - L - R) * v;
+  for (const t of [0, 0.5, 1]) {
+    el("line", { x1: x(t), x2: x(t), y1: top, y2: top + band * CAL.length, stroke: css("--grid"), "stroke-width": 1 }, svg);
+    txt("text", `${t * 100}%`, { x: x(t), y: top + band * CAL.length + 16, "text-anchor": "middle" }, svg);
+  }
+  CAL.forEach(([name, total, before, after], i) => {
+    const y0 = top + i * band + 8;
+    txt("text", name, { x: 0, y: y0 + bh + 4, class: "lbl" }, svg);
+    [[before, "--series-1", "9b 之前"], [after, "--series-3", "9b 之后"]].forEach(([v, c, lab], j) => {
+      const y = y0 + j * (bh + 2);
+      const w = x(v / total) - L;
+      const r = el("rect", { x: L, y, width: Math.max(w, 1), height: bh, rx: 2, fill: css(c) }, svg);
+      const hit = el("rect", { x: L, y: y - 1, width: W - L - R + 40, height: bh + 2, fill: "transparent" }, svg);
+      bindTip(hit, `${v}/${total}`, [`${name} · ${lab}`, `符合期望 ${(100 * v / total).toFixed(1)}%`]);
+      if (j === 1 || v !== total) txt("text", `${v}/${total}`, { x: L + w + 6, y: y + bh - 3, class: "val" }, svg);
+    });
+  });
+  const tb = $("#calTable tbody"); tb.replaceChildren();
+  CAL.forEach(([n, t, b, a]) => {
+    const tr = document.createElement("tr");
+    [n, t, b, a].forEach((v, k) => { const td = document.createElement("td"); td.textContent = v; if (k) td.className = "n"; tr.appendChild(td); });
+    tb.appendChild(tr);
+  });
+}
+
+// ── race chart ──────────────────────────────────────────────────────────
+const RACE = [
+  ["worker_with_payload", 6, 41.5, 1609 / 4000 * 100, "1609/4000"],
+  ["atomic_lost_update", 1, 3, 1683 / 4000 * 100, "1683/4000"],
+  ["counter_overflow_safety", 18, 100, 1169 / 4000 * 100, "1169/4000"],
+];
+function drawRace() {
+  const svg = $("#raceChart"); svg.replaceChildren();
+  const W = svg.clientWidth || 520, L = 150, R = 50, top = 6, band = 56, bh = 12;
+  svg.setAttribute("height", top + band * RACE.length + 22);
+  const x = v => L + (W - L - R) * v / 100;
+  for (const t of [0, 50, 100]) {
+    el("line", { x1: x(t), x2: x(t), y1: top, y2: top + band * RACE.length, stroke: css("--grid"), "stroke-width": 1 }, svg);
+    txt("text", `${t}%`, { x: x(t), y: top + band * RACE.length + 16, "text-anchor": "middle" }, svg);
+  }
+  RACE.forEach(([name, idle, load, o3, o3s], i) => {
+    const y0 = top + i * band + 4;
+    txt("text", name, { x: 0, y: y0 + 22, class: "lbl" }, svg);
+    [[idle, "--series-2", "O2 检出率（空闲）", `${idle}%`], [load, "--series-1", "O2 检出率（满载）", `${load}%`], [o3, "--series-3", "O3 错误调度占比", `${o3s} 调度（每次都判 fail）`]].forEach(([v, c, lab, desc], j) => {
+      const y = y0 + j * (bh + 2);
+      el("rect", { x: L, y, width: Math.max(x(v) - L, 1.5), height: bh, rx: 2, fill: css(c) }, svg);
+      const hit = el("rect", { x: L, y: y - 1, width: W - L - R + 40, height: bh + 2, fill: "transparent" }, svg);
+      bindTip(hit, desc, [name, lab]);
+    });
+    txt("text", `${o3.toFixed(0)}%`, { x: x(o3) + 6, y: y0 + 2 * (bh + 2) + bh - 2, class: "val" }, svg);
+  });
+  const tb = $("#raceTable tbody"); tb.replaceChildren();
+  RACE.forEach(([n, a, b, , s]) => {
+    const tr = document.createElement("tr");
+    [n + "/buggy.rs", a + "%", b + "%", s].forEach((v, k) => { const td = document.createElement("td"); td.textContent = v; if (k) td.className = "n"; tr.appendChild(td); });
+    tb.appendChild(tr);
+  });
+}
+
+// ── tier scatter ────────────────────────────────────────────────────────
+const TIERS = [
+  ["atomic-data/atomic_lost_update",2,1,"Atomic",127,"L1"],["atomic-data/bounded_counter_invariant",2,1,"Mutex",31,"L1"],
+  ["atomic-data/counter_overflow_safety",2,1,"Mutex",40,"L1"],["channel/bounded_backpressure_lock_held",2,1,"Channel",20,"L1"],
+  ["channel/rendezvous_both_send",2,1,"Channel",9,"L1"],["channel/send_while_holding_mutex",2,1,"Channel",9,"L1"],
+  ["condvar/bare_wait_no_predicate",2,2,"Condvar",43,"L1"],["condvar/lost_wakeup_notify_before_wait",2,2,"Condvar",43,"L1"],
+  ["condvar/notify_one_multi_waiter_wrong_pick",3,4,"Condvar,Semaphore",74,"unclassified"],["condvar/two_cv_two_locks",3,5,"Condvar,Semaphore",109,"unclassified"],
+  ["lock-order/abba_2lock",2,2,"Mutex",39,"L1"],["lock-order/cross_module_cycle",2,2,"Mutex",39,"L1"],
+  ["lock-order/cycle_3lock",3,3,"Mutex",286,"unclassified"],["lock-order/partial_deadlock_bystander",3,2,"Mutex",149,"L1"],
+  ["lock-order/two_independent_cycles",4,4,"Mutex",1371,"L2"],["semaphore/acquire_twice_no_release",2,1,"Semaphore",35,"L1"],
+  ["semaphore/permit_leak",2,1,"Semaphore",23,"L1"],["semaphore/throttle_n_permits",3,1,"Semaphore",92,"L1"],
+  ["structure/finite_call_loop",0,0,"",6,"L1"],["structure/nested_scope_lock_order",3,2,"Mutex",41,"L1"],
+  ["structure/scope_bound_k_workers",3,1,"Semaphore",116,"L1"],["structure/scope_worker_abba",2,2,"Mutex",39,"L1"],
+  ["structure/spawn_join_loop_finite",1,0,"",10,"L1"],["structure/worker_with_payload",2,1,"Mutex",47,"L1"],
+];
+const TIER_COLOR = { L1: "--series-1", L2: "--series-2", unclassified: "--series-3" };
+function drawTier() {
+  const svg = $("#tierChart"); svg.replaceChildren();
+  const W = svg.clientWidth || 520, H = 260, L = 44, R = 16, T = 10, B = 34;
+  const x = t => L + (W - L - R) * (t + 0.5) / 5;
+  const ly = v => Math.log10(v);
+  const y = v => T + (H - T - B) * (1 - (ly(v) - 0.5) / (3.5 - 0.5));
+  for (const v of [10, 100, 1000]) {
+    el("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: css("--grid"), "stroke-width": 1 }, svg);
+    txt("text", v.toLocaleString(), { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, svg);
+  }
+  el("line", { x1: L, x2: W - R, y1: y(300), y2: y(300), stroke: css("--axis"), "stroke-width": 1 }, svg);
+  txt("text", "L1 状态上限 300", { x: W - R, y: y(300) - 5, "text-anchor": "end" }, svg);
+  for (let t = 0; t <= 4; t++) txt("text", String(t), { x: x(t), y: H - B + 16, "text-anchor": "middle" }, svg);
+  txt("text", "线程数（spawn 点，不含 main）", { x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle" }, svg);
+  const seen = {};
+  const order = [...TIERS].sort((a, b) => (a[5] === "L1") - (b[5] === "L1")).reverse();
+  for (const [task, thr, res, mech, st, tier] of order) {
+    const key = `${thr}:${st}`; const k = seen[key] = (seen[key] || 0) + 1;
+    const cx = x(thr) + (k - 1) * 9 - (k > 1 ? 4 : 0);
+    const c = el("circle", { cx, cy: y(st), r: 5, fill: css(TIER_COLOR[tier]), stroke: css("--surface-1"), "stroke-width": 2 }, svg);
+    const hit = el("circle", { cx, cy: y(st), r: 12, fill: "transparent" }, svg);
+    bindTip(hit, task, [`计算层 ${tier === "unclassified" ? "未分类" : tier}（声明 L1）`, `线程 ${thr} · 同步资源 ${res} · ${mech || "无同步"}`, `状态 ${st.toLocaleString()}`]);
+  }
+  const lab = TIERS.find(t => t[5] === "L2");
+  txt("text", "two_independent_cycles", { x: x(lab[1]) - 8, y: y(lab[4]) - 10, "text-anchor": "end", class: "lbl" }, svg);
+  const tb = $("#tierTable tbody"); tb.replaceChildren();
+  TIERS.forEach(r => {
+    const tr = document.createElement("tr");
+    [r[0], r[1], r[2], r[3] || "—", r[4], r[5] === "unclassified" ? "未分类" : r[5]].forEach((v, k) => { const td = document.createElement("td"); td.textContent = v; if ([1,2,4].includes(k)) td.className = "n"; tr.appendChild(td); });
+    tb.appendChild(tr);
+  });
+}
+
+// ── arms table ──────────────────────────────────────────────────────────
+const ARMS = [
+  ["SKEL（方法）", ".skel 骨架 → Rust", "映射到骨架行的验证反馈", "骨架 PASS 且完整，Rust 编译通过"],
+  ["CIR（消融）", "ConcIR JSON → Rust", "ConcIR 位置的验证反馈", "同上"],
+  ["G0", "直接写 Rust", "无（编译失败时修）", "能编译"],
+  ["REFINE", "Rust", "模型自查", "回复 NO_ISSUES 且能编译"],
+  ["STATIC", "Rust", "rustc + clippy 并发 lint + lockbud", "没有阻塞性静态告警"],
+  ["DYNAMIC", "Rust", "20 次运行 + Shuttle + miri（反馈种子）", "所有动态工具通过"],
+  ["DYNAMIC_M", "Rust", "DYNAMIC + 合同 monitor", "再加 monitor 无阻塞结果"],
+];
+function drawArms() {
+  const tb = $("#armsBody"); tb.replaceChildren();
+  for (const row of ARMS) {
+    const tr = document.createElement("tr");
+    row.forEach((v, k) => { const td = document.createElement(k ? "td" : "th"); td.textContent = v; tr.appendChild(td); });
+    tb.appendChild(tr);
+  }
+}
+
+function drawAll() { drawCal(); drawRace(); drawTier(); }
+drawPipe(); drawTimeline(); drawRoadmap(); drawArms(); drawAll();
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(drawAll, 120); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawAll);
+</script>
+</body>
+</html>

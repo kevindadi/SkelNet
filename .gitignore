@@ -45,3 +45,6 @@ experiments/**/audit.jsonl
 
 # Local lockbud checkout (scripts/setup_lockbud.sh)
 tools/lockbud/
+
+# Coordinator task-sheet drafts (local only, never tracked)
+docs/prompts/
