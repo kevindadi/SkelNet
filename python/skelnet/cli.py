@@ -1110,12 +1110,66 @@ def _selected_cells(run_dir: Path, manifest: dict) -> list[dict]:
 
 
 def cmd_report(args: argparse.Namespace) -> int:
-    summaries = []
+    from . import report
+
+    requested = list(args.table or [])
+    if not requested and not args.figure and not args.out:
+        # Legacy behaviour: one SUMMARY-based table over the runs.
+        summaries = []
+        for d in args.run_dirs:
+            path = Path(d) / "SUMMARY.json"
+            if path.exists():
+                summaries.append(json.loads(path.read_text(encoding="utf-8")))
+        print(_report_markdown(summaries))
+        return 0
+
+    if not requested or "all" in requested:
+        tables = list(report.ALL_TABLES)
+    else:
+        tables = []
+        for name in requested:
+            if name not in tables:
+                tables.append(name)
+
+    try:
+        prices = (json.loads(Path(args.prices).read_text(encoding="utf-8"))
+                  if args.prices else None)
+        fp_check = (json.loads(Path(args.fp_check).read_text(encoding="utf-8"))
+                    if args.fp_check else None)
+        probe = (json.loads(Path(args.probe).read_text(encoding="utf-8"))
+                 if args.probe else None)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"report: cannot read input file: {exc}", file=sys.stderr)
+        return 2
+
+    call_budget = 5
     for d in args.run_dirs:
-        path = Path(d) / "SUMMARY.json"
-        if path.exists():
-            summaries.append(json.loads(path.read_text(encoding="utf-8")))
-    print(_report_markdown(summaries))
+        manifest_path = Path(d) / "MANIFEST.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            value = (manifest.get("run_params") or {}).get("call_budget")
+            if isinstance(value, int):
+                call_budget = value
+            break
+
+    ctx = report.ReportContext(
+        root=Path(args.root), look=args.look, planned_units=args.planned_units,
+        previous_look_units=args.previous_look_units, bootstrap=args.bootstrap,
+        seed=args.seed, prices=prices, fp_check=fp_check, probe=probe,
+        call_budget=call_budget, allow_duplicates=args.allow_duplicates,
+        allow_mixed=args.allow_mixed)
+    try:
+        ds, payloads = report.build_report(args.run_dirs, ctx, tables,
+                                           figure=bool(args.figure))
+    except report.ReportInputError as exc:
+        print(f"report: {exc}", file=sys.stderr)
+        return 2
+
+    if args.out:
+        report.write_outputs(Path(args.out), ds, payloads, tables,
+                             figure=bool(args.figure), fmt=args.format, ctx=ctx)
+        return 0
+    print(report.markdown_report(ds, payloads, tables, ctx))
     return 0
 
 
@@ -1250,8 +1304,28 @@ def build_parser() -> argparse.ArgumentParser:
     _register_tools(sub)
 
     rep = sub.add_parser("report", help="one table over runs")
-    rep.add_argument("run_dirs", nargs="+")
+    rep.add_argument("run_dirs", nargs="*")
+    rep.add_argument("--table", action="append", default=None,
+                     choices=["main", "tiers", "design", "failures", "cost",
+                              "models", "benchmark", "coverage", "lockbud",
+                              "tests", "numbers", "all"])
+    rep.add_argument("--figure", default=None, choices=["anytime"])
+    rep.add_argument("--format", default="both", choices=["md", "tex", "both"])
+    rep.add_argument("--out", default=None)
+    rep.add_argument("--root", default=str(repo_root()))
+    rep.add_argument("--look", type=int, default=0, choices=[0, 1, 2, 3])
+    rep.add_argument("--planned-units", type=int, default=880)
+    rep.add_argument("--previous-look-units", type=int, default=528)
+    rep.add_argument("--prices", default=None)
+    rep.add_argument("--fp-check", default=None)
+    rep.add_argument("--probe", default=None)
+    rep.add_argument("--bootstrap", type=int, default=10000)
+    rep.add_argument("--seed", type=int, default=20260928)
+    rep.add_argument("--allow-mixed", action="store_true")
+    rep.add_argument("--allow-duplicates", action="store_true")
     rep.set_defaults(func=cmd_report)
+    from .stop_check import register as _register_stop
+    _register_stop(sub)
     from .bench import register as _register_bench
     _register_bench(sub)
     return parser

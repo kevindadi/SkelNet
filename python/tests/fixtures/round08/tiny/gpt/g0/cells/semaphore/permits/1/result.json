@@ -1,0 +1,96 @@
+{
+  "accepted": false,
+  "arm": "G0",
+  "budget_used": {
+    "calls": 1,
+    "tokens": 2452
+  },
+  "calls": [
+    {
+      "attempt": 1,
+      "cache_hit": false,
+      "error": null,
+      "finish_reason": "stop",
+      "finish_reasons": [
+        "stop"
+      ],
+      "request_sha256": "abb15fedfa7df58f8857714b227b1ece89328d9e3e022b736cc9f3c7ad8e5878",
+      "stage": "generate",
+      "system_sha256": "c9533021ce75a22c15f3ba183d03592ed1eaf7197bf088674b54336af9777601",
+      "transport_attempt": 1,
+      "truncation_retry": false,
+      "usage": {
+        "cached": 498,
+        "input": 1992,
+        "output": 460,
+        "reasoning": 0
+      },
+      "wall_ms": 2954
+    }
+  ],
+  "check_ok": false,
+  "compile_wall_ms": 1374,
+  "error": null,
+  "evidence_sufficient": false,
+  "hint": "h1",
+  "history": [],
+  "ledger": {},
+  "model": "GPT 6 Luna",
+  "model_id": "gpt-6-luna",
+  "oracle": {
+    "built": true,
+    "functional_ok": false,
+    "functional_ok_no_o4": true,
+    "layers": {
+      "O1": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 34
+      },
+      "O2": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 6
+      },
+      "O3": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 177
+      },
+      "O4": {
+        "category": "monitor_fail",
+        "detail": null,
+        "status": "fail",
+        "wall_ms": 255
+      }
+    },
+    "o3_tools": {
+      "miri": {
+        "category": null,
+        "status": "pass"
+      },
+      "no_concurrency": false,
+      "shuttle": {
+        "category": null,
+        "status": "pass"
+      }
+    },
+    "oracle_complete": true,
+    "ran": true,
+    "run_ok": true,
+    "terminal_check": "fail"
+  },
+  "parse_ok": false,
+  "rep": 1,
+  "rounds_used": 1,
+  "rust_mode": "llm",
+  "schema_version": "skelnet-cell-v1",
+  "seed": 6885193111324048299,
+  "skip_reason": null,
+  "status": "ok",
+  "task": "semaphore/permits",
+  "tier": "L3"
+}

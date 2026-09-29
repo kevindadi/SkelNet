@@ -1,0 +1,19 @@
+% RQ1/RQ2 main table. Filled by report.py (round 8) from Stage-2 (or Stage-3) runs.
+\begin{tabular}{@{}lrrrrr|rrr|r@{}}
+\toprule
+& \multicolumn{5}{c|}{\textbf{pass@1 of $\mathit{ok}$ (\%)}} & \multicolumn{3}{c|}{\textbf{\arm{SKEL} $-$ arm (pooled)}} & \textbf{Sens.} \\
+\textbf{Arm} & GPT & Kimi & DeepSeek & Qwen & Pooled & $\Delta$ (pp) & 95\% CI & $p_{\text{Holm}}$ & O1--O3 \\
+\midrule
+\arm{SKEL}        & \PH & \PH & \PH & \PH & \PH & -- & -- & -- & \PH \\
+\arm{CIR}         & \PH & \PH & \PH & \PH & \PH & \PH & \PH & \PH$^{s}$ & \PH \\
+\midrule
+\arm{G0}          & \PH & \PH & \PH & \PH & \PH & \PH & \PH & \PH & \PH \\
+\arm{REFINE}      & \PH & \PH & \PH & \PH & \PH & \PH & \PH & \PH & \PH \\
+\arm{STATIC}      & \PH & \PH & \PH & \PH & \PH & \PH & \PH & \PH & \PH \\
+\arm{DYNAMIC}     & \PH & \PH & \PH & \PH & \PH & \PH & \PH & \PH & \PH \\
+\arm{DYNAMIC\_M}  & \PH & \PH & \PH & \PH & \PH & \PH & \PH & \PH$^{s}$ & \PH \\
+\midrule
+\arm{G0} pass@3   & \PH & \PH & \PH & \PH & \PH & \PH & \PH & -- & \PH \\
+\bottomrule
+\multicolumn{10}{@{}l@{}}{\scriptsize $^{s}$ secondary family. Cochran's Q per model: \PH. Sequential boundary at this look: $\alpha=$\PH.}
+\end{tabular}

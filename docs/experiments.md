@@ -173,10 +173,18 @@ their ancestors. A run directory is single-run, so `eval` rebuilds
 
 ## Report columns
 
-`report` prints one table over runs, one row per run (first column is the run
-id, then arm × model): cells, parse rate, check pass rate, verify pass rate,
-mean revision rounds, evidence sufficiency, and functional pass rate. Multiple
-run directories can be compared in one call.
+Each run's `REPORT.md`/`SUMMARY.json` still carries the legacy single-run table
+described below.  The formal cross-run analysis is produced by
+`python -m skelnet report <run_dirs...> --table …` (round 8), which writes the
+paper tables, the anytime figure, and `report.json`; see
+[`docs/report.md`](report.md) for the tables, the statistics, and the
+`stop-check` stopping rules.
+
+`report` (with no `--table`, `--figure`, or `--out`) prints one legacy table
+over runs, one row per run (first column is the run id, then arm × model):
+cells, parse rate, check pass rate, verify pass rate, mean revision rounds,
+evidence sufficiency, and functional pass rate. Multiple run directories can be
+compared in one call.
 
 - **parse rate**: first candidate parsed (SKEL: no `S0xx`; CIR: ConcIR JSON
   parsed; G0: non-empty Rust).

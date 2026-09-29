@@ -173,6 +173,29 @@ def _validate_oracle(oracle: Any) -> list[str]:
     layers = oracle.get("layers")
     if layers is not None:
         errors.extend(_validate_layers(layers))
+    if "o3_tools" in oracle and oracle["o3_tools"] is not None:
+        errors.extend(_validate_o3_tools(oracle["o3_tools"]))
+    return errors
+
+
+def _validate_o3_tools(value: Any) -> list[str]:
+    """Type-check the round-8 ``oracle.o3_tools`` sub-results when present."""
+    if not isinstance(value, dict):
+        return ["oracle.o3_tools must be an object or null"]
+    errors: list[str] = []
+    for name in ("shuttle", "miri"):
+        sub = value.get(name)
+        if not isinstance(sub, dict):
+            errors.append(f"oracle.o3_tools.{name} must be an object")
+            continue
+        for key in ("status", "category"):
+            if key not in sub:
+                errors.append(f"oracle.o3_tools.{name}.{key} is required")
+            elif not (sub[key] is None or isinstance(sub[key], str)):
+                errors.append(
+                    f"oracle.o3_tools.{name}.{key} must be a string or null")
+    if not isinstance(value.get("no_concurrency"), bool):
+        errors.append("oracle.o3_tools.no_concurrency must be a bool")
     return errors
 
 

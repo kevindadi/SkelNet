@@ -1,0 +1,96 @@
+{
+  "accepted": false,
+  "arm": "G0",
+  "budget_used": {
+    "calls": 1,
+    "tokens": 2735
+  },
+  "calls": [
+    {
+      "attempt": 1,
+      "cache_hit": false,
+      "error": null,
+      "finish_reason": "stop",
+      "finish_reasons": [
+        "stop"
+      ],
+      "request_sha256": "abb15fedfa7df58f8857714b227b1ece89328d9e3e022b736cc9f3c7ad8e5878",
+      "stage": "generate",
+      "system_sha256": "c9533021ce75a22c15f3ba183d03592ed1eaf7197bf088674b54336af9777601",
+      "transport_attempt": 1,
+      "truncation_retry": false,
+      "usage": {
+        "cached": 502,
+        "input": 2008,
+        "output": 727,
+        "reasoning": 0
+      },
+      "wall_ms": 3003
+    }
+  ],
+  "check_ok": false,
+  "compile_wall_ms": 839,
+  "error": null,
+  "evidence_sufficient": false,
+  "hint": "h1",
+  "history": [],
+  "ledger": {},
+  "model": "DeepSeek Flash",
+  "model_id": "deepseek-flash",
+  "oracle": {
+    "built": true,
+    "functional_ok": false,
+    "functional_ok_no_o4": false,
+    "layers": {
+      "O1": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 23
+      },
+      "O2": {
+        "category": "wrong_output",
+        "detail": null,
+        "status": "fail",
+        "wall_ms": 24
+      },
+      "O3": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 209
+      },
+      "O4": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 103
+      }
+    },
+    "o3_tools": {
+      "miri": {
+        "category": null,
+        "status": "pass"
+      },
+      "no_concurrency": false,
+      "shuttle": {
+        "category": null,
+        "status": "pass"
+      }
+    },
+    "oracle_complete": true,
+    "ran": false,
+    "run_ok": false,
+    "terminal_check": "fail"
+  },
+  "parse_ok": false,
+  "rep": 2,
+  "rounds_used": 1,
+  "rust_mode": "llm",
+  "schema_version": "skelnet-cell-v1",
+  "seed": 9858479287533917542,
+  "skip_reason": null,
+  "status": "ok",
+  "task": "semaphore/permits",
+  "tier": "L3"
+}

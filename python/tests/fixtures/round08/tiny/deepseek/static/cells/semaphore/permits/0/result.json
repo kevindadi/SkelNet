@@ -1,0 +1,136 @@
+{
+  "accepted": false,
+  "arm": "STATIC",
+  "baseline": {
+    "accept_reason": "static_clean",
+    "accepted_at_call": null,
+    "final_version": 1,
+    "first_round_cache_hit": true,
+    "rounds": [
+      {
+        "call": 1,
+        "compile": "ok",
+        "compile_wall_ms": 1709,
+        "compiled": true,
+        "feedback_bytes": 1257,
+        "feedback_sha256": "f5aba5f825df43649461ac3d3145c7c00eca3904589666cf6fbe8be103b24629",
+        "reply_kind": "program",
+        "seeds": {},
+        "stage": "generate",
+        "tools": {
+          "clippy": {
+            "category": null,
+            "status": "pass",
+            "wall_ms": 216
+          },
+          "lockbud": {
+            "category": "ConflictLock",
+            "status": "fail",
+            "wall_ms": 67
+          }
+        },
+        "truncated": false,
+        "version": 1
+      }
+    ],
+    "tools_missing": []
+  },
+  "budget_used": {
+    "calls": 1,
+    "tokens": 1909
+  },
+  "calls": [
+    {
+      "attempt": 1,
+      "cache_hit": true,
+      "error": null,
+      "finish_reason": "stop",
+      "finish_reasons": [
+        "stop"
+      ],
+      "request_sha256": "abb15fedfa7df58f8857714b227b1ece89328d9e3e022b736cc9f3c7ad8e5878",
+      "stage": "generate",
+      "system_sha256": "c9533021ce75a22c15f3ba183d03592ed1eaf7197bf088674b54336af9777601",
+      "transport_attempt": 1,
+      "truncation_retry": false,
+      "usage": {
+        "cached": null,
+        "input": 1581,
+        "output": 328,
+        "reasoning": 0
+      },
+      "wall_ms": 2495
+    }
+  ],
+  "check_ok": false,
+  "error": null,
+  "evidence_sufficient": false,
+  "hint": "h1",
+  "history": [
+    {
+      "call": 1,
+      "reply_kind": "program",
+      "stage": "generate",
+      "version": 1
+    }
+  ],
+  "ledger": {},
+  "model": "DeepSeek Flash",
+  "model_id": "deepseek-flash",
+  "oracle": {
+    "built": false,
+    "functional_ok": false,
+    "functional_ok_no_o4": false,
+    "layers": {
+      "O1": {
+        "category": "no_build",
+        "detail": null,
+        "status": "fail",
+        "wall_ms": 18
+      },
+      "O2": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 16
+      },
+      "O3": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 148
+      },
+      "O4": {
+        "category": null,
+        "detail": null,
+        "status": "pass",
+        "wall_ms": 33
+      }
+    },
+    "o3_tools": {
+      "miri": {
+        "category": null,
+        "status": "pass"
+      },
+      "no_concurrency": false,
+      "shuttle": {
+        "category": null,
+        "status": "pass"
+      }
+    },
+    "oracle_complete": true,
+    "ran": false,
+    "run_ok": false,
+    "terminal_check": "not_run"
+  },
+  "parse_ok": false,
+  "rep": 0,
+  "rounds_used": 1,
+  "rust_mode": "llm",
+  "schema_version": "skelnet-cell-v1",
+  "seed": 14916597925415447038,
+  "skip_reason": null,
+  "status": "ok",
+  "task": "semaphore/permits",
+  "tier": "L3"
+}
