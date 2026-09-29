@@ -130,14 +130,51 @@ cell is incomplete.)
 
 ## Lockbud 2×2 (STATIC first version joined to the G0 oracle)
 
-The STATIC call-1 lockbud status is generated deterministically from
-`hash("lockbud", task, rep, model) % 100 < 45`.  Joining with the G0 oracle
-(`deadlock = O2 hang or O3 deadlock`) over all 18 included STATIC cells:
+Input data copied from the fixture JSON (each of the 18 included STATIC cells:
+whether the `version == 1` round compiled, its lockbud status, and the G0
+counterpart's result):
+
+| model | task | rep | v1 compiled | lockbud | G0 |
+| --- | --- | --- | --- | --- | --- |
+| deepseek | condvar/lost_wakeup | 0 | yes | fail | skipped |
+| deepseek | condvar/lost_wakeup | 1 | yes | pass | deadlock |
+| deepseek | condvar/lost_wakeup | 2 | yes | fail | ok |
+| deepseek | lock-order/abba_2lock | 0 | yes | fail | ok |
+| deepseek | lock-order/abba_2lock | 1 | yes | pass | other |
+| deepseek | lock-order/abba_2lock | 2 | yes | fail | ok |
+| deepseek | semaphore/permits | 0 | yes | fail | ok |
+| deepseek | semaphore/permits | 1 | yes | pass | deadlock |
+| deepseek | semaphore/permits | 2 | yes | pass | other |
+| gpt | condvar/lost_wakeup | 0 | yes | pass | ok |
+| gpt | condvar/lost_wakeup | 1 | yes | fail | other |
+| gpt | condvar/lost_wakeup | 2 | yes | pass | other |
+| gpt | lock-order/abba_2lock | 0 | yes | pass | other |
+| gpt | lock-order/abba_2lock | 1 | yes | fail | ok |
+| gpt | lock-order/abba_2lock | 2 | yes | fail | ok |
+| gpt | semaphore/permits | 0 | yes | pass | ok |
+| gpt | semaphore/permits | 1 | yes | pass | other |
+| gpt | semaphore/permits | 2 | yes | fail | ok |
+
+`deepseek/condvar/lost_wakeup/0` has no joined G0 cell (skipped) → `no_g0`.
+Of the remaining 17: 2 G0 programs deadlock, none reported → tp = 0, fn = 2;
+lockbud fails on 8 non-deadlocking programs → fp = 8; lockbud passes on 7 →
+tn = 7.
 
 | | oracle deadlock | oracle not deadlock |
 | --- | --- | --- |
-| lockbud `fail` | 0 | 9 |
+| lockbud `fail` | 0 | 8 |
 | lockbud `pass` | 2 | 7 |
 
-Recall = 0/2 = 0.0; FP on oracle-ok = 9/(9+7) = 0.5625; unavailable = 0;
-excluded (v1 did not compile) = 0.
+Recall = 0/(0+2) = 0.0; FP on oracle-ok = 7/9 (9 G0 programs are `ok`, 7 of
+them are reported) = 0.7778; report on not-deadlock = 8/(8+7) = 0.5333;
+`no_g0` = 1; unavailable = 0; excluded (v1 did not compile) = 0.
+
+## Null reasons and design check@1 (F4/F9)
+
+`functional_ok: null`: the DeepSeek SKEL `condvar/lost_wakeup/0` cell has
+`O3.status == "unavailable"`, so its reason is `unavailable:O3` (1 cell).
+
+`check@1` (attempt 1 passed check): the 13 accepted SKEL cells have a
+`verify` PASS entry; the null cell and the four failing SKEL cells have a
+`check` entry with a failing status, so `check@1 = 13/18` and
+`verified@1 = 13/18 = verified@4` (consistent).

@@ -325,9 +325,29 @@ def _build_cell(model: dict, group: dict, task: dict, rep: int, plan: dict,
                 stages.append("rust" if i == skel_calls + 1 else "rust_fix")
         calls = [_call(i, stages[i - 1], rng) for i in range(1, n + 1)]
         history = []
+        accepted_plan = bool(plan.get("accepted", False))
+        check_ok = bool(plan.get("check_ok",
+                                 accepted_plan or plan.get("ok") is True))
         for i in range(1, skel_calls + 1):
-            history.append({"attempt": i, "stage": "verify", "outcome": "PASS",
-                            "complete": True, "unmapped": []})
+            # Attempt 1 reflects the real pipeline: PASS only when the skeleton
+            # verified on the first call; otherwise a FAIL/INVALID verify
+            # (check passed) or a check item -- SKEL only -- when check failed.
+            if i == 1 and accepted_plan and skel_calls == 1:
+                history.append({"attempt": i, "stage": "verify",
+                                "outcome": "PASS", "complete": True,
+                                "unmapped": []})
+            elif kind == "cir":
+                outcome = "FAIL" if check_ok else "INVALID"
+                history.append({"attempt": i, "stage": "verify",
+                                "outcome": outcome, "complete": False,
+                                "unmapped": []})
+            elif check_ok:
+                history.append({"attempt": i, "stage": "verify",
+                                "outcome": "FAIL", "complete": False,
+                                "unmapped": []})
+            else:
+                history.append({"attempt": i, "stage": "check",
+                                "status": "error", "diagnostics": []})
         rust_attempts = []
         for j in range(1, rust_calls + 1):
             rust_attempts.append({

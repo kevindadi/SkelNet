@@ -36,10 +36,9 @@
   "history": [
     {
       "attempt": 1,
-      "complete": true,
-      "outcome": "PASS",
-      "stage": "verify",
-      "unmapped": []
+      "diagnostics": [],
+      "stage": "check",
+      "status": "error"
     }
   ],
   "ledger": {},
