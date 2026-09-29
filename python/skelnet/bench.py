@@ -113,29 +113,11 @@ def _report_unmatched(unmatched: list[str], pattern: str) -> None:
 def _select_patterns(root: Path, pattern: str | None) -> tuple[list[Path], list[str]]:
     """Comma-separated patterns. ``all`` is unchanged.
 
-    Returns selected task directories in directory order, and the patterns
-    that matched nothing. An empty repository makes ``all`` unmatched.
+    The implementation lives on ``cli.select_task_patterns`` so ``run``,
+    ``oracle calibrate`` and ``tools fp-check`` share it.
     """
     from . import cli
-    text = "all" if pattern in (None, "") else str(pattern)
-    universe = cli._select_tasks(root, "all")
-    if text == "all":
-        return (universe, []) if universe else ([], ["all"])
-    parts = [part.strip() for part in text.split(",") if part.strip()]
-    if not parts:
-        return [], [text]
-    order = {task: index for index, task in enumerate(universe)}
-    chosen: dict[Path, int] = {}
-    unmatched: list[str] = []
-    for part in parts:
-        hits = cli._select_tasks(root, part)
-        if not hits:
-            unmatched.append(part)
-            continue
-        for task in hits:
-            chosen.setdefault(task, order.get(task, 10**9))
-    ordered = [task for task, _index in sorted(chosen.items(), key=lambda item: item[1])]
-    return ordered, unmatched
+    return cli.select_task_patterns(root, pattern)
 
 
 def _parse_checks(text: str | None) -> tuple[str, ...]:
@@ -181,6 +163,9 @@ def validate_repo(root: Path | str, pattern: str = "all", *,
                 continue
             if name in ("V2", "V3", "V6") and _is_boundary(rel):
                 row_checks.append(_row(name, "skip", "boundary task has no h1 requirements or reference program"))
+                continue
+            if name in ("V7", "V8") and _is_boundary(rel):
+                row_checks.append(_row(name, "skip", "boundary task has no reference program"))
                 continue
             row_checks.append(_run_check(
                 name, root, task_dir, rel, strict=strict, tools=tools,
@@ -965,6 +950,13 @@ def _write_requirement_tier(task_dir: Path, tier: str, source: str, metrics: dic
         data.pop("tier_source", None)
         data["tier"] = tier
         data["tier_source"] = source
+    else:
+        # Fill only the keys a legacy task does not already have. Existing
+        # values stay put, even when they disagree with the computed tier.
+        if "tier" not in data:
+            data["tier"] = tier
+        if "tier_source" not in data:
+            data["tier_source"] = "legacy"
     data["tier_metrics"] = metrics
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
