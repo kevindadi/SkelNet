@@ -11,14 +11,41 @@ Stage 0 uses `--stage 0 --hint h1` explicitly, four L1 tasks, six main groups an
 one `DYNAMIC_M` smoke (100 cells total). The ledger ceiling is
 `max_requests=800` / `max_tokens=15000000`.
 
+## Stage 0 重新开始 (2026-09-30)
+
+Stage 0 first ran on 2026-09-30 with relative `--out` paths. The oracle then
+failed on every cell: O2 crashed on `target/debug/probe` and O3 was
+`shuttle_unsupported`, because a relative work directory and a relative program
+path were combined and the child could not find the binary. The defect also
+polluted the DYNAMIC/DYNAMIC_M feedback. Every first-round run (14 run
+directories, 104 requests) is therefore void; see `experiments/DEVIATIONS.md`
+D-9c-1 and D-9c-2. Do not mix the void data with the new Stage 0.
+
+Archive the void outputs first (run from the repository root). Each path is
+checked before moving, and the two tracked files are restored afterwards:
+
+```sh
+ROOT="$(git rev-parse --show-toplevel)"
+mkdir -p "$ROOT/experiments/stage0-void-20260930"
+for p in stage0 stage0-smoke budget.json budget.json.lock; do
+  [ -e "$ROOT/experiments/$p" ] && mv "$ROOT/experiments/$p" "$ROOT/experiments/stage0-void-20260930/"
+done
+# COMMANDS.md and budget.template.json are tracked; restore them into stage0/.
+git -C "$ROOT" checkout -- experiments/stage0
+```
+
+Then run Step 0 onwards. Every path below is written relative to the repository
+root via `$ROOT` so the commands do not depend on the current directory.
+
 ## 0. Prepare the budget ledger (once)
 
 The ledger is git-ignored. Do not overwrite an existing one.
 
 ```sh
-[ -f experiments/budget.json ] && cp experiments/budget.json experiments/budget.json.bak
-[ -f experiments/budget.json ] || cp experiments/stage0/budget.template.json experiments/budget.json
-cat experiments/budget.json
+ROOT="$(git rev-parse --show-toplevel)"
+[ -f "$ROOT/experiments/budget.json" ] && cp "$ROOT/experiments/budget.json" "$ROOT/experiments/budget.json.bak"
+[ -f "$ROOT/experiments/budget.json" ] || cp "$ROOT/experiments/stage0/budget.template.json" "$ROOT/experiments/budget.json"
+cat "$ROOT/experiments/budget.json"
 ```
 
 Expected: the `limits."0"` block with `max_requests=800` and
@@ -44,14 +71,16 @@ and `api_key_present: true` for each (it never prints a key value). **Stop** if
 ## 2. Real model probe
 
 ```sh
-PYTHONPATH=python python -m skelnet models probe --out experiments/stage0/probe
+PYTHONPATH=python python -m skelnet models probe --out "$ROOT/experiments/stage0/probe"
 ```
 
 Expected: `experiments/stage0/probe/PROBE.json` with four `probed: true`
 records. For GPT check `reasoning_diagnosis`; for every model note
 `reasoning_tokens_nontrivial` and `nontrivial_answer_ok` (the answer must be
-`YES`). **Stop** if a model reports `probe_error` or `nontrivial_answer_ok` is
-false; report the model and the diagnosis.
+`YES`). For Kimi, `model_id` is `kimi-k2.7-code` and
+`reasoning_tokens_nontrivial` is greater than 0. **Stop** if a model reports
+`probe_error` or `nontrivial_answer_ok` is false; report the model and the
+diagnosis.
 
 ## 3. GPT reasoning smoke (G0 and SKEL, one task)
 
@@ -61,8 +90,8 @@ same `(model, arm, task, rep)` would otherwise appear twice and make
 `stop-check` / `report` reject the input as duplicates).
 
 ```sh
-PYTHONPATH=python python -m skelnet run --arm G0 --model "GPT 6 Luna" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0-smoke/gpt-g0
-PYTHONPATH=python python -m skelnet run --arm SKEL --model "GPT 6 Luna" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0-smoke/gpt-skel
+PYTHONPATH=python python -m skelnet run --arm G0 --model "GPT 6 Luna" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --out "$ROOT/experiments/stage0-smoke/gpt-g0"
+PYTHONPATH=python python -m skelnet run --arm SKEL --model "GPT 6 Luna" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --out "$ROOT/experiments/stage0-smoke/gpt-skel"
 ```
 
 Then inspect the two cells:
@@ -99,49 +128,49 @@ cache), then `REFINE`, `STATIC`, `DYNAMIC` replaying that cache
 ### GPT 6 Luna
 
 ```sh
-PYTHONPATH=python python -m skelnet run --arm G0 --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --out experiments/stage0/gpt-g0
-PYTHONPATH=python python -m skelnet run --arm REFINE --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/gpt-refine
-PYTHONPATH=python python -m skelnet run --arm STATIC --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/gpt-static --allow-missing-tools
-PYTHONPATH=python python -m skelnet run --arm DYNAMIC --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/gpt-dynamic --allow-missing-tools
-PYTHONPATH=python python -m skelnet run --arm SKEL --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0/gpt-skel
-PYTHONPATH=python python -m skelnet run --arm CIR --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0/gpt-cir
-PYTHONPATH=python python -m skelnet run --arm DYNAMIC_M --model "GPT 6 Luna" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/gpt-dynamic_m --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm G0 --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --out "$ROOT/experiments/stage0/gpt-g0"
+PYTHONPATH=python python -m skelnet run --arm REFINE --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/gpt-refine"
+PYTHONPATH=python python -m skelnet run --arm STATIC --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/gpt-static" --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm DYNAMIC --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/gpt-dynamic" --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm SKEL --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out "$ROOT/experiments/stage0/gpt-skel"
+PYTHONPATH=python python -m skelnet run --arm CIR --model "GPT 6 Luna" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out "$ROOT/experiments/stage0/gpt-cir"
+PYTHONPATH=python python -m skelnet run --arm DYNAMIC_M --model "GPT 6 Luna" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/gpt-dynamic_m" --allow-missing-tools
 ```
 
 ### Kimi
 
 ```sh
-PYTHONPATH=python python -m skelnet run --arm G0 --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --out experiments/stage0/kimi-g0
-PYTHONPATH=python python -m skelnet run --arm REFINE --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/kimi-refine
-PYTHONPATH=python python -m skelnet run --arm STATIC --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/kimi-static --allow-missing-tools
-PYTHONPATH=python python -m skelnet run --arm DYNAMIC --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/kimi-dynamic --allow-missing-tools
-PYTHONPATH=python python -m skelnet run --arm SKEL --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0/kimi-skel
-PYTHONPATH=python python -m skelnet run --arm CIR --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0/kimi-cir
-PYTHONPATH=python python -m skelnet run --arm DYNAMIC_M --model "Kimi" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/kimi-dynamic_m --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm G0 --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --out "$ROOT/experiments/stage0/kimi-g0"
+PYTHONPATH=python python -m skelnet run --arm REFINE --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/kimi-refine"
+PYTHONPATH=python python -m skelnet run --arm STATIC --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/kimi-static" --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm DYNAMIC --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/kimi-dynamic" --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm SKEL --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out "$ROOT/experiments/stage0/kimi-skel"
+PYTHONPATH=python python -m skelnet run --arm CIR --model "Kimi" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out "$ROOT/experiments/stage0/kimi-cir"
+PYTHONPATH=python python -m skelnet run --arm DYNAMIC_M --model "Kimi" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/kimi-dynamic_m" --allow-missing-tools
 ```
 
 ### DeepSeek Flash
 
 ```sh
-PYTHONPATH=python python -m skelnet run --arm G0 --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --out experiments/stage0/deepseek-g0
-PYTHONPATH=python python -m skelnet run --arm REFINE --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/deepseek-refine
-PYTHONPATH=python python -m skelnet run --arm STATIC --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/deepseek-static --allow-missing-tools
-PYTHONPATH=python python -m skelnet run --arm DYNAMIC --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/deepseek-dynamic --allow-missing-tools
-PYTHONPATH=python python -m skelnet run --arm SKEL --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0/deepseek-skel
-PYTHONPATH=python python -m skelnet run --arm CIR --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0/deepseek-cir
-PYTHONPATH=python python -m skelnet run --arm DYNAMIC_M --model "DeepSeek Flash" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/deepseek-dynamic_m --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm G0 --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --out "$ROOT/experiments/stage0/deepseek-g0"
+PYTHONPATH=python python -m skelnet run --arm REFINE --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/deepseek-refine"
+PYTHONPATH=python python -m skelnet run --arm STATIC --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/deepseek-static" --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm DYNAMIC --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/deepseek-dynamic" --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm SKEL --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out "$ROOT/experiments/stage0/deepseek-skel"
+PYTHONPATH=python python -m skelnet run --arm CIR --model "DeepSeek Flash" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out "$ROOT/experiments/stage0/deepseek-cir"
+PYTHONPATH=python python -m skelnet run --arm DYNAMIC_M --model "DeepSeek Flash" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/deepseek-dynamic_m" --allow-missing-tools
 ```
 
 ### Qwen
 
 ```sh
-PYTHONPATH=python python -m skelnet run --arm G0 --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --out experiments/stage0/qwen-g0
-PYTHONPATH=python python -m skelnet run --arm REFINE --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/qwen-refine
-PYTHONPATH=python python -m skelnet run --arm STATIC --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/qwen-static --allow-missing-tools
-PYTHONPATH=python python -m skelnet run --arm DYNAMIC --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/qwen-dynamic --allow-missing-tools
-PYTHONPATH=python python -m skelnet run --arm SKEL --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0/qwen-skel
-PYTHONPATH=python python -m skelnet run --arm CIR --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0/qwen-cir
-PYTHONPATH=python python -m skelnet run --arm DYNAMIC_M --model "Qwen" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir experiments/stage0/cache --first-round require-cache --out experiments/stage0/qwen-dynamic_m --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm G0 --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --out "$ROOT/experiments/stage0/qwen-g0"
+PYTHONPATH=python python -m skelnet run --arm REFINE --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/qwen-refine"
+PYTHONPATH=python python -m skelnet run --arm STATIC --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/qwen-static" --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm DYNAMIC --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/qwen-dynamic" --allow-missing-tools
+PYTHONPATH=python python -m skelnet run --arm SKEL --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out "$ROOT/experiments/stage0/qwen-skel"
+PYTHONPATH=python python -m skelnet run --arm CIR --model "Qwen" --tasks "$TASKS" --reps 1 --rounds 4 --stage 0 --hint h1 --out "$ROOT/experiments/stage0/qwen-cir"
+PYTHONPATH=python python -m skelnet run --arm DYNAMIC_M --model "Qwen" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --cache-dir "$ROOT/experiments/stage0/cache" --first-round require-cache --out "$ROOT/experiments/stage0/qwen-dynamic_m" --allow-missing-tools
 ```
 
 Expected per run: a `MANIFEST.json` with `status: "complete"`,
@@ -155,9 +184,9 @@ run otherwise). **Stop** if any run exits non-zero, if
 ## 5. Summaries
 
 ```sh
-PYTHONPATH=python python -m skelnet stop-check experiments/stage0/*-*/ --look 0 --stage 0 --budget-file experiments/budget.json --json > experiments/stage0/look0.json
-PYTHONPATH=python python -m skelnet stop-check experiments/stage0/*-*/ --look 0 --stage 0 --budget-file experiments/budget.json > experiments/stage0/look0.md
-PYTHONPATH=python python -m skelnet report experiments/stage0/*-*/ --look 0 --out experiments/stage0/report
+PYTHONPATH=python python -m skelnet stop-check "$ROOT"/experiments/stage0/*-*/ --look 0 --stage 0 --budget-file "$ROOT/experiments/budget.json" --json > "$ROOT/experiments/stage0/look0.json"
+PYTHONPATH=python python -m skelnet stop-check "$ROOT"/experiments/stage0/*-*/ --look 0 --stage 0 --budget-file "$ROOT/experiments/budget.json" > "$ROOT/experiments/stage0/look0.md"
+PYTHONPATH=python python -m skelnet report "$ROOT"/experiments/stage0/*-*/ --look 0 --out "$ROOT/experiments/stage0/report"
 ```
 
 Expected: the Look-0 table has one row per model with `truncation` below 2%
@@ -169,7 +198,7 @@ check is inconsistent; hand `look0.json` to the coordinator.
 ## 6. lockbud false-positive quantification
 
 ```sh
-PYTHONPATH=python python -m skelnet tools fp-check --tasks all --out experiments/stage0/fpcheck
+PYTHONPATH=python python -m skelnet tools fp-check --tasks all --out "$ROOT/experiments/stage0/fpcheck"
 ```
 
 Expected: `experiments/stage0/fpcheck/FP_CHECK.json` with `summary.clippy` and
