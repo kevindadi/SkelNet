@@ -652,8 +652,16 @@ def _final_nominal_alpha(t_prev: float, t_final: float,
     reused: one step from ``t_prev`` to ``t_final`` with the conditional
     correlation ``sqrt(t_prev / t_final)``.
     """
+    if t_final <= t_prev:
+        raise ValueError(
+            f"the final look's information fraction t_final ({t_final}) must "
+            f"exceed the previous look's t_prev ({t_prev})")
     t_prev = min(max(t_prev, 1e-6), 1.0)
-    t_final = min(max(t_final, t_prev), 1.0)
+    t_final = min(max(t_final, 1e-6), 1.0)
+    if t_final <= t_prev:
+        raise ValueError(
+            f"the final look's information fraction t_final ({t_final}) must "
+            f"exceed the previous look's t_prev ({t_prev})")
     spent = stats.obf_alpha_spent(t_prev, alpha)
     c_prev = stats.normal_ppf(1.0 - spent / 2.0)
     grid = [-c_prev + 2.0 * c_prev * i / stats._OBF_NODES
@@ -676,7 +684,13 @@ def nominal_alpha(ds: Dataset, ctx: ReportContext):
     t = min(max(t, 1e-6), 1.0)
     if ctx.look == 2:
         return stats.obf_nominal_boundaries([t, 1.0])[0]
-    t_prev = min(max(ctx.previous_look_units / ctx.planned_units, 1e-6), 1.0)
+    previous = ctx.previous_look_units
+    if previous is None or units <= previous:
+        raise ReportInputError(
+            f"Look 3 needs the final paired units ({units}) to exceed the "
+            f"previous look's units ({previous}); the final information "
+            f"fraction must be larger than the previous look's")
+    t_prev = min(max(previous / ctx.planned_units, 1e-6), 1.0)
     return _final_nominal_alpha(t_prev, t)
 
 

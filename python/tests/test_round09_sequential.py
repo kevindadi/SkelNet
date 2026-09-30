@@ -1,6 +1,8 @@
 """R9-P4: sequential final-look boundary, missing-arg gates, no_success."""
 
+import contextlib
 import importlib.util
+import io
 import json
 import shutil
 from pathlib import Path
@@ -144,3 +146,30 @@ def test_report_look3_uses_same_alpha_and_gates(tmp_path):
         rc3 = cli.main(["report", *[str(p) for p in runs], "--table", "main",
                         "--look", "3", "--root", str(root)])
     assert rc3 == 2
+
+
+def test_final_nominal_alpha_rejects_non_increasing():
+    with pytest.raises(ValueError):
+        report._final_nominal_alpha(0.6, 0.6)
+    with pytest.raises(ValueError):
+        report._final_nominal_alpha(0.6, 0.5)
+
+
+def test_look3_final_units_not_above_previous_is_an_error(tmp_path):
+    root = _build(tmp_path / "r", SUCCESS)
+    runs = _runs(root)
+    for previous in ("144", "200"):
+        rc, out = _stop_check(runs, root, look=3,
+                              extra=["--previous-look-units", previous])
+        assert rc == 2, previous
+        assert "144" in out and previous in out
+    for previous in ("144", "200"):
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+            rc = cli.main(["report", *[str(p) for p in runs], "--table", "main",
+                           "--look", "3", "--planned-units", "880",
+                           "--previous-look-units", previous, "--root",
+                           str(root)])
+        assert rc == 2, previous
+        assert "144" in buffer.getvalue() and previous in buffer.getvalue()
+

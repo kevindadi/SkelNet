@@ -102,7 +102,11 @@ def cmd_stop_check(args) -> int:
     elif args.look == 1:
         result = look1(ds, ctx)
     else:
-        result = look23(ds, ctx)
+        try:
+            result = look23(ds, ctx)
+        except report.ReportInputError as exc:
+            print(f"stop-check: {exc}", file=sys.stderr)
+            return 2
     result["spend"] = _spend(ds, ctx)
     if args.next_stage_units:
         result["projection"] = _next_projection(ds, ctx, args.next_stage_units)
