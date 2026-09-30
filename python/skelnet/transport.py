@@ -110,12 +110,13 @@ class ModelSpec:
     status: str = "available"        # available | blocked | unknown
     blocked_reason: str | None = None
     discovered: bool = False         # model_id observed in a live model list
-    # Parameter policy (R2, updated R2d). `thinking` is the requested switch; a
-    # string value records a mode the provider always applies (Kimi's
-    # ``kimi-k3`` always reasons, so it is ``"always"`` and no ``thinking`` key
-    # is ever sent). Reasoning effort is provider-specific: GPT 6 uses
-    # ``reasoning_effort="medium"``, Kimi ``"high"``. `supports_seed` gates
-    # per-cell seeds (Responses never send a seed).
+    # Parameter policy (R2, updated R2d, R9c). `thinking` is the requested
+    # switch; a string value records a mode the provider always applies.
+    # ``kimi-k2.7-code`` cannot disable thinking, so it is ``"always"`` and the
+    # channel sends ``extra_body={"thinking": {"type": "enabled"}}``. GPT 6 uses
+    # ``reasoning_effort="medium"``; the Moonshot channel has no
+    # ``reasoning_effort``. `supports_seed` gates per-cell seeds (Responses
+    # never send a seed).
     thinking: bool | str = False
     reasoning_effort: str | None = None
     max_output_tokens: int = 32768
@@ -152,12 +153,13 @@ CHANNELS: dict[str, Channel] = {
         surface="responses",
         notes="Reserved; blocked in R2 (no key/transport decision yet)."),
     # Enabled in R2d: Kimi moves off the OpenCode gateway onto the owner's
-    # Moonshot key (China platform, Chat Completions).
+    # Moonshot key (China platform, Chat Completions). R9c moves it from
+    # ``kimi-k3`` to ``kimi-k2.7-code``.
     "moonshot-direct": Channel(
         name="moonshot-direct", transport="direct-api", provider="moonshot",
         api_key_env="MOONSHOT_API_KEY", base_url="https://api.moonshot.cn/v1",
         surface="chat",
-        notes="Moonshot direct; used by Kimi (kimi-k3) from R2d."),
+        notes="Moonshot direct; used by Kimi (kimi-k2.7-code) from R9c."),
 }
 
 
@@ -206,16 +208,16 @@ def build_registry() -> list[ModelSpec]:
                   discovered="qwen3.8-flash" in DISCOVERED_MODELS["dashscope-direct"],
                   thinking=True, reasoning_effort=None, supports_seed=False,
                   stream=False),
-        # Kimi now runs on the owner's Moonshot key (China platform, Chat
-        # Completions), not the OpenCode gateway. ``kimi-k3`` always reasons and
-        # ``thinking`` must never appear in the request; strength is the
-        # top-level ``reasoning_effort`` ("high"), a deliberate difference from
-        # GPT. ``supports_seed`` is False: the Moonshot docs do not document a
-        # seed parameter for ``kimi-k3``. The OpenCode ``kimi-k2.7-code`` alias
-        # is dropped so it can no longer route to the old channel.
-        ModelSpec("Kimi", "moonshot", "moonshot-direct", "kimi-k3",
+        # Kimi runs on the owner's Moonshot key (China platform, Chat
+        # Completions). Round 9c replaces ``kimi-k3`` with ``kimi-k2.7-code``
+        # (cost and behaviour gap; see experiments/DEVIATIONS.md D-9c-2). The
+        # model cannot disable thinking, so ``thinking`` is ``"always"`` and the
+        # channel sends ``extra_body={"thinking": {"type": "enabled"}}``; there
+        # is no ``reasoning_effort`` on this channel. ``supports_seed`` is False:
+        # the Moonshot docs do not document a seed parameter.
+        ModelSpec("Kimi", "moonshot", "moonshot-direct", "kimi-k2.7-code",
                   role="compare",
-                  thinking="always", reasoning_effort="high",
+                  thinking="always", reasoning_effort=None,
                   supports_seed=False, stream=False),
         ModelSpec("GPT 6 Luna", "openai", "opencode-go", "gpt-6-luna",
                   role="compare", surface="responses",
@@ -240,12 +242,19 @@ def build_registry() -> list[ModelSpec]:
         ModelSpec("OpenAI direct", "openai", "openai-direct", None,
                   role="diagnostic", status="blocked",
                   blocked_reason="Reserved channel; no transport decision in R2."),
+        # Retired in R9c: kept as a blocked diagnostic so old run directories
+        # that name ``kimi-k3`` resolve to an explicit refusal instead of being
+        # silently remapped to the new model.
+        ModelSpec("Kimi k3 (retired)", "moonshot", "moonshot-direct", "kimi-k3",
+                  role="diagnostic", status="blocked",
+                  blocked_reason="replaced by kimi-k2.7-code in round 9c "
+                                 "(cost and behaviour gap)"),
     ]
     return specs
 
 
 # The four models this experiment round runs.
-EXPERIMENTAL_MODEL_IDS = ("gpt-6-luna", "kimi-k3", "deepseek-flash",
+EXPERIMENTAL_MODEL_IDS = ("gpt-6-luna", "kimi-k2.7-code", "deepseek-flash",
                           "qwen3.8-flash")
 
 

@@ -28,9 +28,9 @@ def test_dry_run_env_file_reports_key_presence(tmp_path, monkeypatch, capsys):
     by_id = {m["model_id"]: m for m in document["models"]}
     assert by_id["gpt-6-luna"]["api_key_present"] is True
     # Kimi is on the Moonshot channel now: its key is MOONSHOT_API_KEY.
-    assert by_id["kimi-k3"]["api_key_present"] is True
-    assert by_id["kimi-k3"]["channel"] == "moonshot-direct"
-    assert by_id["kimi-k3"]["base_url"] == "https://api.moonshot.cn/v1"
+    assert by_id["kimi-k2.7-code"]["api_key_present"] is True
+    assert by_id["kimi-k2.7-code"]["channel"] == "moonshot-direct"
+    assert by_id["kimi-k2.7-code"]["base_url"] == "https://api.moonshot.cn/v1"
     assert by_id["deepseek-flash"]["api_key_present"] is False
 
 
@@ -60,10 +60,11 @@ def test_probe_run_records_effort_and_no_key(tmp_path, monkeypatch):
     assert gpt["reasoning_tokens_low"] == 10
     assert gpt["reasoning_tokens_medium"] == 20
     assert gpt["thinking_accepted"] is True
-    # Kimi probes low/high (its strengths are low/high/max).
-    kimi = by_id["kimi-k3"]
-    assert kimi["reasoning_tokens_low"] == 10
-    assert kimi["reasoning_tokens_high"] == 30
+    # kimi-k2.7-code has no reasoning_effort (R9c): no effort variants, but the
+    # default probe still observes reasoning.
+    kimi = by_id["kimi-k2.7-code"]
+    assert kimi["reasoning_tokens_low"] is None
+    assert kimi["reasoning_tokens_high"] is None
     assert kimi["reasoning_tokens_medium"] is None
     assert kimi["thinking_accepted"] is True
     for record in document["models"]:

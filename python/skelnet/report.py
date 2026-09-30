@@ -24,10 +24,11 @@ SECONDARY_BASELINES = ["DYNAMIC_M"]
 DESIGN_LABELS = ["SKEL", "CIR", "SKEL-outcome"]
 EXTRA_LABELS = ["SKEL-nocex", "SKEL-nomap"]
 
-MODEL_ORDER = ["gpt-6-luna", "kimi-k3", "deepseek-flash", "qwen3.8-flash"]
-MODEL_HEADER = {"gpt-6-luna": "GPT", "kimi-k3": "Kimi",
+MODEL_ORDER = ["gpt-6-luna", "kimi-k2.7-code", "deepseek-flash",
+               "qwen3.8-flash"]
+MODEL_HEADER = {"gpt-6-luna": "GPT", "kimi-k2.7-code": "Kimi",
                 "deepseek-flash": "DeepSeek", "qwen3.8-flash": "Qwen"}
-MODEL_FAMILY = {"gpt-6-luna": "GPT", "kimi-k3": "Kimi",
+MODEL_FAMILY = {"gpt-6-luna": "GPT", "kimi-k2.7-code": "Kimi",
                 "deepseek-flash": "DeepSeek", "qwen3.8-flash": "Qwen"}
 
 FAIL_COLUMNS = ["build", "policy", "hang", "output", "deadl", "other",

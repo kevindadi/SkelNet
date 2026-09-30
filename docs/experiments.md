@@ -48,14 +48,15 @@ concatenated `system_sha256`.
 ## Model parameters
 
 The four experimental models are GPT 6 Luna (`gpt-6-luna`, OpenCode Responses,
-`OPENCODE_API_KEY`, reasoning effort `medium`), Kimi (`kimi-k3`, Moonshot direct
-Chat Completions, `MOONSHOT_API_KEY`, reasoning effort `high`), DeepSeek Flash
-(`deepseek-flash`, direct) and Qwen (`qwen3.8-flash`, DashScope direct). Kimi no
-longer runs through the OpenCode gateway: it uses the owner's own Moonshot key
-against `https://api.moonshot.cn/v1`. `kimi-k3` always reasons, so no `thinking`
-key is sent; its strength is the request's top-level `reasoning_effort`. That
-Kimi's effort differs from GPT's is the owner's decision, not a provider
-requirement. DeepSeek and Qwen are unchanged.
+`OPENCODE_API_KEY`, reasoning effort `medium`), Kimi (`kimi-k2.7-code`, Moonshot
+direct Chat Completions, `MOONSHOT_API_KEY`), DeepSeek Flash (`deepseek-flash`,
+direct) and Qwen (`qwen3.8-flash`, DashScope direct). Kimi no longer runs through
+the OpenCode gateway: it uses the owner's own Moonshot key against
+`https://api.moonshot.cn/v1`. Round 9c replaced `kimi-k3` with `kimi-k2.7-code`;
+the new model cannot disable thinking, so the channel always sends
+`extra_body={"thinking": {"type": "enabled"}}` and sends no `reasoning_effort`
+(Moonshot documents none). The old `kimi-k3` id is kept as a blocked diagnostic.
+DeepSeek and Qwen are unchanged.
 
 All four run with thinking enabled; no temperature is sent
 (`provider_default`); each cell is capped at 5 calls / 200k tokens; one output
@@ -71,8 +72,9 @@ is present (never the value); `--env-file` selects the dotenv file to load
 
 A real probe also sends one nontrivial concurrency question
 (`PROBE_NONTRIVIAL_USER`, correct answer `YES`) at the model's default effort,
-and, for models that take a reasoning effort (Kimi and GPT), once more at
-`low`. The record stores `reasoning_tokens_nontrivial`,
+and, for models that take a reasoning effort (GPT 6 Luna), once more at
+`low`. Kimi has no `reasoning_effort`, so it runs the nontrivial prompt only
+once. The record stores `reasoning_tokens_nontrivial`,
 `nontrivial_answer_ok`, `nontrivial_output_tokens`, and
 `reasoning_tokens_nontrivial_low` when the low call ran. GPT's Responses
 channel also stores `responses_reasoning_echo` (the `reasoning` object echoed

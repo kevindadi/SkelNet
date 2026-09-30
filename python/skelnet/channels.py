@@ -25,10 +25,9 @@ def build_client(spec: ModelSpec, params: Any, *, budget: Any,
     """Construct the inner client for a model, or raise ChannelUnavailable.
 
     `params` is a :class:`~skelnet.params.RunParams`. DeepSeek/DashScope send
-    their thinking switch through ``extra_body``; Moonshot (Kimi) always
-    reasons and instead carries the strength as a **top-level**
-    ``reasoning_effort`` (never a ``thinking`` key). The base URL comes from the
-    channel registry.
+    their thinking switch through ``extra_body``; Moonshot (Kimi) cannot disable
+    thinking, so it sends ``extra_body={"thinking": {"type": "enabled"}}`` and no
+    ``reasoning_effort``. The base URL comes from the channel registry.
     """
     if spec.status != "available" or not spec.model_id:
         raise ChannelUnavailable(
@@ -55,14 +54,14 @@ def build_client(spec: ModelSpec, params: Any, *, budget: Any,
                                 sleep=sleep)
     if spec.channel == "moonshot-direct":
         from .direct import DirectChatClient
-        # kimi-k3 always reasons; the strength is the top-level
-        # ``reasoning_effort`` (no ``thinking``/``extra_body``). Read it from
-        # ``params`` so the probe can vary it (low/high).
+        # kimi-k2.7-code cannot disable thinking: always send the switch
+        # explicitly. The channel has no ``reasoning_effort`` parameter.
+        extra_body = {"thinking": {"type": "enabled"}}
         return DirectChatClient(api_key=api_key, base_url=base_url,
                                 model=spec.model_id, budget=budget,
                                 evidence_dir=evidence_dir, params=params,
                                 timeout=timeout, sdk_client=sdk_client,
-                                reasoning_effort=getattr(params, "reasoning_effort", None),
+                                extra_body=extra_body,
                                 reasoning_log=reasoning_log,
                                 sleep=sleep)
     if spec.channel == "opencode-go":

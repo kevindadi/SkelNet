@@ -92,17 +92,17 @@ def test_kimi_real_path_moonshot_request_params(tmp_path, monkeypatch, capsys):
     call = sdk.chat.completions.calls[0]
     assert captured["base_url"] == MOONSHOT_BASE_URL
     assert captured["api_key"] == SECRET
-    assert call["model"] == "kimi-k3"
-    assert call["reasoning_effort"] == "high"
+    assert call["model"] == "kimi-k2.7-code"
+    assert "reasoning_effort" not in call
     assert "temperature" not in call
     assert "thinking" not in call
-    assert "thinking" not in (call.get("extra_body") or {})
+    assert call["extra_body"] == {"thinking": {"type": "enabled"}}
 
     # The frozen registry policy is carried into the MANIFEST.
     manifest = json.loads((out / "MANIFEST.json").read_text())
     assert manifest["model_policy"]["channel"] == "moonshot-direct"
     assert manifest["run_params"]["thinking"] == "always"
-    assert manifest["run_params"]["reasoning_effort"] == "high"
+    assert manifest["run_params"]["reasoning_effort"] is None
     assert manifest["run_params"]["supports_seed"] is False
 
     # The key value never reaches stdout or any run artifact.
@@ -185,11 +185,11 @@ def test_models_probe_dry_run_lists_kimi_moonshot(tmp_path, monkeypatch, capsys)
     text = capsys.readouterr().out
     assert "SECRET-PROBE-KIMI" not in text
     document = json.loads(text)
-    kimi = next(m for m in document["models"] if m["model_id"] == "kimi-k3")
+    kimi = next(m for m in document["models"] if m["model_id"] == "kimi-k2.7-code")
     assert kimi["channel"] == "moonshot-direct"
     assert kimi["base_url"] == MOONSHOT_BASE_URL
     assert kimi["thinking"] == "always"
-    assert kimi["reasoning_effort"] == "high"
+    assert kimi["reasoning_effort"] is None
     assert kimi["api_key_env"] == "MOONSHOT_API_KEY"
     assert kimi["api_key_present"] is True
 
@@ -206,51 +206,53 @@ def test_gpt_still_opencode_responses_medium(tmp_path, monkeypatch):
     assert "temperature" not in call
 
 
-# ── 7. probe real path varies Kimi's top-level reasoning_effort ──────
-def _kimi_effort_handler(kwargs):
-    reasoning = {"low": 10, "high": 30}[kwargs["reasoning_effort"]]
-    usage = {"prompt_tokens": 1, "completion_tokens": reasoning + 1,
-             "completion_tokens_details": {"reasoning_tokens": reasoning}}
+# ── 7. probe real path: no effort variants; thinking is always sent ───
+def _kimi_handler(_kwargs):
+    usage = {"prompt_tokens": 1, "completion_tokens": 4,
+             "completion_tokens_details": {"reasoning_tokens": 3}}
     return chat_response(RUST, reasoning="SECRET-REASONING", usage=usage)
 
 
-def test_models_probe_real_path_kimi_efforts(tmp_path, monkeypatch):
+def test_models_probe_real_path_kimi_no_effort_variants(tmp_path, monkeypatch):
     monkeypatch.setenv("MOONSHOT_API_KEY", "SECRET-PROBE-KIMI")
-    sdk = FakeSDK(chat_handler=_kimi_effort_handler)
+    sdk = FakeSDK(chat_handler=_kimi_handler)
     # Only the outer SDK is replaced: the real channels.build_client and
-    # DirectChatClient run, so the low variant really sends a top-level low.
+    # DirectChatClient run, so the request payload is asserted end to end.
     patch_build_client(monkeypatch, sdk)
     kimi = resolve_model(build_registry(), "Kimi")
 
     out_dir = tmp_path / "probe"
     document = models_probe.probe_run(out_dir, models=[kimi])
 
-    # Default probe, low/high variants, then the nontrivial prompt at high and low.
-    assert [call["reasoning_effort"] for call in sdk.chat.completions.calls] == \
-        ["high", "low", "high", "high", "low"]
+    # Default probe plus the nontrivial prompt: no effort variants for Kimi.
+    assert len(sdk.chat.completions.calls) == 2
     for call in sdk.chat.completions.calls:
-        assert "thinking" not in call
+        assert call["model"] == "kimi-k2.7-code"
+        assert call["extra_body"] == {"thinking": {"type": "enabled"}}
+        assert "reasoning_effort" not in call
         assert "temperature" not in call
         assert "seed" not in call
-        assert "extra_body" not in call
 
     record = document["models"][0]
-    assert record["reasoning_tokens_low"] == 10
-    assert record["reasoning_tokens_high"] == 30
+    assert record["reasoning_tokens_low"] is None
+    assert record["reasoning_tokens_high"] is None
     assert record["reasoning_tokens_medium"] is None
     assert record["reasoning_content_present"] is True
     assert record["finish_reason"] == "stop"
-    assert record["returned_model"] == "kimi-k3"
+    assert record["returned_model"] == "kimi-k2.7-code"
 
     text = (out_dir / "PROBE.json").read_text()
     assert "SECRET-PROBE-KIMI" not in text
     assert "SECRET-REASONING" not in text
 
 
-# ── 8. the OpenCode Kimi alias/entry is gone ─────────────────────────
-def test_kimi_opencode_alias_and_entry_removed():
+# ── 8. kimi-k2.7-code is the live Kimi; kimi-k3 is a blocked diagnostic ─
+def test_kimi_registry_ids():
     registry = build_registry()
-    with pytest.raises(KeyError):
-        resolve_model(registry, "kimi-k2.7-code")
+    live = resolve_model(registry, "kimi-k2.7-code")
+    assert live.status == "available" and live.display_name == "Kimi"
+    retired = resolve_model(registry, "kimi-k3")
+    assert retired.status == "blocked"
+    assert "kimi-k2.7-code" in (retired.blocked_reason or "")
     assert not [s for s in registry
                 if s.provider == "moonshot" and s.channel == "opencode-go"]
