@@ -173,3 +173,27 @@ def test_look3_final_units_not_above_previous_is_an_error(tmp_path):
         assert rc == 2, previous
         assert "144" in buffer.getvalue() and previous in buffer.getvalue()
 
+
+@pytest.mark.parametrize("planned,expected", [(240, 0.0498719),
+                                              (200, 0.0494435)])
+def test_look3_uses_the_real_final_fraction(tmp_path, planned, expected):
+    root = _build(tmp_path / "r", SUCCESS)
+    runs = _runs(root)
+    rc, out = _stop_check(runs, root, look=3,
+                          extra=["--planned-units", str(planned),
+                                 "--previous-look-units", "86"])
+    assert rc == 0
+    payload = json.loads(out)
+    assert payload["units"] == 144
+    assert payload["alpha"] == pytest.approx(expected, abs=1e-6)
+
+    outdir = tmp_path / f"report-{planned}"
+    with contextlib.redirect_stdout(io.StringIO()):
+        rc2 = cli.main(["report", *[str(p) for p in runs], "--table", "main",
+                        "--look", "3", "--planned-units", str(planned),
+                        "--previous-look-units", "86", "--root", str(root),
+                        "--out", str(outdir)])
+    assert rc2 == 0
+    document = json.loads((outdir / "report.json").read_text(encoding="utf-8"))
+    assert document["tables"]["main"]["alpha"] == pytest.approx(expected,
+                                                                abs=1e-6)
