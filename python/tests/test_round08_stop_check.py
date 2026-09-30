@@ -237,7 +237,7 @@ def test_look2_futility_l2l3_only(tmp_path):
 
 def test_look3_reports_but_does_not_judge_futility(tmp_path):
     root = _build(tmp_path / "look3", FUTILITY)
-    payload = _cli(tmp_path, root, look=3)
+    payload = _cli(tmp_path, root, look=3, extra=["--previous-look-units", "86"])
     assert payload["futility"] is False
     assert "margin<3pp" in payload["futility_reasons"]
 
@@ -278,14 +278,20 @@ def test_look1_futility(tmp_path):
 
 
 # ── F3: Look 3 alpha from F1 table ───────────────────────────────────────
+#
+# Round 9 (D9-9) makes the final-look boundary depend on the real information
+# fraction t_final = paired units / planned units.  The round-8 planted fixture
+# has 144 paired units, so the test sets --planned-units 144 (t_final = 1) and
+# varies the previous look's units.  The expected values come from the OBF
+# spending function computed independently (not from the code under test).
 
 @pytest.mark.parametrize("previous,expected", [
-    (528, 0.0456610),   # t = 0.6
-    (264, 0.0498488),   # t = 0.3
+    (86, 0.0457279),   # t_prev = 0.5972
+    (43, 0.0498534),   # t_prev = 0.2986
 ])
 def test_look3_alpha_uses_previous_look_units(tmp_path, previous, expected):
     root = _build(tmp_path / f"alpha{previous}", SUCCESS)
-    payload = _cli(tmp_path, root, look=3, planned=880,
+    payload = _cli(tmp_path, root, look=3, planned=144,
                    extra=["--previous-look-units", str(previous)])
     assert payload["alpha"] == pytest.approx(expected, abs=2e-5)
 

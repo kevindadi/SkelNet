@@ -1,5 +1,18 @@
 # Experiments
 
+## Protocol freeze (round 9)
+
+`experiments/protocol.json` is the frozen, machine-readable protocol and
+`experiments/PROTOCOL.md` is rendered from it (`python -m skelnet protocol
+render`; the Markdown is never hand-edited). `protocol build` regenerates the
+JSON from the code and repository files (params constants, the model registry,
+the prompt routes and asset hashes, the `RustOracle` defaults and seed
+constants, the task-file hashes and `benchmarks/TIERS.md`); `protocol check`
+compares the frozen file with the current code and files and exits 1 listing
+every drifted field. `run` re-runs the same check before a Stage 1/2/3 run and
+records `protocol_sha256` / `protocol_check` in the MANIFEST (Stage 0 only
+warns). Any post-freeze deviation goes to `experiments/DEVIATIONS.md`.
+
 ## Arms
 
 | arm | pipeline |
@@ -87,18 +100,17 @@ to `terminal`). `read_terminal`'s own default argument is `h1` so tooling that
 does not pass a hint uses the v2 line once it exists. Tasks without a
 `requirements.json` (the boundary tasks) have no terminal line.
 
-`run --hint` defaults to `params.DEFAULT_HINT` (currently `h0`). The argparse
-default is unset; `_run_params` reads the constant when the command runs, so
-round 9 changes the protocol default by editing `DEFAULT_HINT` to `h1` and
-nothing else. MANIFEST and `--dry-run` record `hint_source` as `explicit` or
-`default`. Before any model call, a non-boundary task that lacks
-`REQUIREMENTS.md` (h0) or `REQUIREMENTS.h1.md` (h1) aborts the run and lists
-the tasks. `--dry-run` does not abort: it lists them in `requirements_missing`
-and exits 0. Boundary tasks stay skipped. `--stage` 1, 2, or 3 requires hint
-`h1` (plan D10) unless `--allow-nonprotocol-hint` is set, which records
-`hint_override: true`. `eval` of a MANIFEST with no `hint` uses
-`params.LEGACY_HINT` (`h0`) and does not follow a later change of
-`DEFAULT_HINT`.
+`run --hint` defaults to `params.DEFAULT_HINT` (round 9 flipped it to `h1`).
+The argparse default is unset; `_run_params` reads the constant when the command
+runs, so the protocol default changes by editing `DEFAULT_HINT` and nothing else.
+MANIFEST and `--dry-run` record `hint_source` as `explicit` or `default`. Before
+any model call, a non-boundary task that lacks `REQUIREMENTS.md` (h0) or
+`REQUIREMENTS.h1.md` (h1) aborts the run and lists the tasks. `--dry-run` does
+not abort: it lists them in `requirements_missing` and exits 0. Boundary tasks
+stay skipped. `--stage` 1, 2, or 3 requires hint `h1` (plan D10) unless
+`--allow-nonprotocol-hint` is set, which records `hint_override: true`. `eval` of
+a MANIFEST with no `hint` uses `params.LEGACY_HINT` (`h0`) and does not follow a
+later change of `DEFAULT_HINT`.
 
 The oracle records `terminal_check` as one of:
 
@@ -217,7 +229,10 @@ compared in one call.
   budgets. Limits live in the ledger file under `limits.<stage>`
   (`max_requests`, `max_tokens`) and are read on load; every real request
   (including transport and truncation retries) reserves before it is sent.
-  Per-cell call/token budgets are enforced before each logical call.
+  Each `reserve` / `add_tokens` / `check` re-reads the ledger and writes it back
+  inside a POSIX file lock (`fcntl.flock` on `<budget>.lock`), so several runs
+  writing the same stage cannot overwrite one another's counts. Per-cell
+  call/token budgets are enforced before each logical call.
 - The cache key is the sha256 of the request identity: model, system/user
   prompts, `task`, `rep`, the always-computed `seed_for(task, rep)`, the
   per-cell logical `call_index`, temperature policy/value, max output tokens,

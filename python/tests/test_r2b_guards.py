@@ -129,6 +129,6 @@ def test_resume_rejects_changed_hint(tmp_path):
     assert cli.cmd_run(_g0(tmp_path), client_factory=lambda s, o: ScriptedTransportClient([RUST]),
                        oracle_factory=lambda t, term: FakeOracle(True)) == 0
     with pytest.raises(SystemExit):
-        cli.cmd_run(_g0(tmp_path, resume=True, hint="h1"),
+        cli.cmd_run(_g0(tmp_path, resume=True, hint="h0"),
                     client_factory=lambda s, o: ScriptedTransportClient([RUST]),
                     oracle_factory=lambda t, term: FakeOracle(True))

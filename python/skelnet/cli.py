@@ -209,6 +209,32 @@ def _prepare_out(out: Path, *, force: bool) -> None:
     out.mkdir(parents=True, exist_ok=True)
 
 
+def _protocol_preflight(args, root: Path) -> tuple[str | None, str, list[dict]]:
+    """Compare the frozen protocol with the code before a run (P2).
+
+    Returns ``(protocol_sha256, status, mismatches)`` where status is
+    ``"pass"``, ``"fail"`` (present but drifted), or ``"skipped"`` (absent).
+    """
+    path = root / "experiments" / "protocol.json"
+    if not path.is_file():
+        return None, "skipped", []
+    digest = sha256_file(path)
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return digest, "fail", [{"field": "protocol.json", "frozen": None,
+                                 "current": f"invalid JSON: {exc}"}]
+    from .protocol import check_protocol
+    mismatches = check_protocol(doc, root)
+    return digest, ("pass" if not mismatches else "fail"), mismatches
+
+
+def _print_mismatches(mismatches: list[dict]) -> None:
+    for item in mismatches:
+        print(f"- {item['field']}: frozen={item['frozen']!r} "
+              f"current={item['current']!r}", file=sys.stderr)
+
+
 def cmd_run(args: argparse.Namespace, *, client_factory=None,
             oracle_factory=None, oracle_runner=None) -> int:
     if args.arm == "G0" and args.rust_mode == "codegen":
@@ -258,6 +284,17 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         }, indent=2))
         return 0
 
+    protocol_sha, protocol_status, protocol_mismatches = _protocol_preflight(args, root)
+    if args.stage in (1, 2, 3) and protocol_status == "fail":
+        print("protocol check failed; refusing this stage 1/2/3 run",
+              file=sys.stderr)
+        _print_mismatches(protocol_mismatches)
+        return 1
+    if protocol_status == "fail":
+        print("warning: protocol check failed (stage 0 continues)",
+              file=sys.stderr)
+        _print_mismatches(protocol_mismatches)
+
     _preflight_baseline_tools(args)
     _preflight_hint_requirements(run_params, tasks)
     out = Path(args.out)
@@ -270,7 +307,9 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
     backend = Backend(timeout=args.timeout)
     ledger = BudgetLedger(args.budget_file, stage=args.stage)
     manifest = _build_manifest(out, args, backend, tasks, started_at, None,
-                               budget, spec, run_params)
+                               budget, spec, run_params,
+                               protocol_sha=protocol_sha,
+                               protocol_status=protocol_status)
     manifest["status"] = "running"
     _write_manifest(out, manifest)
     if oracle_factory is None:
@@ -559,7 +598,8 @@ def _tool_version(command: str) -> str | None:
 def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
                     tasks: list[Path], started_at: float,
                     ended_at: float | None, budget: dict | None = None,
-                    spec=None, run_params=None) -> dict:
+                    spec=None, run_params=None, protocol_sha=None,
+                    protocol_status="skipped") -> dict:
     tasks_root = repo_root() / "benchmarks" / "tasks"
     return {
         "run_id": out.name,
@@ -583,6 +623,8 @@ def _build_manifest(out: Path, args: argparse.Namespace, backend: Backend,
         "evidence_reasoning": getattr(args, "evidence_reasoning", "hash"),
         "replay_mode": getattr(args, "replay_mode", "key"),
         "stage": args.stage,
+        "protocol_sha256": protocol_sha,
+        "protocol_check": protocol_status,
         "run_params": run_params.to_dict() if run_params is not None else None,
         "budget_file": args.budget_file,
         "cache_dir": args.cache_dir,
@@ -1152,9 +1194,15 @@ def cmd_report(args: argparse.Namespace) -> int:
                 call_budget = value
             break
 
+    from .stop_check import _resolve_previous
+    previous_units, error = _resolve_previous(args)
+    if error:
+        print(f"report: {error}", file=sys.stderr)
+        return 2
+
     ctx = report.ReportContext(
         root=Path(args.root), look=args.look, planned_units=args.planned_units,
-        previous_look_units=args.previous_look_units, bootstrap=args.bootstrap,
+        previous_look_units=previous_units, bootstrap=args.bootstrap,
         seed=args.seed, prices=prices, fp_check=fp_check, probe=probe,
         call_budget=call_budget, allow_duplicates=args.allow_duplicates,
         allow_mixed=args.allow_mixed)
@@ -1300,6 +1348,9 @@ def build_parser() -> argparse.ArgumentParser:
     from .oracle_cli import register as _register_oracle
     _register_oracle(sub)
 
+    from .protocol import register as _register_protocol
+    _register_protocol(sub)
+
     from .tools_cli import register as _register_tools
     _register_tools(sub)
 
@@ -1315,7 +1366,8 @@ def build_parser() -> argparse.ArgumentParser:
     rep.add_argument("--root", default=str(repo_root()))
     rep.add_argument("--look", type=int, default=0, choices=[0, 1, 2, 3])
     rep.add_argument("--planned-units", type=int, default=880)
-    rep.add_argument("--previous-look-units", type=int, default=528)
+    rep.add_argument("--previous-look-units", type=int, default=None)
+    rep.add_argument("--previous-look-from", default=None)
     rep.add_argument("--prices", default=None)
     rep.add_argument("--fp-check", default=None)
     rep.add_argument("--probe", default=None)

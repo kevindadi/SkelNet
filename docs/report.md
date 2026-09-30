@@ -53,11 +53,13 @@ The task tier comes from the cell's `tier`; the task origin (`classic` /
 python -m skelnet report <run_dirs...> [--table NAME ...] [--figure anytime]
                          [--format md|tex|both] [--out DIR] [--root DIR]
                          [--look 0|1|2|3] [--planned-units 880]
+                         [--previous-look-units N | --previous-look-from FILE]
                          [--prices FILE] [--fp-check FILE] [--probe FILE]
                          [--bootstrap 10000] [--seed 20260928]
                          [--allow-mixed] [--allow-duplicates]
 python -m skelnet stop-check <run_dirs...> --look {0,1,2,3}
-                         [--planned-units 880] [--previous-look-units 528]
+                         [--planned-units 880]
+                         [--previous-look-units N | --previous-look-from FILE]
                          [--prices FILE] [--budget-file FILE] [--stage N]
                          [--next-stage-units N] [--root DIR] [--json]
 ```
@@ -158,15 +160,24 @@ from the shared 3 pp rule (futile below 3 pp) and the per-group failure-stage
 decomposition.
 
 `--look 2/3` evaluate the six success criteria of the plan: (1) all four main
-Holm `p` below the O'Brien-Fleming nominal `α` at
-`t = paired units / --planned-units`; (2) SKEL better in at least 3/4 models
-per baseline; (3) positive SKEL − baseline on `L2∪L3`; (4) the four sensitivity
-`Δ` share the main direction; (5) every main cluster-bootstrap 95% CI excludes
-zero; (6) `SKEL − DYNAMIC_M` is reported (and a narrower claim is suggested
-when DYNAMIC_M is significantly better).  Look 2 is futile when the 3 pp margin
-rule or an `L2∪L3` regression fires (`futility_reasons`); Look 3 reports both
-numbers but does not judge futility.  Otherwise the verdict is `success`,
-`futility`, or `continue`.
+Holm `p` below the O'Brien-Fleming nominal `α`; (2) SKEL better in at least 3/4
+models per baseline; (3) positive SKEL − baseline on `L2∪L3`; (4) the four
+sensitivity `Δ` share the main direction; (5) every main cluster-bootstrap 95%
+CI excludes zero; (6) `SKEL − DYNAMIC_M` is reported (and a narrower claim is
+suggested when DYNAMIC_M is significantly better).  At Look 2 the nominal `α` is
+read at `t = paired units / --planned-units`; Look 2 is futile when the 3 pp
+margin rule or an `L2∪L3` regression fires (`futility_reasons`), otherwise the
+verdict is `success`, `futility`, or `continue`.
+
+Look 3 is the final analysis.  It must be told the previous look's information
+explicitly: `--previous-look-units N` or `--previous-look-from <Look-2
+stop-check JSON>` (which reads the JSON's `units` field); without either it
+exits 2.  The final boundary spends all remaining `α` at the real information
+fraction `t_final = paired units / --planned-units` with the conditional
+correlation `sqrt(t_prev / t_final)` (`t_prev = previous units /
+--planned-units`).  A non-significant Look 3 is `no_success` (there is no next
+look); the `main` table footnote (`Nominal alpha` / `Sequential boundary at
+this look`) uses the same value.
 
 ## Decisions
 

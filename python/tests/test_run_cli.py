@@ -169,7 +169,7 @@ def test_manifest_and_audit_cell_ids(tmp_path):
     assert manifest["tasks"]["selected"] == ["lock-order/abba_2lock"]
     assert manifest["ended_at"] is not None
     assert manifest["status"] == "complete"
-    assert manifest["run_params"]["hint"] == "h0"
+    assert manifest["run_params"]["hint"] == "h1"
     assert manifest["run_params"]["temperature_policy"] == "provider_default"
     assert manifest["versions"]["python"]
     assert repo_toolchain_channel() == _expected_toolchain_channel()

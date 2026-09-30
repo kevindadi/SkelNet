@@ -1,0 +1,9 @@
+{
+  "limits": {
+    "0": {
+      "max_requests": 800,
+      "max_tokens": 15000000
+    }
+  },
+  "stages": {}
+}

@@ -86,7 +86,7 @@ def test_static_replay_needs_no_api_key(tmp_path, monkeypatch):
     out = tmp_path / "replay"
     args = cli.build_parser().parse_args([
         "run", "--arm", "STATIC", "--tasks", "lock-order/abba_2lock",
-        "--reps", "1", "--out", str(out),
+        "--reps", "1", "--out", str(out), "--hint", "h0",
         "--replay-from", str(fixture), "--allow-missing-tools",
         "--budget-file", str(tmp_path / "budget-replay.json"),
     ])
