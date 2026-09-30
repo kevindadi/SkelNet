@@ -61,6 +61,7 @@ def _rate(hits: int, total: int) -> float | None:
 def cmd_fp_check(args) -> int:
     from .cli import _report_unmatched_patterns, select_task_patterns
     root = repo_root()
+    out = Path(args.out).resolve()
     tasks, unmatched = select_task_patterns(root, args.tasks)
     if unmatched or not tasks:
         _report_unmatched_patterns(unmatched, args.tasks)
@@ -76,7 +77,7 @@ def cmd_fp_check(args) -> int:
         programs = []
         for role, path in _programs(task_dir):
             source = path.read_text(encoding="utf-8")
-            probe = Path(args.out) / "work" / rel / path.stem
+            probe = out / "work" / rel / path.stem
             clippy = run_clippy(tools, probe / "clippy", source,
                                 lints=CONCURRENCY_LINTS, timeout=args.timeout)
             lockbud = run_lockbud(tools, probe / "lockbud", source,
@@ -111,7 +112,6 @@ def cmd_fp_check(args) -> int:
             "buggy_n": c["buggy_n"],
         }
     document = {"lints": list(CONCURRENCY_LINTS), "tasks": rows, "summary": summary}
-    out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "FP_CHECK.json").write_text(
         json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
