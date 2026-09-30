@@ -55,9 +55,14 @@ false; report the model and the diagnosis.
 
 ## 3. GPT reasoning smoke (G0 and SKEL, one task)
 
+The smoke runs go to `experiments/stage0-smoke/`, a separate directory from the
+step-4 runs, so the step-5 glob `experiments/stage0/*-*/` never sees them (the
+same `(model, arm, task, rep)` would otherwise appear twice and make
+`stop-check` / `report` reject the input as duplicates).
+
 ```sh
-PYTHONPATH=python python -m skelnet run --arm G0 --model "GPT 6 Luna" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0/gpt-smoke-g0
-PYTHONPATH=python python -m skelnet run --arm SKEL --model "GPT 6 Luna" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0/gpt-smoke-skel
+PYTHONPATH=python python -m skelnet run --arm G0 --model "GPT 6 Luna" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0-smoke/gpt-g0
+PYTHONPATH=python python -m skelnet run --arm SKEL --model "GPT 6 Luna" --tasks lock-order/abba_2lock --reps 1 --rounds 4 --stage 0 --hint h1 --out experiments/stage0-smoke/gpt-skel
 ```
 
 Then inspect the two cells:
@@ -65,7 +70,7 @@ Then inspect the two cells:
 ```sh
 PYTHONPATH=python python - <<'PY'
 import json, glob
-for path in glob.glob("experiments/stage0/gpt-smoke-*/cells/**/result.json", recursive=True):
+for path in glob.glob("experiments/stage0-smoke/*/cells/**/result.json", recursive=True):
     cell = json.load(open(path))
     for call in cell.get("calls", []):
         print(path, call["stage"], (call.get("usage") or {}).get("reasoning"))
@@ -181,7 +186,7 @@ Return these (paths are repository-relative):
 - `experiments/stage0/look0.json` and `experiments/stage0/look0.md`.
 - `experiments/stage0/report/REPORT.md` and `experiments/stage0/report/report.json`.
 - Each `experiments/stage0/<model>-*/MANIFEST.json` and `SUMMARY.json`.
-- The `gpt-smoke-*` reasoning check output (step 3).
+- The `experiments/stage0-smoke/*/` reasoning check output (step 3).
 - `experiments/stage0/fpcheck/FP_CHECK.json` (and `FP_CHECK.md` if wanted).
 
 Before sending anything, check it for secrets and absolute paths:

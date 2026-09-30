@@ -1,5 +1,6 @@
 """R9-P6: every Stage-0 command parses, and the task list matches the protocol."""
 
+import fnmatch
 import json
 import shlex
 from pathlib import Path
@@ -73,3 +74,56 @@ def test_template_matches_protocol_ledger():
     template = json.loads(TEMPLATE.read_text(encoding="utf-8"))
     assert template["limits"]["0"] == limits
     assert template["stages"] == {}
+
+
+def _run_out_paths():
+    """The ``--out`` of every ``python -m skelnet run`` command in the doc."""
+    outs = []
+    for line in _code_lines():
+        if "python -m skelnet run" not in line:
+            continue
+        argv = _argv(line)
+        outs.append(argv[argv.index("--out") + 1])
+    return outs
+
+
+def _summary_globs():
+    globs = set()
+    for line in _code_lines():
+        if "python -m skelnet stop-check" not in line \
+                and "python -m skelnet report" not in line:
+            continue
+        for token in _argv(line):
+            if token.startswith("experiments/") and "*" in token:
+                globs.add(token)
+    return globs
+
+
+def test_summary_glob_excludes_smoke_and_runs_are_unique():
+    outs = _run_out_paths()
+    smoke = [path for path in outs if "smoke" in path]
+    runs = [path for path in outs if "smoke" not in path]
+    assert len(smoke) == 2
+    assert len(runs) == 28
+    assert all(path.startswith("experiments/stage0-smoke/") for path in smoke)
+    assert all(path.startswith("experiments/stage0/") for path in runs)
+
+    globs = _summary_globs()
+    assert globs == {"experiments/stage0/*-*/"}
+    matched = set()
+    for pattern in globs:
+        for path in outs:
+            if fnmatch.fnmatch(path + "/", pattern):
+                matched.add(path)
+    # The step-5 glob covers exactly the 28 step-4 runs, never the smoke runs.
+    assert matched == set(runs)
+    assert not (matched & set(smoke))
+
+    # No duplicated (model, arm) among the step-4 runs (a duplicate cell makes
+    # stop-check / report exit 2).
+    def key(path):
+        model, _, arm = path.rstrip("/").split("/")[-1].partition("-")
+        return (model, arm)
+
+    keys = [key(path) for path in runs]
+    assert len(keys) == len(set(keys))
