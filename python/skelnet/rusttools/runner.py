@@ -27,6 +27,26 @@ def _sha(text: str | None) -> str | None:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _absolutize_program(full_cmd: list[str]) -> list[str]:
+    """Resolve a relative program path against the *process* working directory.
+
+    A bare command name (``cargo``) has no path separator and is left for
+    ``execvp`` to find on ``PATH``. A command that names a path (contains a
+    separator) is resolved here, before the child changes directory, so a
+    relative binary path is never re-interpreted relative to ``cwd`` (round 9c:
+    a relative ``--out`` doubled the path and broke O2).
+    """
+    if not full_cmd:
+        return full_cmd
+    program = full_cmd[0]
+    if os.path.isabs(program):
+        return full_cmd
+    if os.sep in program or (os.altsep and os.altsep in program):
+        resolved = str((Path.cwd() / program).resolve())
+        return [resolved, *full_cmd[1:]]
+    return full_cmd
+
+
 def default_runner(cmd: list[str], cwd: Path, timeout: float,
                    env: dict[str, str]) -> Any:
     """Run ``cmd`` in its own process group; kill the group on timeout.
@@ -72,10 +92,11 @@ class ToolRunner:
     def run(self, cmd: list[str], cwd: Path | str, *, timeout: float = 180.0,
             env_extra: dict[str, str] | None = None,
             offline: bool = False) -> ToolCall:
-        cwd = Path(cwd)
+        cwd = Path(cwd).resolve()
         full_cmd = list(cmd)
         if offline and "--offline" not in full_cmd:
             full_cmd = [full_cmd[0], "--offline", *full_cmd[1:]]
+        full_cmd = _absolutize_program(full_cmd)
         env = self.env(env_extra)
         started = time.monotonic()
         timed_out = False

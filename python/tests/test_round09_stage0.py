@@ -94,26 +94,33 @@ def _summary_globs():
                 and "python -m skelnet report" not in line:
             continue
         for token in _argv(line):
-            if token.startswith("experiments/") and "*" in token:
+            if token.startswith("$ROOT/experiments/") and "*" in token:
                 globs.add(token)
     return globs
 
 
+def _relative(path: str) -> str:
+    """Drop the ``$ROOT/`` prefix so globs and outs share one namespace."""
+    return path[len("$ROOT/"):] if path.startswith("$ROOT/") else path
+
+
 def test_summary_glob_excludes_smoke_and_runs_are_unique():
     outs = _run_out_paths()
+    # Every run writes under $ROOT/experiments (D9c-10).
+    assert all(path.startswith("$ROOT/experiments/") for path in outs)
     smoke = [path for path in outs if "smoke" in path]
     runs = [path for path in outs if "smoke" not in path]
     assert len(smoke) == 2
     assert len(runs) == 28
-    assert all(path.startswith("experiments/stage0-smoke/") for path in smoke)
-    assert all(path.startswith("experiments/stage0/") for path in runs)
+    assert all(path.startswith("$ROOT/experiments/stage0-smoke/") for path in smoke)
+    assert all(path.startswith("$ROOT/experiments/stage0/") for path in runs)
 
     globs = _summary_globs()
-    assert globs == {"experiments/stage0/*-*/"}
+    assert globs == {"$ROOT/experiments/stage0/*-*/"}
     matched = set()
     for pattern in globs:
         for path in outs:
-            if fnmatch.fnmatch(path + "/", pattern):
+            if fnmatch.fnmatch(_relative(path) + "/", _relative(pattern)):
                 matched.add(path)
     # The step-5 glob covers exactly the 28 step-4 runs, never the smoke runs.
     assert matched == set(runs)

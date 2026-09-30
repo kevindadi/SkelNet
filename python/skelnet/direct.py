@@ -58,8 +58,9 @@ class DirectChatClient:
                  sleep: Callable[[float], None] = time.sleep) -> None:
         self.model = model
         self.base_url = base_url
-        # Top-level strength for models that always reason (Moonshot/kimi-k3);
-        # never wrapped in ``extra_body`` and never accompanied by ``thinking``.
+        # Optional top-level strength. No experiment model currently sets it:
+        # the Moonshot channel (kimi-k2.7-code) sends its thinking switch
+        # through ``extra_body`` and has no ``reasoning_effort``.
         self.reasoning_effort = reasoning_effort
         self.budget = budget
         self.params = params

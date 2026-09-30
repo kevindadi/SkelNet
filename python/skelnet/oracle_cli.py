@@ -43,7 +43,7 @@ def _safe(name: str) -> str:
 def _task_dirs(args) -> tuple[list[Path], list[str]]:
     from . import cli
     if args.fixtures:
-        base = Path(args.fixtures)
+        base = Path(args.fixtures).resolve()
         return sorted(p for p in base.iterdir() if p.is_dir()), []
     return cli.select_task_patterns(cli.repo_root(), args.tasks)
 
@@ -127,7 +127,7 @@ def cmd_calibrate(args: argparse.Namespace, *, runner=None) -> int:
     if not args.fixtures and (unmatched or not tasks):
         cli._report_unmatched_patterns(unmatched, args.tasks)
         return 2
-    out_dir = Path(args.out)
+    out_dir = Path(args.out).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     report_tasks: list[dict] = []

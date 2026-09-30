@@ -3,10 +3,11 @@
 import json
 
 from skelnet.models_probe import probe_dry_run, probe_run
+from skelnet.transport import EXPERIMENTAL_MODEL_IDS
 
 from _fake_sdk import TransportOutcome
 
-EXPECTED = {"gpt-6-luna", "kimi-k3", "deepseek-flash", "qwen3.8-flash"}
+EXPECTED = set(EXPERIMENTAL_MODEL_IDS)
 
 
 def test_dry_run_lists_four_models():

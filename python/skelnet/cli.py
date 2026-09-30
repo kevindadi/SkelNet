@@ -149,6 +149,18 @@ def default_oracle_factory(*, timeout: float, runner=None):
     return factory
 
 
+def _resolve_path(path_text: str | None) -> str | None:
+    """Resolve a user-supplied path against the process working directory.
+
+    CLI entry points call this so every path handed to a subprocess (or used as
+    a workdir) is absolute. ``None`` stays ``None`` (an unset optional flag).
+    The MANIFEST still records the string the user passed (see ``cmd_run``).
+    """
+    if path_text is None:
+        return None
+    return str(Path(path_text).resolve())
+
+
 def _is_ancestor(ancestor: Path, descendant: Path) -> bool:
     """True when `ancestor` is `descendant` or a strict ancestor of it."""
     try:
@@ -284,6 +296,11 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
         }, indent=2))
         return 0
 
+    if spec.status != "available" or not spec.model_id:
+        print(f"model {args.model!r} is not available ({spec.status}): "
+              f"{spec.blocked_reason}", file=sys.stderr)
+        return 2
+
     protocol_sha, protocol_status, protocol_mismatches = _protocol_preflight(args, root)
     if args.stage in (1, 2, 3) and protocol_status == "fail":
         print("protocol check failed; refusing this stage 1/2/3 run",
@@ -295,6 +312,15 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
               file=sys.stderr)
         _print_mismatches(protocol_mismatches)
 
+    # Absolute paths for runtime; the MANIFEST records the strings the user
+    # passed (D9c-2), so keep the originals before resolving.
+    recorded_paths = {"budget_file": args.budget_file,
+                      "cache_dir": args.cache_dir,
+                      "replay_from": args.replay_from}
+    args.out = _resolve_path(args.out)
+    args.budget_file = _resolve_path(args.budget_file)
+    args.cache_dir = _resolve_path(args.cache_dir)
+    args.replay_from = _resolve_path(args.replay_from)
     _preflight_baseline_tools(args)
     _preflight_hint_requirements(run_params, tasks)
     out = Path(args.out)
@@ -310,6 +336,9 @@ def cmd_run(args: argparse.Namespace, *, client_factory=None,
                                budget, spec, run_params,
                                protocol_sha=protocol_sha,
                                protocol_status=protocol_status)
+    manifest["budget_file"] = recorded_paths["budget_file"]
+    manifest["cache_dir"] = recorded_paths["cache_dir"]
+    manifest["replay_from"] = recorded_paths["replay_from"]
     manifest["status"] = "running"
     _write_manifest(out, manifest)
     if oracle_factory is None:
@@ -1078,7 +1107,7 @@ def _preflight_hint_requirements(run_params, tasks: list[Path]) -> None:
 
 def cmd_eval(args: argparse.Namespace, *, runner=None) -> int:
     from . import params as params_mod
-    run_dir = Path(args.run_dir)
+    run_dir = Path(args.run_dir).resolve()
     manifest: dict = {}
     manifest_path = run_dir / "MANIFEST.json"
     if manifest_path.exists():
@@ -1154,6 +1183,8 @@ def _selected_cells(run_dir: Path, manifest: dict) -> list[dict]:
 def cmd_report(args: argparse.Namespace) -> int:
     from . import report
 
+    args.out = _resolve_path(args.out)
+    args.run_dirs = [_resolve_path(d) for d in args.run_dirs]
     requested = list(args.table or [])
     if not requested and not args.figure and not args.out:
         # Legacy behaviour: one SUMMARY-based table over the runs.
@@ -1277,7 +1308,8 @@ def cmd_models(args: argparse.Namespace) -> int:
     if args.dry_run:
         print(json.dumps(probe_dry_run(specs), indent=2))
         return 0
-    out = Path(args.out) if args.out else Path("experiments") / f"probe-{int(time.time())}"
+    out = (Path(args.out) if args.out
+           else Path("experiments") / f"probe-{int(time.time())}").resolve()
     document = probe_run(out, models=specs)
     print(json.dumps({"probe": str(out / 'PROBE.json'),
                       "models": len(document.get("models", []))}, indent=2))

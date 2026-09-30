@@ -68,16 +68,17 @@ def test_build_client_thinking_switches(tmp_path):
     assert sdk2.chat.completions.calls[0]["extra_body"] == {"enable_thinking": True}
 
 
-def test_kimi_reasoning_effort_and_gpt_reasoning(tmp_path):
-    # Kimi is on the Moonshot direct channel (R2d): top-level reasoning_effort
-    # "high", no thinking key, no temperature.
+def test_kimi_thinking_and_gpt_reasoning(tmp_path):
+    # kimi-k2.7-code (Moonshot direct, R9c): thinking is always enabled via
+    # extra_body; there is no reasoning_effort and no temperature.
     kimi = _spec("Kimi")
     sdk = FakeSDK(chat_handler=lambda k: chat_response("OK"))
     client = channels.build_client(kimi, params_for_model(kimi), budget=_Budget(),
                                    evidence_dir=tmp_path, api_key="x", sdk_client=sdk)
     client.complete("s", "u")
     call = sdk.chat.completions.calls[0]
-    assert call["reasoning_effort"] == "high"
+    assert call["extra_body"] == {"thinking": {"type": "enabled"}}
+    assert "reasoning_effort" not in call
     assert "thinking" not in call
     assert "temperature" not in call
 

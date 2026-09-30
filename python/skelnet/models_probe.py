@@ -262,12 +262,10 @@ def _probe_one(spec, build) -> dict[str, Any]:
         _append_nontrivial(record, spec, build, params)
         return record
 
-    # Reasoning-effort variation for the reasoning models. Moonshot/Kimi uses
-    # low/high (its strengths are low/high/max); OpenCode GPT uses low/medium.
-    if spec.channel == "moonshot-direct":
-        variants = (("low", "reasoning_tokens_low"),
-                    ("high", "reasoning_tokens_high"))
-    elif spec.surface == "responses" or spec.channel == "opencode-go":
+    # Reasoning-effort variation for the reasoning models. Moonshot
+    # ``kimi-k2.7-code`` has no ``reasoning_effort`` (R9c), so it takes no
+    # variant; OpenCode GPT uses low/medium.
+    if spec.surface == "responses" or spec.channel == "opencode-go":
         variants = (("low", "reasoning_tokens_low"),
                     ("medium", "reasoning_tokens_medium"))
     else:

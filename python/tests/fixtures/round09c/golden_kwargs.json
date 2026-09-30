@@ -1,0 +1,26 @@
+{
+  "DeepSeek Flash": {
+    "extra_body": {
+      "thinking": {
+        "type": "enabled"
+      }
+    },
+    "max_tokens": 32768,
+    "model": "deepseek-flash",
+    "seed": 3341467578
+  },
+  "GPT 6 Luna": {
+    "max_output_tokens": 32768,
+    "model": "gpt-6-luna",
+    "reasoning": {
+      "effort": "medium"
+    }
+  },
+  "Qwen": {
+    "extra_body": {
+      "enable_thinking": true
+    },
+    "max_tokens": 32768,
+    "model": "qwen3.8-flash"
+  }
+}
