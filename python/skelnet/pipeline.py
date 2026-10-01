@@ -304,7 +304,11 @@ def run_skel_cell(*, task: str, requirements: str, contract_path: Path,
     last_check_ok = False
     last_status: str | None = None
     property_index: dict[str, str] = {}
-    attempts = max(1, min(rounds, call_budget - 1))
+    # P1 (round 9d): an LLM Rust stage must keep at least 2 calls (one generate,
+    # one fix), so the skeleton stage is capped at min(rounds, B-2) in llm mode.
+    # Deterministic codegen has no Rust LLM stage and keeps min(rounds, B-1).
+    skeleton_cap = call_budget - 2 if rust_mode == "llm" else call_budget - 1
+    attempts = max(1, min(rounds, skeleton_cap))
     for attempt in range(1, attempts + 1):
         result.rounds_used = attempt
         response = provider.propose(CandidateRequest(
@@ -380,7 +384,9 @@ def run_cir_cell(*, task: str, requirements: str, contract_path: Path,
     last_status: str | None = None
     property_index: dict[str, str] = {}
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
-    attempts = max(1, min(rounds, call_budget - 1))
+    # P1 (round 9d): same skeleton/Rust split as SKEL (llm keeps >=2 Rust calls).
+    skeleton_cap = call_budget - 2 if rust_mode == "llm" else call_budget - 1
+    attempts = max(1, min(rounds, skeleton_cap))
     for attempt in range(1, attempts + 1):
         result.rounds_used = attempt
         response = provider.propose(CandidateRequest(

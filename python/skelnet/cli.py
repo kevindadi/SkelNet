@@ -112,11 +112,13 @@ def _budget(arm: str, tasks: int, reps: int, rounds: int,
     elif arm == "G0":
         per_rep = 1
     elif arm in ("SKEL", "CIR") and rust_mode == "codegen":
-        # The skeleton stage gets at most min(rounds, B-1); codegen has no
-        # Rust LLM stage, so the same skeleton rule applies.
+        # Codegen has no Rust LLM stage, so the skeleton stage keeps the whole
+        # min(rounds, B-1) allowance (P1, round 9d).
         per_rep = min(rounds, call_budget - 1)
     else:
-        # SKEL/CIR (llm) and every round-4 baseline arm: the cell budget.
+        # SKEL/CIR (llm) and every round-4 baseline arm: the cell budget. In
+        # llm mode the skeleton stage is capped at min(rounds, B-2) so the Rust
+        # stage keeps >=2 calls; the per-cell total is still B (P1, round 9d).
         per_rep = call_budget
     per_task = reps * per_rep
     return {"arm": arm, "tasks": tasks, "reps": reps, "rounds": rounds,

@@ -94,6 +94,7 @@ def _models_block() -> list[dict]:
             "channel": spec.channel,
             "thinking": spec.thinking,
             "reasoning_effort": spec.reasoning_effort,
+            "stream": spec.stream,
             "temperature_policy": params.TEMPERATURE_PROVIDER_DEFAULT,
         })
     return out
@@ -108,6 +109,9 @@ def _run_params_block() -> dict:
         "seed_policy": params.SEED_PER_CELL,
         "temperature_policy": params.TEMPERATURE_PROVIDER_DEFAULT,
         "hint": params.DEFAULT_HINT,
+        # R9d-P1: llm-mode SKEL/CIR cap the skeleton stage so the Rust stage
+        # keeps >=2 calls (one generate, one fix). Codegen keeps B-1.
+        "skeleton_rounds_rule": "min(rounds, call_budget - 2)",
     }
 
 
@@ -329,13 +333,14 @@ def render_markdown(doc: dict, protocol_sha: str) -> str:
 
     lines.append("## Models")
     lines.append("")
-    lines.append("| display name | model id | channel | thinking | reasoning effort | temperature |")
-    lines.append("| --- | --- | --- | --- | --- | --- |")
+    lines.append("| display name | model id | channel | thinking | reasoning effort | stream | temperature |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
     for model in doc.get("models", []):
         lines.append(
             f"| {model['display_name']} | `{model['model_id']}` | "
             f"`{model['channel']}` | {_bool(model['thinking'])} | "
-            f"{model['reasoning_effort'] or '--'} | {model['temperature_policy']} |")
+            f"{model['reasoning_effort'] or '--'} | {_bool(model.get('stream', False))} | "
+            f"{model['temperature_policy']} |")
     lines.append("")
 
     lines.append("## Run parameters")

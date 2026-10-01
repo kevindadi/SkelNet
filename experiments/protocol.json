@@ -92,143 +92,143 @@
         },
         "rust": {
           "assets": [
-            "rust_from_cir_v3.md",
-            "rust_runtime_api_v1.md"
+            "rust_from_cir_v4.md",
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
-            "f3ee5803255fdfa419e19c8b7b588732417606cafd03222f09007c7a302af24d",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "ff493b386a76944f1150003f0c10d52f2663c33419391c20133ca2a7e98035ae",
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "38034f445193358d7a0f3f7686e8d23104dbd4b2c8e293db06e091f0af52c186"
+          "system_sha256": "514659bf48da7c0a5b38e43416b5df3e6789d2229993239cff16f0e9529d1d4b"
         },
         "rust_fix": {
           "assets": [
             "rust_compile_fix_v1.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+          "system_sha256": "9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf"
         }
       },
       "DYNAMIC": {
         "generate": {
           "assets": [
             "rust_generation_v2.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "0e93c8c8dc4715654ec335e43cdc7514cfd0c1eb839b693287477aed3fb17873",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f"
+          "system_sha256": "d2a9b5bf16fd7a78f6fa63c128c345754315b909e8369537d5c1fbcaebf1ab6e"
         },
         "rust_fix": {
           "assets": [
             "rust_compile_fix_v1.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+          "system_sha256": "9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf"
         },
         "tool_feedback": {
           "assets": [
             "rust_dynamic_feedback_v1.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "e274bcf5f1c245111678d7f9881b2f7602605238feb8beb4fe10b2f30597a43c",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "32a953121f8187701afcf7ecd504bb72e946f1728018f5fd1ff50e02e825e8d2"
+          "system_sha256": "76055134d250cbb1bd2e98a62a4b5c075105165be018cf31d449954c0afe28d6"
         }
       },
       "DYNAMIC_M": {
         "generate": {
           "assets": [
             "rust_generation_v2.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "0e93c8c8dc4715654ec335e43cdc7514cfd0c1eb839b693287477aed3fb17873",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f"
+          "system_sha256": "d2a9b5bf16fd7a78f6fa63c128c345754315b909e8369537d5c1fbcaebf1ab6e"
         },
         "rust_fix": {
           "assets": [
             "rust_compile_fix_v1.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+          "system_sha256": "9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf"
         },
         "tool_feedback": {
           "assets": [
             "rust_dynamic_monitor_feedback_v1.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "2dcfc1816a9ac9be87cf2517474f8021197e251e37b0f0b1efc6b9f646b73063",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "bbf10295a3c24179a479f6f4fbca1af1eff8041a19a8e3cde2717e93218eb832"
+          "system_sha256": "fc5748273a7b13a6118e4cb65d916922fe7dbb0aa4a55e1c6bc13595aa661c2f"
         }
       },
       "G0": {
         "generate": {
           "assets": [
             "rust_generation_v2.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "0e93c8c8dc4715654ec335e43cdc7514cfd0c1eb839b693287477aed3fb17873",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f"
+          "system_sha256": "d2a9b5bf16fd7a78f6fa63c128c345754315b909e8369537d5c1fbcaebf1ab6e"
         }
       },
       "REFINE": {
         "generate": {
           "assets": [
             "rust_generation_v2.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "0e93c8c8dc4715654ec335e43cdc7514cfd0c1eb839b693287477aed3fb17873",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f"
+          "system_sha256": "d2a9b5bf16fd7a78f6fa63c128c345754315b909e8369537d5c1fbcaebf1ab6e"
         },
         "review": {
           "assets": [
             "rust_self_refine_v1.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "c64f2e200c1e2a91601499e1c070065507b07f6a76b6b6e658e9370a989cbee1",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "b2e2d45a6f273b7e34eda3b05f886e7a5e96bb617aadfe731d2d012724f6bf7f"
+          "system_sha256": "1ac2f56ed5d578651bc099c1f74e8060a0fc44417dea4c5f763fae0ff4e622f9"
         },
         "rust_fix": {
           "assets": [
             "rust_compile_fix_v1.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+          "system_sha256": "9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf"
         }
       },
       "SKEL": {
@@ -254,60 +254,60 @@
         },
         "rust": {
           "assets": [
-            "rust_from_skel_v2.md",
-            "rust_runtime_api_v1.md"
+            "rust_from_skel_v3.md",
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
-            "db3831355ebca21ee43f42a52be148430eb4529157baa5b9235b8f44e4981e4d",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "2d62beaa937cba69e7c31ba990e1725cea8f0d53124476c97aa5eddecde7115c",
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "8945fdc362a3eb1b180b318ec3be422072969d1500076a9653674f5744c53923"
+          "system_sha256": "4899a6f6a355dc85a1590c5740edd2decb4f5b977dcc8e05c4c37d4bd45704bc"
         },
         "rust_fix": {
           "assets": [
             "rust_compile_fix_v1.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+          "system_sha256": "9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf"
         }
       },
       "STATIC": {
         "generate": {
           "assets": [
             "rust_generation_v2.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "0e93c8c8dc4715654ec335e43cdc7514cfd0c1eb839b693287477aed3fb17873",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f"
+          "system_sha256": "d2a9b5bf16fd7a78f6fa63c128c345754315b909e8369537d5c1fbcaebf1ab6e"
         },
         "rust_fix": {
           "assets": [
             "rust_compile_fix_v1.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "6a4ea110ea359bf41071c9b5a074cfc7a576b3a8893e0be93c5769c1ce36fd1d",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4"
+          "system_sha256": "9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf"
         },
         "tool_feedback": {
           "assets": [
             "rust_static_feedback_v1.md",
-            "rust_runtime_api_v1.md"
+            "rust_runtime_api_v2.md"
           ],
           "sha256": [
             "6726a994c199d3a2376dfd3195f03441649207ba572514db4bcdb2c69909032e",
-            "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
+            "8646f0d44b24e44528dd122adbd79d0b1e347f5a4d4b558c466643d5e81e3f33"
           ],
-          "system_sha256": "db8c3acb1fcd4d36be5835ea08d3d8fd49b72468f841c3bb6a7ed175fc4e5b59"
+          "system_sha256": "69c712adc9410daa620fb36acfc3848cb63a449fb8f1394d2fd748cce2f41082"
         }
       }
     },
@@ -657,14 +657,15 @@
     "tiers_sha256": "a3d23a4aad082c9649cf467ac1f1b8b37bb9c28a1c1c069973dcadc6ddb04468"
   },
   "deviations_policy": "Any deviation from this frozen protocol after it is frozen must be recorded in experiments/DEVIATIONS.md (file header only at freeze time).",
-  "frozen_at": "2026-09-30T08:07:51Z",
-  "frozen_at_commit": "0f3c793",
+  "frozen_at": "2026-10-01T07:36:12Z",
+  "frozen_at_commit": "903656a",
   "models": [
     {
       "channel": "opencode-go",
       "display_name": "GPT 6 Luna",
       "model_id": "gpt-6-luna",
       "reasoning_effort": "medium",
+      "stream": false,
       "temperature_policy": "provider_default",
       "thinking": true
     },
@@ -673,6 +674,7 @@
       "display_name": "Kimi",
       "model_id": "kimi-k2.7-code",
       "reasoning_effort": null,
+      "stream": true,
       "temperature_policy": "provider_default",
       "thinking": "always"
     },
@@ -681,6 +683,7 @@
       "display_name": "DeepSeek Flash",
       "model_id": "deepseek-flash",
       "reasoning_effort": null,
+      "stream": false,
       "temperature_policy": "provider_default",
       "thinking": true
     },
@@ -689,6 +692,7 @@
       "display_name": "Qwen",
       "model_id": "qwen3.8-flash",
       "reasoning_effort": null,
+      "stream": true,
       "temperature_policy": "provider_default",
       "thinking": true
     }
@@ -711,6 +715,7 @@
     "max_output_tokens": 32768,
     "max_output_tokens_cap": 65536,
     "seed_policy": "per_cell",
+    "skeleton_rounds_rule": "min(rounds, call_budget - 2)",
     "temperature_policy": "provider_default",
     "token_budget": 200000
   },

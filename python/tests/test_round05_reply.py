@@ -140,7 +140,7 @@ def test_rust_fix_routing_through_chat_provider():
 
 def test_rust_fix_route_uses_compile_fix_asset():
     assert prompts.route("CIR", "rust_fix") == (
-        prompts.RUST_COMPILE_FIX_ASSET, prompts.RUST_RUNTIME_API_ASSET)
+        prompts.RUST_COMPILE_FIX_ASSET, prompts.RUST_RUNTIME_API_V2_ASSET)
 
 
 # ── T8: neutral rust prompts ─────────────────────────────────────────

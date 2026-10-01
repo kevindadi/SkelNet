@@ -1,11 +1,12 @@
 """R9-P1/P2: the frozen protocol, its renderer, and drift detection."""
 
+import dataclasses
 import hashlib
 import json
 import shutil
 from pathlib import Path
 
-from skelnet import cli, params, prompts, protocol
+from skelnet import cli, params, prompts, protocol, transport
 from skelnet.oracle import FakeOracle
 
 
@@ -84,6 +85,27 @@ def test_run_params_drift_names_field(tmp_path, monkeypatch):
     monkeypatch.setattr(params, "DEFAULT_CALL_BUDGET", 6)
     mismatches = protocol.check_protocol(doc, root)
     assert any(item["field"] == "run_params.call_budget" for item in mismatches)
+
+
+def test_model_stream_drift_names_field(tmp_path, monkeypatch):
+    # R9d-fix-F2: stream is part of the frozen model policy. Flipping Qwen's
+    # stream must make protocol check report models[3].stream.
+    root = _fake_repo(tmp_path / "repo")
+    doc = _doc(root)
+    original = transport.build_registry()
+
+    def drifted():
+        specs = []
+        for spec in original:
+            if spec.model_id == "qwen3.8-flash":
+                spec = dataclasses.replace(spec, stream=not spec.stream)
+            specs.append(spec)
+        return specs
+
+    monkeypatch.setattr(transport, "build_registry", drifted)
+    mismatches = protocol.check_protocol(doc, root)
+    assert any(item["field"] == "models[3].stream" for item in mismatches), \
+        _fields(mismatches)
 
 
 def test_oracle_seed_drift_names_field(tmp_path, monkeypatch):

@@ -193,16 +193,34 @@ def test_naming_real_o4(tmp_path, form):
     assert spawns[0]["name_source"] == expected_source
 
 
+def _builder_source() -> str:
+    source = (FIXTURE / "abba_2lock" / "rust" / "push_fn.rs").read_text()
+    return source.replace("thread::spawn(", "thread::Builder::new().spawn(").replace(
+        "b1)));", "b1)).unwrap());").replace("t2(a, b)));", "t2(a, b)).unwrap());")
+
+
 @rust_tools
-@pytest.mark.parametrize("form", ["builder", "builder_scoped", "opaque_macro", "custom_method"])
+def test_builder_form_is_instrumented(tmp_path):
+    # R9d-P3: Builder spawns are rewritten, so O4 runs instead of reporting
+    # instrument_unsupported.
+    task_dir = FIXTURE / "abba_2lock"
+    result = RustOracle(terminal=cli.read_terminal(task_dir), task_dir=task_dir,
+                        layers=("O1", "O2", "O4"), stress_runs=1,
+                        monitor_runs=1).evaluate(_builder_source(), tmp_path)
+    assert result.layers["O1"].status == "pass", result.layers["O1"].to_dict()
+    o4 = result.layers["O4"]
+    assert not (o4.status == "unsupported"
+                and o4.category == "instrument_unsupported"), o4.to_dict()
+    assert o4.data["actual_threads"] == 2
+
+
+@rust_tools
+@pytest.mark.parametrize("form", ["builder_scoped", "opaque_macro", "custom_method"])
 def test_unsupported_forms_keep_real_o4_unsupported(tmp_path, form):
     source = (FIXTURE / "abba_2lock" / "rust" / "scope_named.rs").read_text()
     if form == "builder_scoped":
         source = source.replace("s.spawn(", "thread::Builder::new().spawn_scoped(s, ")
         source = source.replace("; 21 });", "; 21 }).unwrap();")
-    elif form == "builder":
-        source = (FIXTURE / "abba_2lock" / "rust" / "push_fn.rs").read_text()
-        source = source.replace("thread::spawn(", "thread::Builder::new().spawn(").replace("b1)));", "b1)).unwrap());").replace("t2(a, b)));", "t2(a, b)).unwrap());")
     elif form == "opaque_macro":
         source = "macro_rules! opaque { (worker => $e:expr) => { $e }; }\n" + source
         source = source.replace("let t1 = s.spawn(", "let t1 = opaque!(worker => s.spawn(").replace("let t2 = s.spawn(", "let t2 = opaque!(worker => s.spawn(").replace("; 21 });", "; 21 }));")

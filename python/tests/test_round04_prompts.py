@@ -14,7 +14,7 @@ def test_generate_routes_match_g0_bytes():
     g0 = prompts.system_prompt_for("G0", prompts.STAGE_GENERATE)
     assert g0.encode().hex().startswith("")  # hashed below
     digest = __import__("hashlib").sha256(g0.encode()).hexdigest()
-    assert digest.startswith("346fd7ced59f183c")
+    assert digest.startswith("d2a9b5bf16fd7a78")  # v2 runtime appendix (round 9d fix)
     for arm in prompts.BASELINE_ARMS:
         assert prompts.system_prompt_for(arm, "generate") == g0
         assert prompts.route(arm, "generate") == prompts.route("G0", "generate")

@@ -61,7 +61,11 @@ DeepSeek and Qwen are unchanged.
 All four run with thinking enabled; no temperature is sent
 (`provider_default`); each cell is capped at 5 calls / 200k tokens; one output
 is capped at 32768 tokens (retry cap 65536). Kimi's `reasoning_content` is
-recorded separately and never merged into the reply text.
+recorded separately and never merged into the reply text. The direct-chat
+channels `dashscope-direct` (Qwen) and `moonshot-direct` (Kimi) send
+`stream=True` with `stream_options={"include_usage": True}` (round 9d P4): a
+~32k-token generation is read chunk by chunk instead of waiting for the whole
+response body inside the 300 s timeout. DeepSeek and GPT are unchanged.
 
 `RunParams` (in the MANIFEST as `run_params`) fixes the temperature policy,
 seed policy, per-cell call/token budgets, max output tokens and hint.
@@ -259,11 +263,13 @@ compared in one call.
 
 ## SKEL/CIR method rules (round 5)
 
-- **Budget.** A cell may make at most `--call-budget` LLM calls. The skeleton
-  stage gets `min(rounds, call_budget - 1)` calls (so at least one is left for
-  Rust); the Rust stage uses the rest. `_budget` reports the per-arm request
-  totals: G0 = 1, SKEL/CIR codegen = `min(rounds, call_budget-1)`, SKEL/CIR llm
-  and every round-4 baseline = `call_budget`.
+- **Budget.** A cell may make at most `--call-budget` LLM calls. In `llm` mode
+  the skeleton stage gets `min(rounds, call_budget - 2)` calls (so at least two
+  are left for Rust — one generate, one fix; round 9d P1); the Rust stage uses
+  the rest. `--rust-mode codegen` has no Rust LLM stage and keeps
+  `min(rounds, call_budget - 1)`. `_budget` reports the per-arm request totals:
+  G0 = 1, SKEL/CIR codegen = `min(rounds, call_budget-1)`, SKEL/CIR llm and every
+  round-4 baseline = `call_budget`.
 - **Skeleton acceptance (K5).** A skeleton is accepted only on `PASS ∧ complete`.
   If the skeleton never verifies but a candidate exists, the last non-empty
   skeleton still drives the Rust stage (`--rust-when-unverified last`, the

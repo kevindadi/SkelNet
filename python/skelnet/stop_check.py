@@ -219,7 +219,8 @@ def look0(ds: report.Dataset, ctx, args, budget_file) -> dict:
     ledger = _ledger_check(ds, args, budget_file)
     result = {"look": 0, "models": models, "identity_error": identity,
               "groups": groups, "coverage": coverage, "stage1": stage1,
-              "ledger": ledger}
+              "ledger": ledger,
+              "program_features": report.program_feature_counts(args.run_dirs)}
     result.update(_warnings_block(ds))
     return result
 
@@ -624,6 +625,18 @@ def _look0_markdown(lines, result):
         lines.append("| " + row["label"] + f" | {row['n']} | " +
                      " | ".join(_pct(row[key]) for key in keys) + " |")
     lines.append("")
+    features = result.get("program_features")
+    if features:
+        lines.append("Program features (final `candidate.rs`, per arm):")
+        lines.append("")
+        names = list(features["totals"])
+        lines.append("| Arm | programs | " + " | ".join(names) + " |")
+        lines.append("| --- | --- | " + " | ".join(["---"] * len(names)) + " |")
+        for arm in sorted(features["by_arm"]):
+            bucket = features["by_arm"][arm]
+            lines.append(f"| {arm} | {bucket['programs']} | " +
+                         " | ".join(str(bucket[name]) for name in names) + " |")
+        lines.append("")
     lines.append("Stage 1 extrapolation (24 tasks x 4 models x 3 reps x 6 groups):")
     lines.append("")
     lines.append("| Model | Group | calls | billable | reasoning | LLM s | oracle s | USD | note |")

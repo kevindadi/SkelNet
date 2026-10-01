@@ -2,19 +2,19 @@
 
 > This file is generated from `protocol.json` by `python -m skelnet protocol render`. Do not edit it by hand.
 
-- `protocol.json` sha256: `93eba787905388457c5da83445bd6fbdd35455bf9e18679bbb5ffee2cbfc6e23`
+- `protocol.json` sha256: `3f3f29eafb57b95eb9b579333fb4fcbeb905a1ac9c6884f8a770b28c95df3f88`
 - schema: `skelnet-protocol-v1`
-- frozen at commit: `0f3c793`
-- frozen at: `2026-09-30T08:07:51Z`
+- frozen at commit: `903656a`
+- frozen at: `2026-10-01T07:36:12Z`
 
 ## Models
 
-| display name | model id | channel | thinking | reasoning effort | temperature |
-| --- | --- | --- | --- | --- | --- |
-| GPT 6 Luna | `gpt-6-luna` | `opencode-go` | yes | medium | provider_default |
-| Kimi | `kimi-k2.7-code` | `moonshot-direct` | always | -- | provider_default |
-| DeepSeek Flash | `deepseek-flash` | `deepseek-direct` | yes | -- | provider_default |
-| Qwen | `qwen3.8-flash` | `dashscope-direct` | yes | -- | provider_default |
+| display name | model id | channel | thinking | reasoning effort | stream | temperature |
+| --- | --- | --- | --- | --- | --- | --- |
+| GPT 6 Luna | `gpt-6-luna` | `opencode-go` | yes | medium | no | provider_default |
+| Kimi | `kimi-k2.7-code` | `moonshot-direct` | always | -- | yes | provider_default |
+| DeepSeek Flash | `deepseek-flash` | `deepseek-direct` | yes | -- | no | provider_default |
+| Qwen | `qwen3.8-flash` | `dashscope-direct` | yes | -- | yes | provider_default |
 
 ## Run parameters
 
@@ -25,6 +25,7 @@
 | max_output_tokens | 32768 |
 | max_output_tokens_cap | 65536 |
 | seed_policy | per_cell |
+| skeleton_rounds_rule | min(rounds, call_budget - 2) |
 | temperature_policy | provider_default |
 | token_budget | 200000 |
 
@@ -38,25 +39,25 @@ Secondary groups: DYNAMIC_M.
 | --- | --- | --- | --- |
 | CIR | feedback | `concir_generation_v4.md`, `concir_feedback_v1.md` | `2743e2f4e5ae4da07fe74b05e8a97e3f773940d1b2036a77e86d6caeebdcbc7b` |
 | CIR | generate | `concir_generation_v4.md` | `6ef31102fc66fa8dab5eef62d8b1a52956822a8f59c6825e360141c1e1fba27b` |
-| CIR | rust | `rust_from_cir_v3.md`, `rust_runtime_api_v1.md` | `38034f445193358d7a0f3f7686e8d23104dbd4b2c8e293db06e091f0af52c186` |
-| CIR | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |
-| DYNAMIC | generate | `rust_generation_v2.md`, `rust_runtime_api_v1.md` | `346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f` |
-| DYNAMIC | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |
-| DYNAMIC | tool_feedback | `rust_dynamic_feedback_v1.md`, `rust_runtime_api_v1.md` | `32a953121f8187701afcf7ecd504bb72e946f1728018f5fd1ff50e02e825e8d2` |
-| DYNAMIC_M | generate | `rust_generation_v2.md`, `rust_runtime_api_v1.md` | `346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f` |
-| DYNAMIC_M | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |
-| DYNAMIC_M | tool_feedback | `rust_dynamic_monitor_feedback_v1.md`, `rust_runtime_api_v1.md` | `bbf10295a3c24179a479f6f4fbca1af1eff8041a19a8e3cde2717e93218eb832` |
-| G0 | generate | `rust_generation_v2.md`, `rust_runtime_api_v1.md` | `346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f` |
-| REFINE | generate | `rust_generation_v2.md`, `rust_runtime_api_v1.md` | `346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f` |
-| REFINE | review | `rust_self_refine_v1.md`, `rust_runtime_api_v1.md` | `b2e2d45a6f273b7e34eda3b05f886e7a5e96bb617aadfe731d2d012724f6bf7f` |
-| REFINE | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |
+| CIR | rust | `rust_from_cir_v4.md`, `rust_runtime_api_v2.md` | `514659bf48da7c0a5b38e43416b5df3e6789d2229993239cff16f0e9529d1d4b` |
+| CIR | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v2.md` | `9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf` |
+| DYNAMIC | generate | `rust_generation_v2.md`, `rust_runtime_api_v2.md` | `d2a9b5bf16fd7a78f6fa63c128c345754315b909e8369537d5c1fbcaebf1ab6e` |
+| DYNAMIC | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v2.md` | `9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf` |
+| DYNAMIC | tool_feedback | `rust_dynamic_feedback_v1.md`, `rust_runtime_api_v2.md` | `76055134d250cbb1bd2e98a62a4b5c075105165be018cf31d449954c0afe28d6` |
+| DYNAMIC_M | generate | `rust_generation_v2.md`, `rust_runtime_api_v2.md` | `d2a9b5bf16fd7a78f6fa63c128c345754315b909e8369537d5c1fbcaebf1ab6e` |
+| DYNAMIC_M | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v2.md` | `9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf` |
+| DYNAMIC_M | tool_feedback | `rust_dynamic_monitor_feedback_v1.md`, `rust_runtime_api_v2.md` | `fc5748273a7b13a6118e4cb65d916922fe7dbb0aa4a55e1c6bc13595aa661c2f` |
+| G0 | generate | `rust_generation_v2.md`, `rust_runtime_api_v2.md` | `d2a9b5bf16fd7a78f6fa63c128c345754315b909e8369537d5c1fbcaebf1ab6e` |
+| REFINE | generate | `rust_generation_v2.md`, `rust_runtime_api_v2.md` | `d2a9b5bf16fd7a78f6fa63c128c345754315b909e8369537d5c1fbcaebf1ab6e` |
+| REFINE | review | `rust_self_refine_v1.md`, `rust_runtime_api_v2.md` | `1ac2f56ed5d578651bc099c1f74e8060a0fc44417dea4c5f763fae0ff4e622f9` |
+| REFINE | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v2.md` | `9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf` |
 | SKEL | feedback | `skel_generation_v1.md`, `skel_feedback_v1.md` | `1f9527b333a2c446a45a2e5235a6a1622b9db53e8523e6fee7c9ecb800f69189` |
 | SKEL | generate | `skel_generation_v1.md` | `88f784ab8b00b7489553aa6da4d28344713c48b081251ed13bacf84fac1149f0` |
-| SKEL | rust | `rust_from_skel_v2.md`, `rust_runtime_api_v1.md` | `8945fdc362a3eb1b180b318ec3be422072969d1500076a9653674f5744c53923` |
-| SKEL | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |
-| STATIC | generate | `rust_generation_v2.md`, `rust_runtime_api_v1.md` | `346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f` |
-| STATIC | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |
-| STATIC | tool_feedback | `rust_static_feedback_v1.md`, `rust_runtime_api_v1.md` | `db8c3acb1fcd4d36be5835ea08d3d8fd49b72468f841c3bb6a7ed175fc4e5b59` |
+| SKEL | rust | `rust_from_skel_v3.md`, `rust_runtime_api_v2.md` | `4899a6f6a355dc85a1590c5740edd2decb4f5b977dcc8e05c4c37d4bd45704bc` |
+| SKEL | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v2.md` | `9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf` |
+| STATIC | generate | `rust_generation_v2.md`, `rust_runtime_api_v2.md` | `d2a9b5bf16fd7a78f6fa63c128c345754315b909e8369537d5c1fbcaebf1ab6e` |
+| STATIC | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v2.md` | `9f589aeb8ca3c580be92bb043ebefce932e5cbc777512ff34ac0e369915b97bf` |
+| STATIC | tool_feedback | `rust_static_feedback_v1.md`, `rust_runtime_api_v2.md` | `69c712adc9410daa620fb36acfc3848cb63a449fb8f1394d2fd748cce2f41082` |
 
 ## Oracle
 
