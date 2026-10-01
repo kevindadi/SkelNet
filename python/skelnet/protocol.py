@@ -94,6 +94,7 @@ def _models_block() -> list[dict]:
             "channel": spec.channel,
             "thinking": spec.thinking,
             "reasoning_effort": spec.reasoning_effort,
+            "stream": spec.stream,
             "temperature_policy": params.TEMPERATURE_PROVIDER_DEFAULT,
         })
     return out
@@ -332,13 +333,14 @@ def render_markdown(doc: dict, protocol_sha: str) -> str:
 
     lines.append("## Models")
     lines.append("")
-    lines.append("| display name | model id | channel | thinking | reasoning effort | temperature |")
-    lines.append("| --- | --- | --- | --- | --- | --- |")
+    lines.append("| display name | model id | channel | thinking | reasoning effort | stream | temperature |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
     for model in doc.get("models", []):
         lines.append(
             f"| {model['display_name']} | `{model['model_id']}` | "
             f"`{model['channel']}` | {_bool(model['thinking'])} | "
-            f"{model['reasoning_effort'] or '--'} | {model['temperature_policy']} |")
+            f"{model['reasoning_effort'] or '--'} | {_bool(model.get('stream', False))} | "
+            f"{model['temperature_policy']} |")
     lines.append("")
 
     lines.append("## Run parameters")
