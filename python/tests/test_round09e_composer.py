@@ -85,14 +85,17 @@ def _usage(input_tokens=10, output_tokens=5, reasoning=3, cached=1):
 
 
 # ── registry ─────────────────────────────────────────────────────────
-def test_experimental_set_has_composer_not_kimi():
+def test_experimental_set_is_glm_not_cursor_or_kimi():
     ids = set(EXPERIMENTAL_MODEL_IDS)
-    assert "cursor-agent" in ids
-    assert "kimi-k2.7-code" not in ids
+    assert "glm-5.3-flash" in ids
+    assert "cursor-agent" not in ids and "kimi-k2.7-code" not in ids
     registry = build_registry()
-    composer = resolve_model(registry, "Cursor Agent")
-    assert composer.status == "available"
-    assert composer.channel == "cursor" and composer.model_id == "cursor-agent"
+    glm = resolve_model(registry, "GLM 5.3 Flash")
+    assert glm.status == "available"
+    assert glm.channel == "opencode-go" and glm.model_id == "glm-5.3-flash"
+    # The Cursor Agent stays available (replayable) but is out of the set.
+    cursor = resolve_model(registry, "Cursor Agent")
+    assert cursor.status == "available" and cursor.channel == "cursor"
     kimi = resolve_model(registry, "Kimi")
     assert kimi.status == "available" and kimi.channel == "moonshot-direct"
 
