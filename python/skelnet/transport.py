@@ -215,8 +215,11 @@ def build_registry() -> list[ModelSpec]:
         # channel sends ``extra_body={"thinking": {"type": "enabled"}}``; there
         # is no ``reasoning_effort`` on this channel. ``supports_seed`` is False:
         # the Moonshot docs do not document a seed parameter.
+        # Round 9e: Kimi is no longer one of the experimental models (too slow);
+        # it stays available so old runs can be replayed, but is out of the
+        # frozen model set. See experiments/DEVIATIONS.md D-9e-1.
         ModelSpec("Kimi", "moonshot", "moonshot-direct", "kimi-k2.7-code",
-                  role="compare",
+                  role="diagnostic",
                   thinking="always", reasoning_effort=None,
                   supports_seed=False, stream=True),
         ModelSpec("GPT 6 Luna", "openai", "opencode-go", "gpt-6-luna",
@@ -224,12 +227,12 @@ def build_registry() -> list[ModelSpec]:
                   discovered="gpt-6-luna" in DISCOVERED_MODELS["opencode-go"],
                   thinking=True, reasoning_effort="medium", supports_seed=False),
         # ── Reserved / comparison entries ───────────────────────────────
-        ModelSpec("Composer 2.5", "cursor", "cursor", "composer-2.5",
-                  role="diagnostic", status="blocked",
-                  blocked_reason="Cursor agent accumulates large, partly "
-                                 "unobservable context (150-180k input "
-                                 "tokens/call) and cannot be reduced to a "
-                                 "stateless chat call; not comparable to direct APIs",
+        # Round 9e: the fourth experimental model. It must use the Cursor agent
+        # SDK, so the experiment calls it "Cursor Agent"; the SDK model selector
+        # is the internal ``CursorAgentClient.SDK_MODEL``.
+        ModelSpec("Cursor Agent", "cursor", "cursor", "cursor-agent",
+                  role="compare",
+                  thinking=False, reasoning_effort=None, supports_seed=False,
                   discovered="composer-2.5" in DISCOVERED_MODELS["cursor"]),
         ModelSpec("GLM", "zhipu", "opencode-go", "glm-5.3-flash", role="compare",
                   aliases=("glm-5.3",),
@@ -253,8 +256,9 @@ def build_registry() -> list[ModelSpec]:
     return specs
 
 
-# The four models this experiment round runs.
-EXPERIMENTAL_MODEL_IDS = ("gpt-6-luna", "kimi-k2.7-code", "deepseek-flash",
+# The four models this experiment round runs. Round 9e replaces Kimi with the
+# Cursor agent (registry id ``cursor-agent``); see experiments/DEVIATIONS.md.
+EXPERIMENTAL_MODEL_IDS = ("gpt-6-luna", "cursor-agent", "deepseek-flash",
                           "qwen3.8-flash")
 
 

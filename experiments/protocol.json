@@ -657,8 +657,8 @@
     "tiers_sha256": "a3d23a4aad082c9649cf467ac1f1b8b37bb9c28a1c1c069973dcadc6ddb04468"
   },
   "deviations_policy": "Any deviation from this frozen protocol after it is frozen must be recorded in experiments/DEVIATIONS.md (file header only at freeze time).",
-  "frozen_at": "2026-10-01T07:36:12Z",
-  "frozen_at_commit": "903656a",
+  "frozen_at": "2026-10-01T13:36:03Z",
+  "frozen_at_commit": "7fda511",
   "models": [
     {
       "channel": "opencode-go",
@@ -670,13 +670,13 @@
       "thinking": true
     },
     {
-      "channel": "moonshot-direct",
-      "display_name": "Kimi",
-      "model_id": "kimi-k2.7-code",
+      "channel": "cursor",
+      "display_name": "Cursor Agent",
+      "model_id": "cursor-agent",
       "reasoning_effort": null,
-      "stream": true,
+      "stream": false,
       "temperature_policy": "provider_default",
-      "thinking": "always"
+      "thinking": false
     },
     {
       "channel": "deepseek-direct",
@@ -738,7 +738,7 @@
       },
       "models": [
         "gpt-6-luna",
-        "kimi-k2.7-code",
+        "cursor-agent",
         "deepseek-flash",
         "qwen3.8-flash"
       ],
@@ -768,7 +768,7 @@
       "ledger_limits": null,
       "models": [
         "gpt-6-luna",
-        "kimi-k2.7-code",
+        "cursor-agent",
         "deepseek-flash",
         "qwen3.8-flash"
       ],
@@ -790,7 +790,7 @@
       "ledger_limits": null,
       "models": [
         "gpt-6-luna",
-        "kimi-k2.7-code",
+        "cursor-agent",
         "deepseek-flash",
         "qwen3.8-flash"
       ],
@@ -812,7 +812,7 @@
       "ledger_limits": null,
       "models": [
         "gpt-6-luna",
-        "kimi-k2.7-code",
+        "cursor-agent",
         "deepseek-flash",
         "qwen3.8-flash"
       ],
