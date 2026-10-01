@@ -1,0 +1,107 @@
+{
+  "task": "buffer/sensor_tray",
+  "requirements": [
+    "A main task starts two sensor roles and two recorder roles that run at the same time.",
+    "The sensors and the recorders share one single-slot tray that can hold at most one reading, and every access to the tray is guarded by one lock.",
+    "A sensor must wait while the tray is occupied, and must place its reading only when the tray is free.",
+    "A recorder must wait while the tray is empty, and must pick up a reading only when one is present.",
+    "A sensor must signal the recorders after it has placed a reading.",
+    "A recorder must signal the sensors after it has picked up a reading.",
+    "Every reading that is placed must eventually be picked up, and every schedule must terminate with all four roles finished.",
+    "In every state the tray holds at most one reading.",
+    "The two readings are each picked up exactly once.",
+    "The program must print exactly the line `DONE total=14` and then exit. The value is the sum of the two reading values that the recorders actually picked up, not a constant written into the print."
+  ],
+  "unverifiable": [
+    1,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R1",
+        "R3",
+        "R4",
+        "R7",
+        "R9"
+      ],
+      [
+        "R2",
+        "R8"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R7"
+      ],
+      [
+        "R1",
+        "R7"
+      ],
+      [
+        "R1",
+        "R9"
+      ],
+      [
+        "R1",
+        "R9"
+      ]
+    ]
+  },
+  "terminal": "DONE total=14",
+  "entities": {
+    "roles": [
+      "sensor_a",
+      "sensor_b",
+      "recorder_a",
+      "recorder_b"
+    ],
+    "resources": [
+      {
+        "name": "tray_lock",
+        "kind": "lock"
+      },
+      {
+        "name": "tray_empty",
+        "kind": "condition variable"
+      },
+      {
+        "name": "tray_full",
+        "kind": "condition variable"
+      }
+    ]
+  },
+  "contract": "buffer/sensor_tray/contract.json",
+  "terminal_v2": "DONE total=14",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "origin": "disguised",
+  "disguise_of": "buffer/bounded_buffer_2p2c",
+  "tier": "L2",
+  "tier_source": "computed",
+  "tier_metrics": {
+    "threads": 4,
+    "thread_funcs": [
+      "main::recorder_a",
+      "main::recorder_b",
+      "main::sensor_a",
+      "main::sensor_b"
+    ],
+    "sync_resources": 3,
+    "unused_resources": [],
+    "mechanisms": [
+      "Condvar"
+    ],
+    "mechanism_count": 1,
+    "parameterized": false,
+    "states": 4868,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L2",
+    "nearest_tier": "L2",
+    "violations": []
+  }
+}

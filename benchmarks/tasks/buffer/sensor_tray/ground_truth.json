@@ -1,0 +1,11 @@
+{
+  "defect_family": "buffer",
+  "resources": [
+    "main::tray_lock",
+    "main::tray_empty",
+    "main::tray_full"
+  ],
+  "statements": [],
+  "expected_outcome_fixed": "PASS",
+  "provenance": "new (SkelNet R7b)"
+}

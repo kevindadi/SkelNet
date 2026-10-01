@@ -1,0 +1,291 @@
+{
+  "program": "sensor_tray",
+  "version": "3.5.0",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "tray_lock",
+          "tray_empty",
+          "tray_full",
+          "occupancy"
+        ],
+        "functions": [
+          "main",
+          "sensor_a",
+          "sensor_b",
+          "recorder_a",
+          "recorder_b"
+        ],
+        "types": []
+      },
+      "requires": {
+        "resources": [],
+        "functions": [],
+        "types": []
+      },
+      "resources": [
+        {
+          "name": "tray_lock",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "tray_empty",
+          "kind": "sync",
+          "type": "Condvar",
+          "mode": "Sync"
+        },
+        {
+          "name": "tray_full",
+          "kind": "sync",
+          "type": "Condvar",
+          "mode": "Sync"
+        },
+        {
+          "name": "occupancy",
+          "kind": "var",
+          "type": "Var",
+          "base": {
+            "Int": [
+              0,
+              1
+            ]
+          },
+          "init": 0
+        }
+      ],
+      "protection": [
+        {
+          "var": "occupancy",
+          "lock": "tray_lock"
+        }
+      ],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "scope",
+              "funcs": [
+                "main::sensor_a",
+                "main::sensor_b",
+                "main::recorder_a",
+                "main::recorder_b"
+              ]
+            },
+            {
+              "sid": "s2",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "sensor_a",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "main::tray_lock"
+            },
+            {
+              "sid": "s2",
+              "kind": "branch",
+              "cond": "occupancy == 1",
+              "then": "s3",
+              "else": "s5"
+            },
+            {
+              "sid": "s3",
+              "kind": "condvar_wait",
+              "condvar": "main::tray_empty",
+              "lock": "main::tray_lock"
+            },
+            {
+              "sid": "s4",
+              "kind": "goto",
+              "target": "s2"
+            },
+            {
+              "sid": "s5",
+              "kind": "write_shared",
+              "resource": "main::occupancy",
+              "expr": "occupancy + 1"
+            },
+            {
+              "sid": "s6",
+              "kind": "condvar_notify",
+              "condvar": "main::tray_full"
+            },
+            {
+              "sid": "s7",
+              "kind": "mutex_unlock",
+              "resource": "main::tray_lock"
+            },
+            {
+              "sid": "s8",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "sensor_b",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "main::tray_lock"
+            },
+            {
+              "sid": "s2",
+              "kind": "branch",
+              "cond": "occupancy == 1",
+              "then": "s3",
+              "else": "s5"
+            },
+            {
+              "sid": "s3",
+              "kind": "condvar_wait",
+              "condvar": "main::tray_empty",
+              "lock": "main::tray_lock"
+            },
+            {
+              "sid": "s4",
+              "kind": "goto",
+              "target": "s2"
+            },
+            {
+              "sid": "s5",
+              "kind": "write_shared",
+              "resource": "main::occupancy",
+              "expr": "occupancy + 1"
+            },
+            {
+              "sid": "s6",
+              "kind": "condvar_notify",
+              "condvar": "main::tray_full"
+            },
+            {
+              "sid": "s7",
+              "kind": "mutex_unlock",
+              "resource": "main::tray_lock"
+            },
+            {
+              "sid": "s8",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "recorder_a",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "main::tray_lock"
+            },
+            {
+              "sid": "s2",
+              "kind": "branch",
+              "cond": "occupancy == 0",
+              "then": "s3",
+              "else": "s5"
+            },
+            {
+              "sid": "s3",
+              "kind": "condvar_wait",
+              "condvar": "main::tray_full",
+              "lock": "main::tray_lock"
+            },
+            {
+              "sid": "s4",
+              "kind": "goto",
+              "target": "s2"
+            },
+            {
+              "sid": "s5",
+              "kind": "write_shared",
+              "resource": "main::occupancy",
+              "expr": "occupancy - 1"
+            },
+            {
+              "sid": "s6",
+              "kind": "condvar_notify",
+              "condvar": "main::tray_empty"
+            },
+            {
+              "sid": "s7",
+              "kind": "mutex_unlock",
+              "resource": "main::tray_lock"
+            },
+            {
+              "sid": "s8",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "recorder_b",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "main::tray_lock"
+            },
+            {
+              "sid": "s2",
+              "kind": "branch",
+              "cond": "occupancy == 0",
+              "then": "s3",
+              "else": "s5"
+            },
+            {
+              "sid": "s3",
+              "kind": "condvar_wait",
+              "condvar": "main::tray_full",
+              "lock": "main::tray_lock"
+            },
+            {
+              "sid": "s4",
+              "kind": "goto",
+              "target": "s2"
+            },
+            {
+              "sid": "s5",
+              "kind": "write_shared",
+              "resource": "main::occupancy",
+              "expr": "occupancy - 1"
+            },
+            {
+              "sid": "s6",
+              "kind": "condvar_notify",
+              "condvar": "main::tray_empty"
+            },
+            {
+              "sid": "s7",
+              "kind": "mutex_unlock",
+              "resource": "main::tray_lock"
+            },
+            {
+              "sid": "s8",
+              "kind": "return"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "entry": "main::main"
+}

@@ -1,0 +1,241 @@
+{
+  "program": "bounded_buffer_semaphores",
+  "version": "3.5.0",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "m",
+          "slots",
+          "items",
+          "count"
+        ],
+        "functions": [
+          "main",
+          "p1",
+          "p2",
+          "c1",
+          "c2"
+        ],
+        "types": []
+      },
+      "requires": {
+        "resources": [],
+        "functions": [],
+        "types": []
+      },
+      "resources": [
+        {
+          "name": "m",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "slots",
+          "kind": "sync",
+          "type": "Semaphore",
+          "mode": "Sync",
+          "count": 1
+        },
+        {
+          "name": "items",
+          "kind": "sync",
+          "type": "Semaphore",
+          "mode": "Sync",
+          "count": 0
+        },
+        {
+          "name": "count",
+          "kind": "var",
+          "type": "Var",
+          "base": {
+            "Int": [
+              0,
+              1
+            ]
+          },
+          "init": 0
+        }
+      ],
+      "protection": [
+        {
+          "var": "count",
+          "lock": "m"
+        }
+      ],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "scope",
+              "funcs": [
+                "main::p1",
+                "main::p2",
+                "main::c1",
+                "main::c2"
+              ]
+            },
+            {
+              "sid": "s2",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "p1",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "semaphore_acquire",
+              "resource": "main::slots"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "main::count",
+              "expr": "count + 1"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_unlock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s5",
+              "kind": "semaphore_release",
+              "resource": "main::items"
+            },
+            {
+              "sid": "s6",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "p2",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "semaphore_acquire",
+              "resource": "main::slots"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "main::count",
+              "expr": "count + 1"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_unlock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s5",
+              "kind": "semaphore_release",
+              "resource": "main::items"
+            },
+            {
+              "sid": "s6",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "c1",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "semaphore_acquire",
+              "resource": "main::items"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "main::count",
+              "expr": "count - 1"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_unlock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s5",
+              "kind": "semaphore_release",
+              "resource": "main::slots"
+            },
+            {
+              "sid": "s6",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "c2",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "semaphore_acquire",
+              "resource": "main::items"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "main::count",
+              "expr": "count - 1"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_unlock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s5",
+              "kind": "semaphore_release",
+              "resource": "main::slots"
+            },
+            {
+              "sid": "s6",
+              "kind": "return"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "entry": "main::main"
+}

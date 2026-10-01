@@ -1,0 +1,21 @@
+skeleton sensor_tray;
+
+mutex tray_lock;
+condvar tray_empty for tray_lock;
+condvar tray_full for tray_lock;
+shared occupancy: Int[0..=1] = 0 guarded_by tray_lock;
+
+@R1 @R2 @R3 @R5 @R7 @R8 @R9
+fn main() { scope { spawn sensor_a(); spawn sensor_b(); spawn recorder_a(); spawn recorder_b(); } }
+
+@R2 @R3 @R5 @R7 @R8 @R9
+fn sensor_a() { lock tray_lock { while occupancy == 1 { tray_empty.wait(); } occupancy = occupancy + 1; tray_full.notify_one(); } }
+
+@R2 @R3 @R5 @R7 @R8 @R9
+fn sensor_b() { lock tray_lock { while occupancy == 1 { tray_empty.wait(); } occupancy = occupancy + 1; tray_full.notify_one(); } }
+
+@R2 @R4 @R6 @R7 @R8 @R9
+fn recorder_a() { lock tray_lock { while occupancy == 0 { tray_full.wait(); } occupancy = occupancy - 1; tray_empty.notify_one(); } }
+
+@R2 @R4 @R6 @R7 @R8 @R9
+fn recorder_b() { lock tray_lock { while occupancy == 0 { tray_full.wait(); } occupancy = occupancy - 1; tray_empty.notify_one(); } }
