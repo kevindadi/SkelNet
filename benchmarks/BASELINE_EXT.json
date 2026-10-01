@@ -17,6 +17,40 @@
       ],
       "states_explored_reference": 109,
       "baseline_deviation": false
+    },
+    {
+      "task": "buffer/bounded_buffer_2p2c",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "buffer-bound",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::c1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::c2 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": 4868,
+      "baseline_deviation": false
     }
   ]
 }

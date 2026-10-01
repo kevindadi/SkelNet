@@ -1,0 +1,106 @@
+{
+  "task": "buffer/bounded_buffer_2p2c",
+  "requirements": [
+    "A main task starts two producer roles and two consumer roles that run at the same time.",
+    "The producers and the consumers share one bounded buffer that can hold at most one item.",
+    "A producer must wait while the buffer is full, and must put its item only when there is room.",
+    "A consumer must wait while the buffer is empty, and must take an item only when one is present.",
+    "A producer must signal the consumers after it has put an item.",
+    "A consumer must signal the producers after it has taken an item.",
+    "Every item that is put must eventually be taken, and every schedule must terminate with all four roles finished.",
+    "In every state the buffer holds at most one item.",
+    "The two items are each taken exactly once.",
+    "The program must print exactly the line `DONE sum=3` and then exit. The value is the sum of the two item values that the consumers actually took, not a constant written into the print."
+  ],
+  "unverifiable": [
+    1,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R1",
+        "R3",
+        "R4",
+        "R7",
+        "R9"
+      ],
+      [
+        "R2",
+        "R8"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R7"
+      ],
+      [
+        "R1",
+        "R7"
+      ],
+      [
+        "R1",
+        "R9"
+      ],
+      [
+        "R1",
+        "R9"
+      ]
+    ]
+  },
+  "terminal": "DONE sum=3",
+  "entities": {
+    "roles": [
+      "p1",
+      "p2",
+      "c1",
+      "c2"
+    ],
+    "resources": [
+      {
+        "name": "m",
+        "kind": "lock"
+      },
+      {
+        "name": "not_full",
+        "kind": "condition variable"
+      },
+      {
+        "name": "not_empty",
+        "kind": "condition variable"
+      }
+    ]
+  },
+  "contract": "buffer/bounded_buffer_2p2c/contract.json",
+  "terminal_v2": "DONE sum=3",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "origin": "classic",
+  "tier": "L2",
+  "tier_source": "computed",
+  "tier_metrics": {
+    "threads": 4,
+    "thread_funcs": [
+      "main::c1",
+      "main::c2",
+      "main::p1",
+      "main::p2"
+    ],
+    "sync_resources": 3,
+    "unused_resources": [],
+    "mechanisms": [
+      "Condvar"
+    ],
+    "mechanism_count": 1,
+    "parameterized": false,
+    "states": 4868,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L2",
+    "nearest_tier": "L2",
+    "violations": []
+  }
+}
