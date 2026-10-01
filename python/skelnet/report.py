@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -30,6 +31,48 @@ MODEL_HEADER = {"gpt-6-luna": "GPT", "kimi-k2.7-code": "Kimi",
                 "deepseek-flash": "DeepSeek", "qwen3.8-flash": "Qwen"}
 MODEL_FAMILY = {"gpt-6-luna": "GPT", "kimi-k2.7-code": "Kimi",
                 "deepseek-flash": "DeepSeek", "qwen3.8-flash": "Qwen"}
+
+# R9d-P5: read-only counters over the final generated programs, so Look 1 can
+# check that the prompt/instrumenter fixes took effect.
+_PROGRAM_FEATURE_PATTERNS = (
+    ("thread_scope", re.compile(r"\bthread\s*::\s*scope\b")),
+    ("thread_builder", re.compile(r"\b(?:thread\s*::\s*)?Builder\s*::\s*new\b")),
+    ("yield_now", re.compile(r"\byield_now\b")),
+    ("sleep", re.compile(r"\bsleep\s*\(")),
+)
+
+
+def program_feature_counts(run_dirs) -> dict:
+    """Count thread::scope / thread::Builder / yield_now / sleep occurrences in
+    each run's final ``cells/**/candidate.rs``, per arm.
+
+    Read-only: reads only ``MANIFEST.json`` and ``candidate.rs``; never writes.
+    """
+    totals = {name: 0 for name, _ in _PROGRAM_FEATURE_PATTERNS}
+    by_arm: dict[str, dict] = {}
+    programs = 0
+    for run_dir in run_dirs:
+        run_dir = Path(run_dir)
+        arm = "?"
+        manifest = run_dir / "MANIFEST.json"
+        if manifest.is_file():
+            try:
+                arm = json.loads(manifest.read_text(encoding="utf-8")
+                                 ).get("arm", "?")
+            except (OSError, json.JSONDecodeError):
+                arm = "?"
+        bucket = by_arm.setdefault(
+            arm, {"programs": 0, **{name: 0 for name, _ in _PROGRAM_FEATURE_PATTERNS}})
+        for candidate in sorted(run_dir.glob("cells/**/candidate.rs")):
+            text = candidate.read_text(encoding="utf-8", errors="ignore")
+            bucket["programs"] += 1
+            programs += 1
+            for name, pattern in _PROGRAM_FEATURE_PATTERNS:
+                count = len(pattern.findall(text))
+                bucket[name] += count
+                totals[name] += count
+    return {"programs": programs, "totals": totals, "by_arm": by_arm}
+
 
 FAIL_COLUMNS = ["build", "policy", "hang", "output", "deadl", "other",
                 "design", "monitor"]
