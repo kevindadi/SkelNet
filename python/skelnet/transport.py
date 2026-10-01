@@ -227,15 +227,18 @@ def build_registry() -> list[ModelSpec]:
                   discovered="gpt-6-luna" in DISCOVERED_MODELS["opencode-go"],
                   thinking=True, reasoning_effort="medium", supports_seed=False),
         # ── Reserved / comparison entries ───────────────────────────────
-        # Round 9e: the fourth experimental model. It must use the Cursor agent
-        # SDK, so the experiment calls it "Cursor Agent"; the SDK model selector
-        # is the internal ``CursorAgentClient.SDK_MODEL``.
+        # Round 9e: the Cursor agent was tried as the fourth experimental model
+        # but its data was dropped (agent-SDK context overhead; token usage not
+        # comparable and under-counted by the ledger). Kept available but out of
+        # the experimental set. The SDK selector is CursorAgentClient.SDK_MODEL.
         ModelSpec("Cursor Agent", "cursor", "cursor", "cursor-agent",
-                  role="compare",
+                  role="diagnostic",
                   thinking=False, reasoning_effort=None, supports_seed=False,
                   discovered="composer-2.5" in DISCOVERED_MODELS["cursor"]),
-        ModelSpec("GLM", "zhipu", "opencode-go", "glm-5.3-flash", role="compare",
-                  aliases=("glm-5.3",),
+        # Round 9e: GLM 5.3 Flash on OpenCode replaces the Cursor agent as the
+        # fourth experimental model.
+        ModelSpec("GLM 5.3 Flash", "zhipu", "opencode-go", "glm-5.3-flash",
+                  role="compare", aliases=("glm-5.3",),
                   discovered="glm-5.3-flash" in DISCOVERED_MODELS["opencode-go"]),
         ModelSpec("Grok 4.7", "xai", "opencode-go", "grok-4.7", role="compare",
                   surface="responses",
@@ -257,8 +260,9 @@ def build_registry() -> list[ModelSpec]:
 
 
 # The four models this experiment round runs. Round 9e replaces Kimi with the
-# Cursor agent (registry id ``cursor-agent``); see experiments/DEVIATIONS.md.
-EXPERIMENTAL_MODEL_IDS = ("gpt-6-luna", "cursor-agent", "deepseek-flash",
+# Cursor agent and then the Cursor agent with GLM 5.3 Flash (OpenCode); see
+# experiments/DEVIATIONS.md.
+EXPERIMENTAL_MODEL_IDS = ("gpt-6-luna", "glm-5.3-flash", "deepseek-flash",
                           "qwen3.8-flash")
 
 

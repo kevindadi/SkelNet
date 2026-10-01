@@ -177,3 +177,28 @@ which experiment cells were affected. This file starts empty at freeze time.
   `experiments/stage1/cache_cursor`.
 - **Paper impact:** the models table lists the Cursor Agent; the coordinator
   updates the cost/behaviour discussion and the threats-to-validity section.
+
+## D-9e-2 — Cursor Agent replaced by GLM 5.3 Flash (2026-10-02, round 9e)
+
+- **What changed:** the fourth experimental model is now **GLM 5.3 Flash**
+  (`glm-5.3-flash`, `opencode-go`) instead of the Cursor Agent. The Cursor Agent
+  `ModelSpec` stays **available** but is out of the experimental set.
+  `experiments/protocol.json` / `PROTOCOL.md` are regenerated
+  (`protocol build` → `protocol render`); the new `protocol.json` sha256 is
+  `0336f997b490eae4cc6bd53bfa791b482931b9eec1d5742aa1d39a3ed66f8ef0`.
+- **Why:** the Cursor Agent data was dropped as unusable. Its six Stage-1 arms
+  did complete (6 × 72 = 432 cells), but the agent SDK carries a large, partly
+  unobservable context per call (per-cell `input` of ~90k–136k tokens; the 432
+  cells report ~107.4M billable tokens), and the **global ledger only counted
+  ~64M** of the whole stage — i.e. the server-reported agent usage is not
+  reliably accountable, on top of not being comparable to a stateless chat
+  call. Owner decision (2026-10-02).
+- **Affected cells:** the six `experiments/stage1/cursor-*` run directories and
+  `cache_cursor` were **deleted**; they never entered any test. The DeepSeek,
+  GPT 6 Luna and Qwen runs are unaffected. The token cost of the deleted runs
+  remains in the shared `experiments/budget.json` stage-1 ledger (real spend).
+- **Handling:** GLM 5.3 Flash runs the same six arms (G0 → SKEL → CIR → REFINE
+  → STATIC → DYNAMIC) with the same task set and flags; its Stage-1 cache
+  directory is `experiments/stage1/cache_glm`.
+- **Paper impact:** the models table lists GLM 5.3 Flash; the coordinator updates
+  the cost/behaviour discussion and the threats-to-validity section.

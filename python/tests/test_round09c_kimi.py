@@ -122,7 +122,7 @@ def test_probe_dry_run_lists_new_kimi(tmp_path, monkeypatch, capsys):
     assert cli.main(["models", "probe", "--dry-run", "--env-file", str(env)]) == 0
     ids = {m["model_id"] for m in json.loads(capsys.readouterr().out)["models"]}
     assert set(EXPERIMENTAL_MODEL_IDS) == ids
-    assert "cursor-agent" in ids and "kimi-k2.7-code" not in ids
+    assert "glm-5.3-flash" in ids and "kimi-k2.7-code" not in ids
     # Kimi is still probeable explicitly (Moonshot channel).
     assert cli.main(["models", "probe", "--dry-run", "--models", "kimi-k2.7-code",
                      "--env-file", str(env)]) == 0
