@@ -51,6 +51,410 @@
       ],
       "states_explored_reference": 4868,
       "baseline_deviation": false
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "buffer-bound",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::c1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::c2 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": null,
+      "baseline_deviation": false
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "tray-bound",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::sensor_a completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::sensor_b completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::recorder_a completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::recorder_b completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": null,
+      "baseline_deviation": false
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "p1-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "p2-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "p3-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "p4-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "p5-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p3 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p4 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p5 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": null,
+      "baseline_deviation": false
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "p1-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "p2-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "p3-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "p4-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p3 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::p4 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": null,
+      "baseline_deviation": false
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "r1-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "r2-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "r3-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "r4-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "r5-completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::r1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::r2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::r3 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::r4 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::r5 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": null,
+      "baseline_deviation": false
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "processed-bound",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::stage1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::stage2 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::stage3 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": null,
+      "baseline_deviation": false
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "finished-bound",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::producer completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::w2 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": null,
+      "baseline_deviation": false
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "printed-bound",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::spooler completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::printer1 completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::printer2 completes",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": null,
+      "baseline_deviation": false
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "balances-bounded",
+          "outcome": "PASS"
+        },
+        {
+          "id": "transfers-complete",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ab completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::bc completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ca completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ab holds [main::a, main::b] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::bc holds [main::b, main::c] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ca holds [main::a, main::c] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": null,
+      "baseline_deviation": false
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "gold": "gold.skel",
+      "outcome": "PASS",
+      "complete": true,
+      "properties": [
+        {
+          "id": "no-deadlock",
+          "outcome": "PASS"
+        },
+        {
+          "id": "stock-bounded",
+          "outcome": "PASS"
+        },
+        {
+          "id": "shipments-complete",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ship_ns completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ship_sw completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ship_wn completes",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ship_ns holds [main::north, main::south] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ship_sw holds [main::south, main::west] at once",
+          "outcome": "PASS"
+        },
+        {
+          "id": "preserved: main::ship_wn holds [main::north, main::west] at once",
+          "outcome": "PASS"
+        }
+      ],
+      "states_explored_reference": null,
+      "baseline_deviation": false
     }
   ]
 }

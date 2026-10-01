@@ -1764,6 +1764,666 @@
       "file": "spec.md",
       "sha256": "7437299abc5dd9f573c5e06dffe0f8f59103e8a673f4ef06929eb166823d5dcb",
       "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "a8acf6b164b1fb9e1f2a6e90e3770db61677b277f158ad8af785d9fee0b8d3cd",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "REQUIREMENTS.md",
+      "sha256": "96394d5c37184c30c1dcd2a4722cc37ecfb60064a22c28e6dab20344e84c08e8",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "contract.json",
+      "sha256": "e7c909b21c15bd9eb1e32276e0c6c84556087a13108b130a4a6a6a2d225d3565",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "gold.cir.json",
+      "sha256": "b919f2a6dc3cc6fc116e819c34cef03dd7fe49175885b6ef256fcecb6c412523",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "gold.skel",
+      "sha256": "e12e4bfa722f20db31572dc45928e2e64c382f8f2692731ca7defae5bea607c0",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "ground_truth.json",
+      "sha256": "7fc157c7b0bc7054890d4ba8ada1ca9b9e9f4573ee81a2499d4874e49ad83880",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "requirements.json",
+      "sha256": "7f9b1fe6163991a25b0d87d3230df47253971e883166b0bce9961fb561aeefee",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "rust/buggy.rs",
+      "sha256": "a09fba80585acf521ec41482eeece4bda7ac697a939a09cee75ff05e329448ca",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "rust/fixed.rs",
+      "sha256": "f58cb00195d50dbd0612c83f363b01fb71730903bc3d9345202613e8d081ad79",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/bounded_buffer_semaphores",
+      "file": "spec.md",
+      "sha256": "c17cc2c68ee7a859095920466a54016160f2e3017590a591816c95f9493636c0",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "574022c58872984389f0f60d552ed29f4b4b52e09e81b4956a64dba72d96c34a",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "REQUIREMENTS.md",
+      "sha256": "4ee6b59f715d55c1dcdf5c466df400333eb9a3348dd66c50ef74b7d8c920854e",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "contract.json",
+      "sha256": "196eb056c566ea158ae4b7976df88deb08efb1f4b412e87ba6d74a1c03b34ea9",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "gold.cir.json",
+      "sha256": "8ab42b1bcbbb2ffe1e88d5de11a753cbb64e4d8ff41e3e3f7daac44d1d5345f2",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "gold.skel",
+      "sha256": "1e33ab9e3004dacf10ae069be3eb500a6df4758a6d0681fb990d210586c68de7",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "ground_truth.json",
+      "sha256": "a6c25713bc35a5394254b5d202b79cbd848bc12b54724eb854068a00719c5c50",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "requirements.json",
+      "sha256": "fa8aa83c441306599fea916d6de2c6bf513c63f4006527a176831d98252031f5",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "rust/buggy.rs",
+      "sha256": "3f160106febe6ddf24796230b7ce1d533572f237570ff1aa60d6ef0ac4c42b02",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "rust/fixed.rs",
+      "sha256": "c2f3bf543940e379728b7b59f42ed4612adc4f47ca37126fd2ea951a248558ed",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "buffer/sensor_tray",
+      "file": "spec.md",
+      "sha256": "c85925820de7645b66de23cc7d1d828c5cf247a873c5c2d78dc4e70c1d5c6017",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "dd3d3f13ac92be69fde1931ea876e5aa97e7198762074b8293e13716548274e7",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "REQUIREMENTS.md",
+      "sha256": "265a2906c5ec9fdb4e4224a8d252a936dc727510038df1e3aef184b0c0bebc04",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "contract.json",
+      "sha256": "04c1c476cb4eb8eefb425d3a5c815820a5669a3e6b65ca713a3c926de350adf8",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "gold.cir.json",
+      "sha256": "729c0b9640c25194b944a80dac99047093b593ddfb31837ed359b23e3c155438",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "gold.skel",
+      "sha256": "65611f320a5086b6d62895e92b8f11521d335cf6307fb45674a7f5774e4b5b91",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "ground_truth.json",
+      "sha256": "443b6d972c6714b6c7925b3967d90b21c455b5388a753df9e5681f2548cb4a4e",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "requirements.json",
+      "sha256": "f3d73328f41bffa56bbf2a06770ed9fc25b49417f53eb1171e9a06873c2574d3",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "rust/buggy.rs",
+      "sha256": "97e64b8d1ffef8cb6ecb4c547ef3202a88880f4a71255489ae3b8818e565a0e3",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "rust/fixed.rs",
+      "sha256": "eb038007ff98415f08e3b0a2befc14102f246eab9c1fe0e5e5888f7572f528ff",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_5_ordered",
+      "file": "spec.md",
+      "sha256": "02e4affbcb965151c02747c6c78ee18072847a7e8bfa69efd2c7894e830b23f7",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "d90023b8c0eb40159054b69cf45d8eb5ec22ef2d222f8047f3e6f59ac0607d59",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "REQUIREMENTS.md",
+      "sha256": "80dff751ff21c76cf822688048efad85802b32c3cb0ce5a6747e7991a3947378",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "contract.json",
+      "sha256": "0d4bff4bd0fefe4ffd692a9ee0b6ff7e5239496b3dab39b1e429154bccddfa01",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "gold.cir.json",
+      "sha256": "e3ae38c723388d0101bb4b52a556676abb4771ce8441f5948ce373b3e6bd6a55",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "gold.skel",
+      "sha256": "95c562510de273c7635dd635401aac670746a88306983a8bd4697882730b8927",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "ground_truth.json",
+      "sha256": "f8bee493f57a45535e64bb6720cb2c6a3a3d270a6a09e6363a7c8f732dd9b5c1",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "requirements.json",
+      "sha256": "b02b2965cba80b0e1a129e0593507555c33b7136ff7a65aa2ff88ddd90efd06f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "rust/buggy.rs",
+      "sha256": "19aa886b2f49919b24d7e5de7c429a0c9386643e8c06d8d165f8117e7c259591",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "rust/fixed.rs",
+      "sha256": "e955f43fda2bb5868845400d0a4120ef522956b7b99b0cffc3ad8fafe404487f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/dining_4_waiter",
+      "file": "spec.md",
+      "sha256": "26a1480677dda2320236c3892390014978c3e085c399e082b8b6f7670534215b",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "d75755dccbf82a3473d91d9116d5c090f642e156456da2b9a348696ebc406c07",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "REQUIREMENTS.md",
+      "sha256": "7ddc2db05c922bfbbacba1465e5b06ddb0be2da70373c9e27cfee8b87ae00274",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "contract.json",
+      "sha256": "00ce5c3a250ca6997739ac53aa2c4cf18effac3b0f50a0a7421fffa897473a96",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "gold.cir.json",
+      "sha256": "122d65195aede5cd85984101c3aaa1394a393f55bca2c1c1ededf153e92489a5",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "gold.skel",
+      "sha256": "0bbee01b3cfef03f1aab6abb359925e4188526e28baa8fcd6170862829dab297",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "ground_truth.json",
+      "sha256": "f804ace7f85af427e20bb3c5ab52e5400ed7dae0a9d6e3264e6f63a346f55d44",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "requirements.json",
+      "sha256": "78f47cc51a0f3c14d09791d6fdfa4b19ce321a8469d7f4f12949fc8a63f91e64",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "rust/buggy.rs",
+      "sha256": "2924f8a56df92d8a3c34b49a3702ee75b65b10c0be7e08f71dc230c105576532",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "rust/fixed.rs",
+      "sha256": "5636ca9d5418627024c8839fdfc6e88119174ca7e02d6322354431752452857b",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "philosophers/toolbay_5_ordered",
+      "file": "spec.md",
+      "sha256": "25ac07b2fd5a8e812dc28820ecbe5884489eca94725be5a8c22a69c5fade7417",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "e2333deb2ee865d7bc7267e4f519d11f5f68081288affa317479f0d1dcc7e25e",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "REQUIREMENTS.md",
+      "sha256": "9936933594c531fcac1f9d22df46740a33c9044d05d565d729fe660562c1202e",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "contract.json",
+      "sha256": "4a8f8fdf21e5dae0bef95980e7bb62a12b92f7666d303fe02938f1d0369d3eb4",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "gold.cir.json",
+      "sha256": "7d9e6e166d18fb9d7bc6b33da272287aefb724122ce8f729de79fd36e86be4d3",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "gold.skel",
+      "sha256": "6118e086c20a88f82c059d508ce8bd8bdd171d77faf5a984e0f791da0afc593d",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "ground_truth.json",
+      "sha256": "a26ba0fcff4cfc5b2f4ecfca7ba6ffd8e396c029fe02d292fd45a57e16a5cfd3",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "requirements.json",
+      "sha256": "160a35f8e2b3ec28943dfc3d1d6161c37a26e9b11300cee2f014a0fd3c3533fa",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "rust/buggy.rs",
+      "sha256": "7ef6426898d68d74228d582a5540f2c327202d4dfa7c64001e5ccdd178437084",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "rust/fixed.rs",
+      "sha256": "2f5949832483550be24b44a045036a04dabc2143418597f14f67c11f4238d287",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "pipeline/three_stage_channels",
+      "file": "spec.md",
+      "sha256": "bca112c17ecd5fe0f0dca5e0abefbc9af3282bf07a8cb82b8c9240b090f4d60d",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "62a95cffb1886aa2c2b6f79cd7e4efbcab2f84e54afa88ece9d2682dd42d97b3",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "REQUIREMENTS.md",
+      "sha256": "8d621ce4bba07a2fc31de65d51fe790c1d81f8224da822fdd410e6e5a3aafff6",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "contract.json",
+      "sha256": "34180df3998327d5f24a4edc75444a487ec795c24e4abafbfe4483ebba5f1e6d",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "gold.cir.json",
+      "sha256": "9b43e0bbdcd840fa0f34806fab89372dc829beef5636c4d9f4a9015214002914",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "gold.skel",
+      "sha256": "ad76e982d48fa8534029ae924e4e377ad7325464f02bf3dab73dd5f7108786da",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "ground_truth.json",
+      "sha256": "93cdb0325974dab61d76690b48fcddf351baad7491ee731f31e41c4ca2f0c273",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "requirements.json",
+      "sha256": "475669b51c18cd18932728a8a1a807487d1c9abedba04a92d3b67c5d7678a69b",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "rust/buggy.rs",
+      "sha256": "72ddc5a70846a735903089f7a424569af4b08c951a893138993a9141ec300564",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "rust/expect.json",
+      "sha256": "22038ca37051395b48b84ecb64dd342bdc35759a504181c05f43582cf17c7276",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "rust/fixed.rs",
+      "sha256": "7ba47a99b0cc4eb3c42e13bf2e103e9af1b0d075ef9b919120dfac99bbf8fe59",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "shutdown/graceful_workers",
+      "file": "spec.md",
+      "sha256": "dd734295bf27bb6c4966179bca276078b718b2a0cb41950aab553e10934cb6f0",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "455231482419eb517b22fb01c91bccca6834ce763ed57f68cbbc3a5d40ffbc45",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "REQUIREMENTS.md",
+      "sha256": "b3b26569860f3173174f706e59bf9e2f61b5289b9fbab32f3b16c3edceb887a4",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "contract.json",
+      "sha256": "27c711be26ab1bc81da80937bcd169b7a4b3a76976e6c3b8f054db2cf7db3de6",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "gold.cir.json",
+      "sha256": "aad1c347ed5926345d66951e136b0837671010db601c5ba3d08c4798252b3804",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "gold.skel",
+      "sha256": "53097683d535190a109d4642fba2fac5d783d923b03cce79b049d9dde5782aa5",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "ground_truth.json",
+      "sha256": "e6662e3783b19184d87506643e357f8e57c3b0bf0809228341d98d07b5248e12",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "requirements.json",
+      "sha256": "ec69263b1769b827f8bc5ae6de72455139efd760dcd89ea721280551b475784d",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "rust/buggy.rs",
+      "sha256": "3594c07d0f33e969e03d7865e231428f63009715884db747a4259c3ce5dd3a89",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "rust/expect.json",
+      "sha256": "22038ca37051395b48b84ecb64dd342bdc35759a504181c05f43582cf17c7276",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "rust/fixed.rs",
+      "sha256": "b917614e17e95155993109093efcf545a2209bceef07f76a8bca74ae38dfc34e",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "printing/print_queue_two_printers",
+      "file": "spec.md",
+      "sha256": "057cf6038f6e6b7312c2c2417c1dfa8f29c140617cfda21fd8be7da7a2f72b07",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "743318efbe67cdfe4affaca6c0717da744126a92d09dbe7eaf19f3d4647ea5ae",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "REQUIREMENTS.md",
+      "sha256": "d05a5e75f54171a2ecc4b74a4c5333100aa78dc875210c7c3582a748c154c3a5",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "contract.json",
+      "sha256": "94629c6b72f7d01176baf9470ce814356c01db99d7a63c112334c6c32c6ebd5d",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "gold.cir.json",
+      "sha256": "c2875d416ff3d6b9c85a246b6a239c142871f34f9fd3aa3f6a209bdbd7bf18fa",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "gold.skel",
+      "sha256": "e7e758b36ecabf49332b246c2df2f0d879433c059f50f28b1f1c08ff6e2a1364",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "ground_truth.json",
+      "sha256": "fc0f625d5772d54349f1efffa4fb6e085114af6d88fa37f49aaf5fbf5ea09182",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "requirements.json",
+      "sha256": "0da8af50feb65f446cf3e6ea336fba63e1a624bc07e2ea7981f7ce53c7bf8202",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "rust/buggy.rs",
+      "sha256": "a51badc261bf7538bdc449a946b96455cbe78d732e6c01a39493bba5b9352217",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "rust/fixed.rs",
+      "sha256": "cf90910965a538a1f17926d1cd4374fdc1e9787b312db9d9ca3670aefb4632e1",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_accounts",
+      "file": "spec.md",
+      "sha256": "58b7e414fa8c4c8165cda0153dcc26abf98fbf9630b670b5566e0dc5f9257fcd",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "REQUIREMENTS.h1.md",
+      "sha256": "17c8f4a1fa57b65a0d09581f4fd82b29149e9823c6efb36997cb8fd2fec33848",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "REQUIREMENTS.md",
+      "sha256": "1de788ba7146d7ed0b1fda8662b2c64da8002936c33fa617df418272a90b9ed3",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "contract.json",
+      "sha256": "7b66aad425f446467ac88384a0ce05b3b00f3f66f2f38df36fcd9d7b6658c95d",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "gold.cir.json",
+      "sha256": "9a0264c8f83cf40a977a42fdbe56fafb95ae62d218483ffc6646d8228beddb28",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "gold.skel",
+      "sha256": "02b11fbcee6f7c94337e7803157f7c88919237ccde1e34bdf66d2fc2013367d1",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "ground_truth.json",
+      "sha256": "c940c7e3ce71c27c6a699dfb07d9c61f98d3ce6186e99b9391500f4ac317c774",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "requirements.json",
+      "sha256": "e65b88cd8883211c46eaf58cd78ff5f3964e9833553789f261d7f3ebeb0ac4b4",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "rust/buggy.rs",
+      "sha256": "dd9c5c611900451531448b42f82449b2e3a3fc07234151c0d821ce1f479b8549",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "rust/expect.json",
+      "sha256": "235468b47c22cf9de18ea07facc637151e06a7aeac9d497d537d37252df69e4f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "rust/fixed.rs",
+      "sha256": "40523a4a431cfbacfab0c67751e5145582c746b33d0cebb2e16f3c4a61eaa76f",
+      "source": "new (SkelNet R7b)"
+    },
+    {
+      "task": "transfer/ordered_three_warehouses",
+      "file": "spec.md",
+      "sha256": "59dd1927ecaaa3b6ea0df4e150f80333ab99b5b0bef5bd7aa9174cb8d20b448c",
+      "source": "new (SkelNet R7b)"
     }
   ]
 }
