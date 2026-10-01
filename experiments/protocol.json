@@ -92,14 +92,14 @@
         },
         "rust": {
           "assets": [
-            "rust_from_cir_v3.md",
+            "rust_from_cir_v4.md",
             "rust_runtime_api_v1.md"
           ],
           "sha256": [
-            "f3ee5803255fdfa419e19c8b7b588732417606cafd03222f09007c7a302af24d",
+            "214c3fe6e104649dcd314c317d31d57a06b37989e7971e432821ea9f4efe9ca7",
             "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
           ],
-          "system_sha256": "38034f445193358d7a0f3f7686e8d23104dbd4b2c8e293db06e091f0af52c186"
+          "system_sha256": "8eeb2d2b97a2c1e544c6bf4556b5f07e1a7ba191c2c0b7a528866f115b7a2d46"
         },
         "rust_fix": {
           "assets": [
@@ -254,14 +254,14 @@
         },
         "rust": {
           "assets": [
-            "rust_from_skel_v2.md",
+            "rust_from_skel_v3.md",
             "rust_runtime_api_v1.md"
           ],
           "sha256": [
-            "db3831355ebca21ee43f42a52be148430eb4529157baa5b9235b8f44e4981e4d",
+            "999d8d033256ed7d5025bea1a407b8bab527757fef0fe839299cc0ae5046c7fd",
             "10a361db202058aab7f238d06fc2a13ad39cce1076bd3e81cb64297903a3c6e4"
           ],
-          "system_sha256": "8945fdc362a3eb1b180b318ec3be422072969d1500076a9653674f5744c53923"
+          "system_sha256": "cce4399d1a4cf80656a14e7b4d5c0a0f2d8aba5725eeda306c62e049b6fb2a9d"
         },
         "rust_fix": {
           "assets": [
@@ -657,8 +657,8 @@
     "tiers_sha256": "a3d23a4aad082c9649cf467ac1f1b8b37bb9c28a1c1c069973dcadc6ddb04468"
   },
   "deviations_policy": "Any deviation from this frozen protocol after it is frozen must be recorded in experiments/DEVIATIONS.md (file header only at freeze time).",
-  "frozen_at": "2026-09-30T08:07:51Z",
-  "frozen_at_commit": "0f3c793",
+  "frozen_at": "2026-09-30T22:22:06Z",
+  "frozen_at_commit": "03dbfe3",
   "models": [
     {
       "channel": "opencode-go",
@@ -711,6 +711,7 @@
     "max_output_tokens": 32768,
     "max_output_tokens_cap": 65536,
     "seed_policy": "per_cell",
+    "skeleton_rounds_rule": "min(rounds, call_budget - 2)",
     "temperature_policy": "provider_default",
     "token_budget": 200000
   },

@@ -108,6 +108,9 @@ def _run_params_block() -> dict:
         "seed_policy": params.SEED_PER_CELL,
         "temperature_policy": params.TEMPERATURE_PROVIDER_DEFAULT,
         "hint": params.DEFAULT_HINT,
+        # R9d-P1: llm-mode SKEL/CIR cap the skeleton stage so the Rust stage
+        # keeps >=2 calls (one generate, one fix). Codegen keeps B-1.
+        "skeleton_rounds_rule": "min(rounds, call_budget - 2)",
     }
 
 

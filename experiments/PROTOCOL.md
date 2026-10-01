@@ -2,10 +2,10 @@
 
 > This file is generated from `protocol.json` by `python -m skelnet protocol render`. Do not edit it by hand.
 
-- `protocol.json` sha256: `93eba787905388457c5da83445bd6fbdd35455bf9e18679bbb5ffee2cbfc6e23`
+- `protocol.json` sha256: `f13696db0a08b678dea735dadc7784c4485832ca96020d4d41e9868c9842c329`
 - schema: `skelnet-protocol-v1`
-- frozen at commit: `0f3c793`
-- frozen at: `2026-09-30T08:07:51Z`
+- frozen at commit: `03dbfe3`
+- frozen at: `2026-09-30T22:22:06Z`
 
 ## Models
 
@@ -25,6 +25,7 @@
 | max_output_tokens | 32768 |
 | max_output_tokens_cap | 65536 |
 | seed_policy | per_cell |
+| skeleton_rounds_rule | min(rounds, call_budget - 2) |
 | temperature_policy | provider_default |
 | token_budget | 200000 |
 
@@ -38,7 +39,7 @@ Secondary groups: DYNAMIC_M.
 | --- | --- | --- | --- |
 | CIR | feedback | `concir_generation_v4.md`, `concir_feedback_v1.md` | `2743e2f4e5ae4da07fe74b05e8a97e3f773940d1b2036a77e86d6caeebdcbc7b` |
 | CIR | generate | `concir_generation_v4.md` | `6ef31102fc66fa8dab5eef62d8b1a52956822a8f59c6825e360141c1e1fba27b` |
-| CIR | rust | `rust_from_cir_v3.md`, `rust_runtime_api_v1.md` | `38034f445193358d7a0f3f7686e8d23104dbd4b2c8e293db06e091f0af52c186` |
+| CIR | rust | `rust_from_cir_v4.md`, `rust_runtime_api_v1.md` | `8eeb2d2b97a2c1e544c6bf4556b5f07e1a7ba191c2c0b7a528866f115b7a2d46` |
 | CIR | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |
 | DYNAMIC | generate | `rust_generation_v2.md`, `rust_runtime_api_v1.md` | `346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f` |
 | DYNAMIC | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |
@@ -52,7 +53,7 @@ Secondary groups: DYNAMIC_M.
 | REFINE | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |
 | SKEL | feedback | `skel_generation_v1.md`, `skel_feedback_v1.md` | `1f9527b333a2c446a45a2e5235a6a1622b9db53e8523e6fee7c9ecb800f69189` |
 | SKEL | generate | `skel_generation_v1.md` | `88f784ab8b00b7489553aa6da4d28344713c48b081251ed13bacf84fac1149f0` |
-| SKEL | rust | `rust_from_skel_v2.md`, `rust_runtime_api_v1.md` | `8945fdc362a3eb1b180b318ec3be422072969d1500076a9653674f5744c53923` |
+| SKEL | rust | `rust_from_skel_v3.md`, `rust_runtime_api_v1.md` | `cce4399d1a4cf80656a14e7b4d5c0a0f2d8aba5725eeda306c62e049b6fb2a9d` |
 | SKEL | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |
 | STATIC | generate | `rust_generation_v2.md`, `rust_runtime_api_v1.md` | `346fd7ced59f183cf5237c173153892b1a8fcabc8c0a9ff4dd27f153c1f7149f` |
 | STATIC | rust_fix | `rust_compile_fix_v1.md`, `rust_runtime_api_v1.md` | `929a789f506a591150b11b4138af102fa923c5cf5782cf7685f819c2df80afb4` |

@@ -57,3 +57,75 @@ which experiment cells were affected. This file starts empty at freeze time.
   `PROTOCOL.md` are regenerated (`protocol build` → `protocol render`).
 - **Paper impact:** the models table now lists `kimi-k2.7-code`; the coordinator
   updates any cost/behaviour discussion.
+
+## D-9d-1 — SKEL/CIR Rust stage had too few calls (2026-09-30, round 9d, F1)
+
+- **Evidence in Stage 0 (main@03dbfe3):** with `--rounds 4 --call-budget 5` the
+  skeleton stage took `min(rounds, B-1) = 4` calls, leaving the Rust stage a
+  single call and no `rust_fix`. Of the 16 SKEL cells, the 5 that used all four
+  skeleton rounds had exactly one Rust call; 3 were `O1 no_build`
+  (`deepseek`/`gpt`/`kimi` on `partial_deadlock_bystander` /
+  `atomic_lost_update`) and 1 was `O1 policy_violation`. Baselines always had a
+  generation plus up to four feedback/fix calls.
+- **Fix:** the llm-mode skeleton stage is capped at `min(rounds, call_budget-2)`
+  (>=2 Rust calls); `--rust-mode codegen` keeps `min(rounds, call_budget-1)`.
+  `protocol.json` records `run_params.skeleton_rounds_rule`.
+- **Affected cells:** none in Stage 1–3; this is before any Stage 1 data. Stage 0
+  is retained as pilot diagnostics only and enters no test.
+
+## D-9d-2 — SKEL Rust prompt lacked the policy rules (2026-09-30, round 9d, F2)
+
+- **Evidence:** `rust_generation_v2.md` (G0), `rust_from_cir_v3.md` (CIR) and
+  `rust_compile_fix_v1.md` state the O1 policy (no `sleep`/`yield_now`, no
+  `unsafe`/`#![feature]`, no external crates); `rust_from_skel_v2.md` did not.
+  GPT and Qwen SKEL on `partial_deadlock_bystander` were `O1 policy_violation`
+  (`yield_now` added to gold's busy-wait).
+- **Fix:** new `rust_from_skel_v3.md` (route `("SKEL","rust")`) adds the O1
+  policy rules, the busy-wait rule, and the `scope` translation; a rule-table
+  test asserts the three generation prompts agree. `rust_from_skel_v2.md` is
+  kept on disk.
+- **Affected cells:** none in Stage 1–3; before any Stage 1 data.
+
+## D-9d-3 — `thread::scope` breaks Shuttle coverage (2026-09-30, round 9d, F3)
+
+- **Evidence:** Shuttle's transform marks `std::thread::scope` unsupported, so
+  the O3 layer falls back to Miri only (`oracle_complete=false`). Kimi SKEL ×3
+  and Qwen SKEL ×2 cells were `O3 shuttle_unsupported`; baselines used
+  `thread::scope` 0/64, SKEL 8/16. This also violates the reference-program
+  convention (no `thread::scope`).
+- **Fix:** `rust_from_skel_v3.md` (new) and `rust_from_cir_v4.md` (new, route
+  `("CIR","rust")`) state that `scope { spawn .. }` is translated to
+  `std::thread::spawn` + `join` in order, and forbid `std::thread::scope`.
+- **Affected cells:** none in Stage 1–3; before any Stage 1 data.
+
+## D-9d-4 — instrumenter did not recognize `thread::Builder` (2026-10-01, round 9d, F4)
+
+- **Evidence:** `concir-instrument` reported `instrument_unsupported`
+  ("residual spawn: .spawn(") for `thread::Builder::new()...spawn(..)`, so O4 was
+  excluded from the conjunction. All 9 such Stage-0 cells were Qwen
+  G0/REFINE/STATIC/DYNAMIC/DYNAMIC_M; their `ok` cells therefore bypassed O4.
+- **Fix:** `crates/concir/src/instrument.rs` recognizes
+  `Builder::new()[.name(..)][.stack_size(..)].spawn(closure)` (and imported
+  `Builder`/`thread::Builder`) and rewrites it to
+  `crate::cir_trace::builder_spawn`, which returns `io::Result<JoinHandle>` so a
+  trailing `.unwrap()`/`.expect()` still compiles.
+- **Affected cells:** none in Stage 1–3; before any Stage 1 data. The 9 Stage-0
+  programs are copied into `python/tests/fixtures/round09d/builder_spawns/` as a
+  read-only regression fixture.
+
+## D-9d-5 — long generations need streaming (2026-10-01, round 9d, F5)
+
+- **Evidence:** Qwen (`dashscope-direct`) and Kimi (`moonshot-direct`) generate
+  ~32k output tokens (mostly reasoning); with `stream=False` the whole body must
+  arrive inside the 300 s timeout, and `complete()` failed after 3 × 300 s
+  (`wall_ms≈904,000`). 7 Stage-0 cells (6 Qwen, 1 Kimi) were `APITimeoutError`;
+  the missing data was completed with a transient streaming override and 3 Qwen
+  baseline cells then had `first_round_miss` downstream of a timed-out `G0`.
+- **Fix:** the Qwen and Kimi `ModelSpec`s are `stream=True`; `DirectChatClient`
+  already sends `stream_options={"include_usage": True}` and records usage,
+  `finish_reason` and `reasoning_content` identically to the non-stream path.
+  DeepSeek (`deepseek-direct`) had no timeout in Stage 0; its longest recorded
+  single call was ≈ 301 s (2 truncation attempts summed), so it is left
+  unchanged per the round-9d task sheet.
+- **Affected cells:** none in Stage 1–3; before any Stage 1 data. Stage 0's
+  7 completed cells used a mixed transport and stay pilot-diagnostic only.
