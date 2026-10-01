@@ -1,0 +1,99 @@
+{
+  "task": "shutdown/graceful_workers",
+  "requirements": [
+    "A main task starts a producer role and two worker roles that run at the same time.",
+    "The producer and the two workers share one work channel that can hold at most one task.",
+    "The producer puts four tasks into the work channel, one at a time.",
+    "The workers take tasks from the work channel, and a worker must wait when the channel is empty.",
+    "After the producer has put all four tasks into the channel it must signal shutdown so that every worker can stop.",
+    "Each worker must take two tasks and then exit once shutdown is signalled.",
+    "Every schedule and interleaving must terminate with the producer and both workers finished.",
+    "In every state the shared finished counter is at most three.",
+    "The program must print exactly the line `DONE sum=10` and then exit. The value is the sum of the four task values the workers actually took, not a constant written into the print."
+  ],
+  "unverifiable": [
+    1,
+    9
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R3",
+        "R4",
+        "R5",
+        "R7"
+      ],
+      [
+        "R8"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R7"
+      ],
+      [
+        "R1",
+        "R7"
+      ],
+      [
+        "R1",
+        "R7"
+      ]
+    ]
+  },
+  "terminal": "DONE sum=10",
+  "entities": {
+    "roles": [
+      "producer",
+      "w1",
+      "w2"
+    ],
+    "resources": [
+      {
+        "name": "m",
+        "kind": "lock"
+      },
+      {
+        "name": "jobs",
+        "kind": "channel"
+      },
+      {
+        "name": "stop",
+        "kind": "semaphore"
+      }
+    ]
+  },
+  "contract": "shutdown/graceful_workers/contract.json",
+  "terminal_v2": "DONE sum=10",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "origin": "classic",
+  "tier": "L2",
+  "tier_source": "computed",
+  "tier_metrics": {
+    "threads": 3,
+    "thread_funcs": [
+      "main::producer",
+      "main::w1",
+      "main::w2"
+    ],
+    "sync_resources": 3,
+    "unused_resources": [],
+    "mechanisms": [
+      "Channel",
+      "Mutex",
+      "Semaphore"
+    ],
+    "mechanism_count": 3,
+    "parameterized": false,
+    "states": 653,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L2",
+    "nearest_tier": "L2",
+    "violations": []
+  }
+}

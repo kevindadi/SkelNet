@@ -1,0 +1,241 @@
+{
+  "program": "three_stage_channels",
+  "version": "3.5.0",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "m",
+          "ch1",
+          "ch2",
+          "processed"
+        ],
+        "functions": [
+          "main",
+          "stage1",
+          "stage2",
+          "stage3"
+        ],
+        "types": []
+      },
+      "requires": {
+        "resources": [],
+        "functions": [],
+        "types": []
+      },
+      "resources": [
+        {
+          "name": "m",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "ch1",
+          "kind": "sync",
+          "type": "Channel",
+          "mode": "Sync",
+          "base": "Int",
+          "capacity": 1
+        },
+        {
+          "name": "ch2",
+          "kind": "sync",
+          "type": "Channel",
+          "mode": "Sync",
+          "base": "Int",
+          "capacity": 1
+        },
+        {
+          "name": "processed",
+          "kind": "var",
+          "type": "Var",
+          "base": "Int",
+          "init": 0
+        }
+      ],
+      "protection": [
+        {
+          "var": "processed",
+          "lock": "m"
+        }
+      ],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "scope",
+              "funcs": [
+                "main::stage1",
+                "main::stage2",
+                "main::stage3"
+              ]
+            },
+            {
+              "sid": "s2",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "stage1",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "channel_send",
+              "channel": "main::ch1",
+              "value": "1"
+            },
+            {
+              "sid": "s2",
+              "kind": "channel_send",
+              "channel": "main::ch1",
+              "value": "2"
+            },
+            {
+              "sid": "s3",
+              "kind": "channel_send",
+              "channel": "main::ch1",
+              "value": "3"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_lock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s5",
+              "kind": "write_shared",
+              "resource": "main::processed",
+              "expr": "processed + 1"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "stage2",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "channel_recv",
+              "channel": "main::ch1",
+              "dst": "_"
+            },
+            {
+              "sid": "s2",
+              "kind": "channel_recv",
+              "channel": "main::ch1",
+              "dst": "_"
+            },
+            {
+              "sid": "s3",
+              "kind": "channel_recv",
+              "channel": "main::ch1",
+              "dst": "_"
+            },
+            {
+              "sid": "s4",
+              "kind": "channel_send",
+              "channel": "main::ch2",
+              "value": "2"
+            },
+            {
+              "sid": "s5",
+              "kind": "channel_send",
+              "channel": "main::ch2",
+              "value": "3"
+            },
+            {
+              "sid": "s6",
+              "kind": "channel_send",
+              "channel": "main::ch2",
+              "value": "4"
+            },
+            {
+              "sid": "s7",
+              "kind": "mutex_lock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s8",
+              "kind": "write_shared",
+              "resource": "main::processed",
+              "expr": "processed + 1"
+            },
+            {
+              "sid": "s9",
+              "kind": "mutex_unlock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s10",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "stage3",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "channel_recv",
+              "channel": "main::ch2",
+              "dst": "_"
+            },
+            {
+              "sid": "s2",
+              "kind": "channel_recv",
+              "channel": "main::ch2",
+              "dst": "_"
+            },
+            {
+              "sid": "s3",
+              "kind": "channel_recv",
+              "channel": "main::ch2",
+              "dst": "_"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_lock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s5",
+              "kind": "write_shared",
+              "resource": "main::processed",
+              "expr": "processed + 1"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "entry": "main::main"
+}

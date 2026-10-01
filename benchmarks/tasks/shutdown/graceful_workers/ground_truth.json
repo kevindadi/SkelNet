@@ -1,0 +1,11 @@
+{
+  "defect_family": "shutdown",
+  "resources": [
+    "main::m",
+    "main::jobs",
+    "main::stop"
+  ],
+  "statements": [],
+  "expected_outcome_fixed": "PASS",
+  "provenance": "new (SkelNet R7b)"
+}

@@ -1,0 +1,100 @@
+{
+  "task": "printing/print_queue_two_printers",
+  "requirements": [
+    "A main task starts a spooler role and two printer roles that run at the same time.",
+    "The spooler and the two printers share one print queue that can hold at most one job.",
+    "The spooler puts four print jobs into the queue, one at a time.",
+    "The printers take jobs from the queue, and a printer must wait when the queue is empty.",
+    "After the spooler has put all four jobs into the queue it must signal shutdown so that every printer can stop.",
+    "Each printer must take two jobs and then exit once shutdown is signalled.",
+    "Every schedule and interleaving must terminate with the spooler and both printers finished.",
+    "In every state the shared printed counter is at most three.",
+    "The program must print exactly the line `DONE pages=10` and then exit. The value is the sum of the four job sizes the printers actually took, not a constant written into the print."
+  ],
+  "unverifiable": [
+    1,
+    9
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R3",
+        "R4",
+        "R5",
+        "R7"
+      ],
+      [
+        "R8"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R7"
+      ],
+      [
+        "R1",
+        "R7"
+      ],
+      [
+        "R1",
+        "R7"
+      ]
+    ]
+  },
+  "terminal": "DONE pages=10",
+  "entities": {
+    "roles": [
+      "spooler",
+      "printer1",
+      "printer2"
+    ],
+    "resources": [
+      {
+        "name": "ledger",
+        "kind": "lock"
+      },
+      {
+        "name": "queue",
+        "kind": "channel"
+      },
+      {
+        "name": "halt",
+        "kind": "semaphore"
+      }
+    ]
+  },
+  "contract": "printing/print_queue_two_printers/contract.json",
+  "terminal_v2": "DONE pages=10",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "origin": "disguised",
+  "disguise_of": "shutdown/graceful_workers",
+  "tier": "L2",
+  "tier_source": "computed",
+  "tier_metrics": {
+    "threads": 3,
+    "thread_funcs": [
+      "main::printer1",
+      "main::printer2",
+      "main::spooler"
+    ],
+    "sync_resources": 3,
+    "unused_resources": [],
+    "mechanisms": [
+      "Channel",
+      "Mutex",
+      "Semaphore"
+    ],
+    "mechanism_count": 3,
+    "parameterized": false,
+    "states": 653,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L2",
+    "nearest_tier": "L2",
+    "violations": []
+  }
+}

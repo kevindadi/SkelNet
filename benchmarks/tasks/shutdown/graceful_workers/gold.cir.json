@@ -1,0 +1,236 @@
+{
+  "program": "graceful_workers",
+  "version": "3.5.0",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "m",
+          "jobs",
+          "stop",
+          "finished"
+        ],
+        "functions": [
+          "main",
+          "producer",
+          "w1",
+          "w2"
+        ],
+        "types": []
+      },
+      "requires": {
+        "resources": [],
+        "functions": [],
+        "types": []
+      },
+      "resources": [
+        {
+          "name": "m",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "jobs",
+          "kind": "sync",
+          "type": "Channel",
+          "mode": "Sync",
+          "base": "Int",
+          "capacity": 1
+        },
+        {
+          "name": "stop",
+          "kind": "sync",
+          "type": "Semaphore",
+          "mode": "Sync",
+          "count": 0
+        },
+        {
+          "name": "finished",
+          "kind": "var",
+          "type": "Var",
+          "base": "Int",
+          "init": 0
+        }
+      ],
+      "protection": [
+        {
+          "var": "finished",
+          "lock": "m"
+        }
+      ],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "scope",
+              "funcs": [
+                "main::producer",
+                "main::w1",
+                "main::w2"
+              ]
+            },
+            {
+              "sid": "s2",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "producer",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "channel_send",
+              "channel": "main::jobs",
+              "value": "1"
+            },
+            {
+              "sid": "s2",
+              "kind": "channel_send",
+              "channel": "main::jobs",
+              "value": "2"
+            },
+            {
+              "sid": "s3",
+              "kind": "channel_send",
+              "channel": "main::jobs",
+              "value": "3"
+            },
+            {
+              "sid": "s4",
+              "kind": "channel_send",
+              "channel": "main::jobs",
+              "value": "4"
+            },
+            {
+              "sid": "s5",
+              "kind": "semaphore_release",
+              "resource": "main::stop"
+            },
+            {
+              "sid": "s6",
+              "kind": "semaphore_release",
+              "resource": "main::stop"
+            },
+            {
+              "sid": "s7",
+              "kind": "mutex_lock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s8",
+              "kind": "write_shared",
+              "resource": "main::finished",
+              "expr": "finished + 1"
+            },
+            {
+              "sid": "s9",
+              "kind": "mutex_unlock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s10",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "w1",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "channel_recv",
+              "channel": "main::jobs",
+              "dst": "_"
+            },
+            {
+              "sid": "s2",
+              "kind": "channel_recv",
+              "channel": "main::jobs",
+              "dst": "_"
+            },
+            {
+              "sid": "s3",
+              "kind": "semaphore_acquire",
+              "resource": "main::stop"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_lock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s5",
+              "kind": "write_shared",
+              "resource": "main::finished",
+              "expr": "finished + 1"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "w2",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "channel_recv",
+              "channel": "main::jobs",
+              "dst": "_"
+            },
+            {
+              "sid": "s2",
+              "kind": "channel_recv",
+              "channel": "main::jobs",
+              "dst": "_"
+            },
+            {
+              "sid": "s3",
+              "kind": "semaphore_acquire",
+              "resource": "main::stop"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_lock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s5",
+              "kind": "write_shared",
+              "resource": "main::finished",
+              "expr": "finished + 1"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::m"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "entry": "main::main"
+}

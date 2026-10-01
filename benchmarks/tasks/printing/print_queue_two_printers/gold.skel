@@ -1,0 +1,18 @@
+skeleton print_queue_two_printers;
+
+mutex ledger;
+channel queue: Int cap 1;
+semaphore halt = 0;
+shared printed: Int = 0 guarded_by ledger;
+
+@R1 @R2 @R7
+fn main() { scope { spawn spooler(); spawn printer1(); spawn printer2(); } }
+
+@R2 @R3 @R4 @R5 @R8
+fn spooler() { queue.send(1); queue.send(2); queue.send(3); queue.send(4); halt.post(); halt.post(); lock ledger { printed = printed + 1; } }
+
+@R2 @R4 @R5 @R6 @R8
+fn printer1() { queue.recv(); queue.recv(); halt.take(); lock ledger { printed = printed + 1; } }
+
+@R2 @R4 @R5 @R6 @R8
+fn printer2() { queue.recv(); queue.recv(); halt.take(); lock ledger { printed = printed + 1; } }
