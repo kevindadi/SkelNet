@@ -180,7 +180,9 @@ def test_key_requirements_are_channel_specific(tmp_path):
 def test_models_probe_dry_run_lists_kimi_moonshot(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("MOONSHOT_API_KEY", raising=False)
     env = write_env(tmp_path, MOONSHOT_API_KEY="SECRET-PROBE-KIMI")
-    rc = cli.main(["models", "probe", "--dry-run", "--env-file", str(env)])
+    # Round 9e: Kimi is out of the experimental set, so probe it explicitly.
+    rc = cli.main(["models", "probe", "--dry-run", "--models", "kimi-k2.7-code",
+                   "--env-file", str(env)])
     assert rc == 0
     text = capsys.readouterr().out
     assert "SECRET-PROBE-KIMI" not in text

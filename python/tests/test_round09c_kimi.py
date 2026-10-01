@@ -118,12 +118,17 @@ def test_kimi_k3_run_refused(tmp_path, monkeypatch, capsys):
 def test_probe_dry_run_lists_new_kimi(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("MOONSHOT_API_KEY", raising=False)
     env = write_env(tmp_path, MOONSHOT_API_KEY=SECRET)
+    # Round 9e: the experimental set is GPT / Composer / DeepSeek / Qwen.
     assert cli.main(["models", "probe", "--dry-run", "--env-file", str(env)]) == 0
+    ids = {m["model_id"] for m in json.loads(capsys.readouterr().out)["models"]}
+    assert set(EXPERIMENTAL_MODEL_IDS) == ids
+    assert "composer-2.5" in ids and "kimi-k2.7-code" not in ids
+    # Kimi is still probeable explicitly (Moonshot channel).
+    assert cli.main(["models", "probe", "--dry-run", "--models", "kimi-k2.7-code",
+                     "--env-file", str(env)]) == 0
     text = capsys.readouterr().out
     assert SECRET not in text
     document = json.loads(text)
-    ids = {m["model_id"] for m in document["models"]}
-    assert set(EXPERIMENTAL_MODEL_IDS) == ids
     kimi = next(m for m in document["models"] if m["model_id"] == "kimi-k2.7-code")
     assert kimi["display_name"] == "Kimi"
     assert kimi["channel"] == "moonshot-direct"

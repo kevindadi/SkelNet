@@ -48,23 +48,23 @@ concatenated `system_sha256`.
 ## Model parameters
 
 The four experimental models are GPT 6 Luna (`gpt-6-luna`, OpenCode Responses,
-`OPENCODE_API_KEY`, reasoning effort `medium`), Kimi (`kimi-k2.7-code`, Moonshot
-direct Chat Completions, `MOONSHOT_API_KEY`), DeepSeek Flash (`deepseek-flash`,
-direct) and Qwen (`qwen3.8-flash`, DashScope direct). Kimi no longer runs through
-the OpenCode gateway: it uses the owner's own Moonshot key against
-`https://api.moonshot.cn/v1`. Round 9c replaced `kimi-k3` with `kimi-k2.7-code`;
-the new model cannot disable thinking, so the channel always sends
-`extra_body={"thinking": {"type": "enabled"}}` and sends no `reasoning_effort`
-(Moonshot documents none). The old `kimi-k3` id is kept as a blocked diagnostic.
-DeepSeek and Qwen are unchanged.
+`OPENCODE_API_KEY`, reasoning effort `medium`), Composer 2.5 (`composer-2.5`,
+Cursor agent SDK, `CURSOR_API_KEY`), DeepSeek Flash (`deepseek-flash`, direct)
+and Qwen (`qwen3.8-flash`, DashScope direct). Round 9e replaced Kimi
+(`kimi-k2.7-code`, Moonshot direct) with Composer 2.5 because Kimi was too slow;
+Kimi stays available but is no longer part of the frozen model set, so a run
+that names it can still be replayed (see `experiments/DEVIATIONS.md` D-9e-1).
+Composer 2.5 runs through the Cursor **agent** SDK, not a stateless chat
+endpoint: its context is partly unobservable and its token usage/cost is
+server-reported per agent turn, so it is not directly comparable to the
+direct-API models. Every arm is still scored by the same oracle.
 
-All four run with thinking enabled; no temperature is sent
+GPT, DeepSeek and Qwen run with thinking enabled and no temperature
 (`provider_default`); each cell is capped at 5 calls / 200k tokens; one output
-is capped at 32768 tokens (retry cap 65536). Kimi's `reasoning_content` is
-recorded separately and never merged into the reply text. The direct-chat
-channels `dashscope-direct` (Qwen) and `moonshot-direct` (Kimi) send
-`stream=True` with `stream_options={"include_usage": True}` (round 9d P4): a
-~32k-token generation is read chunk by chunk instead of waiting for the whole
+is capped at 32768 tokens (retry cap 65536). The direct-chat channels
+`dashscope-direct` (Qwen) and `moonshot-direct` (Kimi, when probed explicitly)
+send `stream=True` with `stream_options={"include_usage": True}` (round 9d P4):
+a ~32k-token generation is read chunk by chunk instead of waiting for the whole
 response body inside the 300 s timeout. DeepSeek and GPT are unchanged.
 
 `RunParams` (in the MANIFEST as `run_params`) fixes the temperature policy,
@@ -77,8 +77,8 @@ is present (never the value); `--env-file` selects the dotenv file to load
 A real probe also sends one nontrivial concurrency question
 (`PROBE_NONTRIVIAL_USER`, correct answer `YES`) at the model's default effort,
 and, for models that take a reasoning effort (GPT 6 Luna), once more at
-`low`. Kimi has no `reasoning_effort`, so it runs the nontrivial prompt only
-once. The record stores `reasoning_tokens_nontrivial`,
+`low`. Composer 2.5 has no `reasoning_effort`, so it runs the nontrivial prompt
+only once. The record stores `reasoning_tokens_nontrivial`,
 `nontrivial_answer_ok`, `nontrivial_output_tokens`, and
 `reasoning_tokens_nontrivial_low` when the low call ran. GPT's Responses
 channel also stores `responses_reasoning_echo` (the `reasoning` object echoed

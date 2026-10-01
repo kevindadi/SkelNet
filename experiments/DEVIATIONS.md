@@ -141,3 +141,37 @@ which experiment cells were affected. This file starts empty at freeze time.
   makes `protocol check` exit 1.
 - **Affected cells:** none in Stage 1–3; before any Stage 1 data. Stage 0's
   7 completed cells used a mixed transport and stay pilot-diagnostic only.
+
+## D-9e-1 — Kimi replaced by Cursor Composer 2.5 (2026-10-01, round 9e)
+
+- **What changed:** the experimental model set now runs **Composer 2.5**
+  (`composer-2.5`, Cursor) instead of **Kimi** (`kimi-k2.7-code`, Moonshot
+  direct). A new `cursor` channel and `python/skelnet/cursor.py`
+  (`CursorAgentClient`) drive the Cursor agent SDK; the Kimi `ModelSpec` stays
+  **available** but is no longer one of the experimental models (so old run
+  directories that name `Kimi` can still be replayed, while the frozen model set
+  excludes it).
+  `experiments/protocol.json` and `PROTOCOL.md` are regenerated
+  (`protocol build` → `protocol render`); the new `protocol.json` sha256 is
+  `772bfe409a2e249e0e889f7273ecb76de73c24f97bcf64f470b6c5c6b6aba16f`.
+- **Why:** Kimi was too slow to keep the four-model grid on schedule. In Stage 1
+  its `G0` run took ≈78 min for 72 cells (median LLM wall 32.3 s, max 350.7 s)
+  versus DeepSeek's ≈43 min (median 16.8 s); `kimi-skel` was still incomplete
+  after ≈90 min. Owner decision (2026-10-01).
+- **Comparability caveat:** Composer 2.5 runs through the Cursor *agent* SDK, not
+  a stateless chat endpoint. Its context is partly unobservable and its token
+  usage/cost are server-reported per agent turn, so `budget_used.tokens` and
+  `cost` are **not directly comparable** to the direct-API models. This is
+  recorded as a threats-to-validity item; the comparison of primary metrics
+  (`functional_ok` and the O1–O4 layers) is unaffected because every arm is
+  scored by the same oracle.
+- **Affected cells:** the Stage 1 Kimi runs are abandoned — `kimi-g0`
+  (`complete`, 72 cells) and `kimi-skel` (incomplete, 25/72). They are retained
+  on disk as pilot-diagnostic only and enter no test. The DeepSeek, GPT 6 Luna
+  and Qwen runs are unaffected. Stage 0 Kimi runs are pilot-diagnostic only.
+- **Handling:** the remaining Stage 1 grid is run for the other three models
+  first (in progress); the Composer 2.5 arms are launched with the same task set
+  and flags. The stage-1 cache directory for the new model is
+  `experiments/stage1/cache_composer`.
+- **Paper impact:** the models table lists Composer 2.5; the coordinator updates
+  the cost/behaviour discussion and the threats-to-validity section.

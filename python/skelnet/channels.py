@@ -10,7 +10,7 @@ from .audit import AuditLog
 from .transport import CHANNELS, ModelSpec, TransportError, verify_identity
 
 _CHANNEL_TIMEOUT = {"dashscope-direct": 300.0, "deepseek-direct": 180.0,
-                    "opencode-go": 180.0}
+                    "opencode-go": 180.0, "cursor": 900.0}
 
 
 class ChannelUnavailable(TransportError):
@@ -70,6 +70,13 @@ def build_client(spec: ModelSpec, params: Any, *, budget: Any,
         return cls(api_key=api_key, base_url=base_url, model=spec.model_id,
                    budget=budget, evidence_dir=evidence_dir, params=params,
                    timeout=timeout, sdk_client=sdk_client, sleep=sleep)
+    if spec.channel == "cursor":
+        from .cursor import CursorAgentClient
+        return CursorAgentClient(api_key=api_key, base_url=base_url,
+                                 model=spec.model_id, budget=budget,
+                                 evidence_dir=evidence_dir, params=params,
+                                 timeout=timeout, sdk_client=sdk_client,
+                                 sleep=sleep)
     raise ChannelUnavailable(f"no client for channel {spec.channel!r}")
 
 
