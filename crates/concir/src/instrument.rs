@@ -16,7 +16,9 @@
 //! Thread creation is collected across expressions, parseable macro arguments,
 //! loops and functions. Ordinary and imported `spawn` calls, lexically bound
 //! scoped spawns, and `thread::Builder::new()...spawn(closure)` are traced;
-//! unknown spawn methods remain unsupported.
+//! unknown spawn methods remain unsupported. The Builder rewrite replaces the
+//! whole chain, so a `.name(..)`/`.stack_size(..)` configuration is dropped in
+//! the *instrumented* copy only; the ordinary O1-O3 build is unaffected.
 //! Names prefer a unique worker call, then a direct handle binding, then the
 //! first worker call, and finally file order. Loop sites retain one resource.
 
