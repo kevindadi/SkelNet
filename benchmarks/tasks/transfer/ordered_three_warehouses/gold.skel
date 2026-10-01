@@ -1,0 +1,20 @@
+skeleton ordered_three_warehouses;
+
+mutex north;
+mutex south;
+mutex west;
+shared stock_north: Int[0..=3] = 1 guarded_by north;
+shared stock_south: Int[0..=3] = 1 guarded_by south;
+shared stock_west: Int[0..=3] = 1 guarded_by west;
+
+@R1 @R2 @R3 @R5 @R7 @R8 @R9
+fn main() { scope { spawn ship_ns(); spawn ship_sw(); spawn ship_wn(); } }
+
+@R2 @R3 @R4 @R5 @R6 @R7 @R8 @R9
+fn ship_ns() { lock north { lock south { stock_north = stock_north - 1; stock_south = stock_south + 1; } } }
+
+@R2 @R3 @R4 @R5 @R6 @R7 @R8 @R9
+fn ship_sw() { lock south { lock west { stock_south = stock_south - 1; stock_west = stock_west + 1; } } }
+
+@R2 @R3 @R4 @R5 @R6 @R7 @R8 @R9
+fn ship_wn() { lock north { lock west { stock_west = stock_west - 1; stock_north = stock_north + 1; } } }
