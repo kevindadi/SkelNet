@@ -111,7 +111,7 @@ def test_skel_prompt_routing(tmp_path):
     assert got == [
         _joined_sha((prompts.SKEL_GENERATION_ASSET,)),
         _joined_sha((prompts.SKEL_GENERATION_ASSET, prompts.SKEL_FEEDBACK_ASSET)),
-        _joined_sha((prompts.RUST_FROM_SKEL_V2_ASSET, prompts.RUST_RUNTIME_API_ASSET)),
+        _joined_sha((prompts.RUST_FROM_SKEL_V3_ASSET, prompts.RUST_RUNTIME_API_ASSET)),
     ]
     # The feedback-round system prompt still contains the generation grammar.
     feedback_prompt = client.system_prompts[1]
@@ -127,7 +127,7 @@ def test_cir_prompt_routing(tmp_path):
     assert got == [
         _joined_sha((prompts.CIR_GENERATION_ASSET,)),
         _joined_sha((prompts.CIR_GENERATION_ASSET, prompts.CIR_FEEDBACK_ASSET)),
-        _joined_sha((prompts.RUST_FROM_CIR_V3_ASSET, prompts.RUST_RUNTIME_API_ASSET)),
+        _joined_sha((prompts.RUST_FROM_CIR_V4_ASSET, prompts.RUST_RUNTIME_API_ASSET)),
     ]
     feedback_prompt = client.system_prompts[1]
     assert prompts.read_asset(prompts.CIR_GENERATION_ASSET) in feedback_prompt
