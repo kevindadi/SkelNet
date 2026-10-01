@@ -71,6 +71,7 @@ def _run(arm: str, out: Path, *, allow_missing: bool) -> int:
     argv = [
         "run", "--arm", arm, "--model", "DeepSeek Flash",
         "--tasks", "lock-order/abba_2lock", "--reps", "1", "--rounds", "4",
+        "--hint", "h0",  # the replay tests use h0
         "--call-budget", "5", "--out", str(out),
         "--cache-dir", str(HERE),
         "--budget-file", str(out / "budget.json"),

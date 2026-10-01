@@ -54,9 +54,6 @@ is applied later by the checker.
 
 - Create each thread with `std::thread::spawn` and call `join` on every handle
   before its function returns.
-- Do **not** use `std::thread::scope` (or `thread::Builder`): the schedule
-  explorer does not support scoped threads, and the reference programs do not
-  use them.
 
 ## Rules
 

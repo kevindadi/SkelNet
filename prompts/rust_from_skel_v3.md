@@ -35,9 +35,6 @@ Write one std-only single-file Rust program that implements the skeleton.
   `std::thread::spawn` (worker functions receive their shared `Arc` handles as
   arguments), then call `join` on every handle, in the order the `spawn`s
   appear, before the scope block ends.
-- Do **not** use `std::thread::scope` (or `thread::Builder`): the schedule
-  explorer does not support scoped threads, and the reference programs do not
-  use them.
 
 ## Output format
 

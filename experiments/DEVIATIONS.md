@@ -84,6 +84,10 @@ which experiment cells were affected. This file starts empty at freeze time.
   policy rules, the busy-wait rule, and the `scope` translation; a rule-table
   test asserts the three generation prompts agree. `rust_from_skel_v2.md` is
   kept on disk.
+- **Fix-round addendum (round 9d review):** the shared policy now lives in a
+  neutral `rust_runtime_api_v2.md` appended to **every** Rust-stage route, so
+  all arms receive the same runtime note; the generation prompts no longer
+  mention `thread::Builder`.
 - **Affected cells:** none in Stage 1–3; before any Stage 1 data.
 
 ## D-9d-3 — `thread::scope` breaks Shuttle coverage (2026-09-30, round 9d, F3)
@@ -95,7 +99,11 @@ which experiment cells were affected. This file starts empty at freeze time.
   convention (no `thread::scope`).
 - **Fix:** `rust_from_skel_v3.md` (new) and `rust_from_cir_v4.md` (new, route
   `("CIR","rust")`) state that `scope { spawn .. }` is translated to
-  `std::thread::spawn` + `join` in order, and forbid `std::thread::scope`.
+  `std::thread::spawn` + `join` in order.
+- **Fix-round addendum (round 9d review):** the `thread::scope` prohibition was
+  moved out of the SKEL/CIR prompts into the shared `rust_runtime_api_v2.md`
+  appendix, which every Rust-stage route includes; it no longer names the
+  schedule explorer, so no group learns about the judge that the others do not.
 - **Affected cells:** none in Stage 1–3; before any Stage 1 data.
 
 ## D-9d-4 — instrumenter did not recognize `thread::Builder` (2026-10-01, round 9d, F4)
@@ -127,5 +135,9 @@ which experiment cells were affected. This file starts empty at freeze time.
   DeepSeek (`deepseek-direct`) had no timeout in Stage 0; its longest recorded
   single call was ≈ 301 s (2 truncation attempts summed), so it is left
   unchanged per the round-9d task sheet.
+- **Fix-round addendum (round 9d review):** `stream` is now part of the frozen
+  protocol (`models[*].stream` in `protocol.json` and the `PROTOCOL.md` Models
+  table), so a transport drift such as flipping Qwen's `stream` back to `False`
+  makes `protocol check` exit 1.
 - **Affected cells:** none in Stage 1–3; before any Stage 1 data. Stage 0's
   7 completed cells used a mixed transport and stay pilot-diagnostic only.
