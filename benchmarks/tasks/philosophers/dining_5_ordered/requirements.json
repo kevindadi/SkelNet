@@ -1,0 +1,149 @@
+{
+  "task": "philosophers/dining_5_ordered",
+  "requirements": [
+    "A main task starts five philosopher roles that run at the same time.",
+    "The five philosophers share five forks, and no fork may be held by more than one philosopher at a time.",
+    "Each philosopher must hold both of the forks beside it at the same time while it eats.",
+    "A philosopher that finds a fork busy must wait for it to become free and then continue.",
+    "Every philosopher must take its two forks in one global order that is the same for all five philosophers.",
+    "The main task starts all five philosophers and only finishes after all five have finished.",
+    "Every philosopher must release both forks before it finishes.",
+    "It must never be possible for the philosophers to leave each other waiting forever, each holding one fork and needing another.",
+    "Every possible schedule or interleaving of the five philosophers must terminate with all five finished.",
+    "The program must print exactly the line `DONE sum=15` and then exit. The value is the sum of the ids the five philosophers return, not a constant written into the print."
+  ],
+  "unverifiable": [
+    1,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R4",
+        "R5",
+        "R7",
+        "R8",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ]
+    ]
+  },
+  "terminal": "DONE sum=15",
+  "entities": {
+    "roles": [
+      "p1",
+      "p2",
+      "p3",
+      "p4",
+      "p5"
+    ],
+    "resources": [
+      {
+        "name": "f0",
+        "kind": "lock"
+      },
+      {
+        "name": "f1",
+        "kind": "lock"
+      },
+      {
+        "name": "f2",
+        "kind": "lock"
+      },
+      {
+        "name": "f3",
+        "kind": "lock"
+      },
+      {
+        "name": "f4",
+        "kind": "lock"
+      }
+    ]
+  },
+  "contract": "philosophers/dining_5_ordered/contract.json",
+  "terminal_v2": "DONE sum=15",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "origin": "classic",
+  "protocol_params": {
+    "philosophers": 5
+  },
+  "tier": "L3",
+  "tier_source": "computed",
+  "tier_metrics": {
+    "threads": 5,
+    "thread_funcs": [
+      "main::p1",
+      "main::p2",
+      "main::p3",
+      "main::p4",
+      "main::p5"
+    ],
+    "sync_resources": 5,
+    "unused_resources": [],
+    "mechanisms": [
+      "Mutex"
+    ],
+    "mechanism_count": 1,
+    "parameterized": true,
+    "states": 13654,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L3",
+    "nearest_tier": "L3",
+    "violations": []
+  }
+}

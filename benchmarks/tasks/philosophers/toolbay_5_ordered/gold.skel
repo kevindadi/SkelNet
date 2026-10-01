@@ -1,0 +1,25 @@
+skeleton toolbay_5_ordered;
+
+mutex bay0;
+mutex bay1;
+mutex bay2;
+mutex bay3;
+mutex bay4;
+
+@R1 @R6 @R8 @R9
+fn main() { scope { spawn r1(); spawn r2(); spawn r3(); spawn r4(); spawn r5(); } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn r1() { lock bay0 { lock bay1 { } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn r2() { lock bay1 { lock bay2 { } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn r3() { lock bay2 { lock bay3 { } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn r4() { lock bay3 { lock bay4 { } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn r5() { lock bay0 { lock bay4 { } } }

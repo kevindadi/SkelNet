@@ -1,0 +1,138 @@
+{
+  "task": "philosophers/dining_4_waiter",
+  "requirements": [
+    "A main task starts four philosopher roles that run at the same time.",
+    "The four philosophers share four forks, and no fork may be held by more than one philosopher at a time.",
+    "Each philosopher must hold both of the forks beside it at the same time while it eats.",
+    "A philosopher that finds a fork busy must wait for it to become free and then continue.",
+    "At most three philosophers may hold forks at the same time, so a philosopher must take a seat from the waiter before it picks up any fork.",
+    "The main task starts all four philosophers and only finishes after all four have finished.",
+    "Every philosopher must release both forks and its seat before it finishes.",
+    "It must never be possible for the philosophers to leave each other waiting forever, each holding one fork and needing another.",
+    "Every possible schedule or interleaving of the four philosophers must terminate with all four finished.",
+    "The program must print exactly the line `DONE sum=10` and then exit. The value is the sum of the ids the four philosophers return, not a constant written into the print."
+  ],
+  "unverifiable": [
+    1,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R4",
+        "R5",
+        "R7",
+        "R8",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ]
+    ]
+  },
+  "terminal": "DONE sum=10",
+  "entities": {
+    "roles": [
+      "p1",
+      "p2",
+      "p3",
+      "p4"
+    ],
+    "resources": [
+      {
+        "name": "f0",
+        "kind": "lock"
+      },
+      {
+        "name": "f1",
+        "kind": "lock"
+      },
+      {
+        "name": "f2",
+        "kind": "lock"
+      },
+      {
+        "name": "f3",
+        "kind": "lock"
+      },
+      {
+        "name": "waiter",
+        "kind": "semaphore"
+      }
+    ]
+  },
+  "contract": "philosophers/dining_4_waiter/contract.json",
+  "terminal_v2": "DONE sum=10",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "origin": "classic",
+  "protocol_params": {
+    "philosophers": 4
+  },
+  "tier": "L3",
+  "tier_source": "computed",
+  "tier_metrics": {
+    "threads": 4,
+    "thread_funcs": [
+      "main::p1",
+      "main::p2",
+      "main::p3",
+      "main::p4"
+    ],
+    "sync_resources": 5,
+    "unused_resources": [],
+    "mechanisms": [
+      "Mutex",
+      "Semaphore"
+    ],
+    "mechanism_count": 2,
+    "parameterized": true,
+    "states": 7093,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L3",
+    "nearest_tier": "L3",
+    "violations": []
+  }
+}

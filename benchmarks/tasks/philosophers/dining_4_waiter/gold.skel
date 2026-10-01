@@ -1,0 +1,22 @@
+skeleton dining_4_waiter;
+
+mutex f0;
+mutex f1;
+mutex f2;
+mutex f3;
+semaphore waiter = 3;
+
+@R1 @R6 @R8 @R9
+fn main() { scope { spawn p1(); spawn p2(); spawn p3(); spawn p4(); } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn p1() { permit waiter { lock f0 { lock f1 { } } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn p2() { permit waiter { lock f1 { lock f2 { } } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn p3() { permit waiter { lock f2 { lock f3 { } } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn p4() { permit waiter { lock f3 { lock f0 { } } } }
