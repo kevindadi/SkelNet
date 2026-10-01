@@ -1,0 +1,56 @@
+{
+  "qwen-dynamic__atomic-data__atomic_lost_update": {
+    "task": "atomic-data/atomic_lost_update",
+    "old_O4": "unsupported/instrument_unsupported",
+    "arm": "DYNAMIC",
+    "model": "qwen3.8-flash"
+  },
+  "qwen-dynamic__lock-order__abba_2lock": {
+    "task": "lock-order/abba_2lock",
+    "old_O4": "unsupported/instrument_unsupported",
+    "arm": "DYNAMIC",
+    "model": "qwen3.8-flash"
+  },
+  "qwen-dynamic_m__lock-order__abba_2lock": {
+    "task": "lock-order/abba_2lock",
+    "old_O4": "unsupported/instrument_unsupported",
+    "arm": "DYNAMIC_M",
+    "model": "qwen3.8-flash"
+  },
+  "qwen-g0__atomic-data__atomic_lost_update": {
+    "task": "atomic-data/atomic_lost_update",
+    "old_O4": "unsupported/instrument_unsupported",
+    "arm": "G0",
+    "model": "qwen3.8-flash"
+  },
+  "qwen-g0__lock-order__abba_2lock": {
+    "task": "lock-order/abba_2lock",
+    "old_O4": "unsupported/instrument_unsupported",
+    "arm": "G0",
+    "model": "qwen3.8-flash"
+  },
+  "qwen-refine__atomic-data__atomic_lost_update": {
+    "task": "atomic-data/atomic_lost_update",
+    "old_O4": "unsupported/instrument_unsupported",
+    "arm": "REFINE",
+    "model": "qwen3.8-flash"
+  },
+  "qwen-refine__lock-order__abba_2lock": {
+    "task": "lock-order/abba_2lock",
+    "old_O4": "unsupported/instrument_unsupported",
+    "arm": "REFINE",
+    "model": "qwen3.8-flash"
+  },
+  "qwen-static__atomic-data__atomic_lost_update": {
+    "task": "atomic-data/atomic_lost_update",
+    "old_O4": "unsupported/instrument_unsupported",
+    "arm": "STATIC",
+    "model": "qwen3.8-flash"
+  },
+  "qwen-static__lock-order__abba_2lock": {
+    "task": "lock-order/abba_2lock",
+    "old_O4": "unsupported/instrument_unsupported",
+    "arm": "STATIC",
+    "model": "qwen3.8-flash"
+  }
+}

@@ -14,8 +14,9 @@
 //! everything it cannot cover (RwLock, barriers, atomics, macro bodies,
 //! generics) as a limitation instead of silently dropping it.
 //! Thread creation is collected across expressions, parseable macro arguments,
-//! loops and functions. Ordinary and imported `spawn` calls and lexically bound
-//! scoped spawns are traced; Builder and unknown spawn methods remain unsupported.
+//! loops and functions. Ordinary and imported `spawn` calls, lexically bound
+//! scoped spawns, and `thread::Builder::new()...spawn(closure)` are traced;
+//! unknown spawn methods remain unsupported.
 //! Names prefer a unique worker call, then a direct handle binding, then the
 //! first worker call, and finally file order. Loop sites retain one resource.
 
@@ -97,6 +98,26 @@ where
         TAG.with(|t| *t.borrow_mut() = Some(tag));
         f()
     })
+}
+
+/// `thread::Builder::new()[.name(..)][.stack_size(..)].spawn(f)` returns
+/// `io::Result<JoinHandle<T>>`; keep that result shape so a trailing
+/// `.unwrap()`/`.expect()` chain still compiles after the rewrite.
+pub fn builder_spawn<F, T>(
+    name: &'static str,
+    f: F,
+) -> std::io::Result<std::thread::JoinHandle<T>>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    record("spawn", name);
+    let n = NEXT_TAG.fetch_add(1, Ordering::SeqCst);
+    let tag = format!("t{}", n);
+    Ok(std::thread::spawn(move || {
+        TAG.with(|t| *t.borrow_mut() = Some(tag));
+        f()
+    }))
 }
 
 /// Preserve std's scoped borrowing, implicit joins and closure return value.
@@ -440,6 +461,7 @@ struct SpawnHit {
     binding: Option<String>,
     receiver: Option<String>,
     in_loop: bool,
+    builder: bool,
 }
 
 /// The first plain function called inside a spawned closure, used to name the
@@ -546,6 +568,7 @@ enum ThreadName {
     Spawn,
     Scope,
     ScopeParam,
+    Builder,
     Other,
 }
 
@@ -598,6 +621,7 @@ impl SpawnCollector {
                 if path == "std::thread::*" {
                     self.names.insert("spawn".into(), ThreadName::Spawn);
                     self.names.insert("scope".into(), ThreadName::Scope);
+                    self.names.insert("Builder".into(), ThreadName::Builder);
                 }
                 continue;
             }
@@ -605,6 +629,7 @@ impl SpawnCollector {
             let kind = match path.as_str() {
                 "std::thread::spawn" => ThreadName::Spawn,
                 "std::thread::scope" => ThreadName::Scope,
+                "std::thread::Builder" => ThreadName::Builder,
                 _ => ThreadName::Other,
             };
             self.names.insert(local, kind);
@@ -657,13 +682,40 @@ impl SpawnCollector {
         (self.names.get(&id) == Some(&ThreadName::ScopeParam)).then_some(id)
     }
 
+    /// The path `[std::][thread::]Builder::new` (imported `Builder` included).
+    fn builder_is_new(&self, func: &Expr) -> bool {
+        let Expr::Path(p) = plain_expr(func) else { return false };
+        let segs: Vec<_> = p.path.segments.iter().map(|s| s.ident.to_string()).collect();
+        match segs.as_slice() {
+            [builder, new] => builder == "Builder" && new == "new"
+                && self.names.get("Builder") == Some(&ThreadName::Builder),
+            [module, builder, new] => module == "thread" && builder == "Builder" && new == "new",
+            [root, module, builder, new] => root == "std" && module == "thread"
+                && builder == "Builder" && new == "new",
+            _ => false,
+        }
+    }
+
+    /// `Builder::new()` optionally chained with `.name(..)`/`.stack_size(..)`.
+    fn builder_chain(&self, expr: &Expr) -> bool {
+        match plain_expr(expr) {
+            Expr::Call(c) => self.builder_is_new(&c.func),
+            Expr::MethodCall(m) => match m.method.to_string().as_str() {
+                "name" | "stack_size" => self.builder_chain(&m.receiver),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
     fn hit(&mut self, start: usize, end: usize, open: usize,
-           args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>, receiver: Option<String>) {
+           args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>,
+           receiver: Option<String>, builder: bool) {
         self.hits.entry(start).or_insert_with(|| SpawnHit {
             callee_start: start, callee_end: end, open_brace: open,
             unique: spawn_unique(args), callee_name: spawn_callee(args),
             binding: self.bindings.get(&start).cloned(), receiver,
-            in_loop: self.loop_depth > 0,
+            in_loop: self.loop_depth > 0, builder,
         });
     }
 
@@ -717,9 +769,13 @@ impl SpawnCollector {
                 (format!("spawn{index}"), "index")
             };
             let name = format!("{display}#{}", hit.callee_start);
-            let (callee, prefix) = match &hit.receiver {
-                Some(receiver) => ("crate::cir_trace::scope_spawn", format!("{receiver}, \"{name}\", ")),
-                None => ("crate::cir_trace::spawn", format!("\"{name}\", ")),
+            let (callee, prefix) = if hit.builder {
+                ("crate::cir_trace::builder_spawn", format!("\"{name}\", "))
+            } else {
+                match &hit.receiver {
+                    Some(receiver) => ("crate::cir_trace::scope_spawn", format!("{receiver}, \"{name}\", ")),
+                    None => ("crate::cir_trace::spawn", format!("\"{name}\", ")),
+                }
             };
             edits.push(Edit { start: hit.callee_start, end: hit.callee_end, text: callee.into() });
             edits.push(Edit { start: hit.open_brace, end: hit.open_brace, text: prefix });
@@ -781,7 +837,8 @@ impl<'ast> Visit<'ast> for SpawnCollector {
                 let direct_spawn = match expr {
                     Expr::Call(call) => self.thread_call(&call.func, ThreadName::Spawn),
                     Expr::MethodCall(call) => call.method == "spawn"
-                        && self.scope_receiver(&call.receiver).is_some(),
+                        && (self.scope_receiver(&call.receiver).is_some()
+                            || self.builder_chain(&call.receiver)),
                     _ => false,
                 };
                 if direct_spawn {
@@ -819,7 +876,7 @@ impl<'ast> Visit<'ast> for SpawnCollector {
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
         if self.thread_call(&node.func, ThreadName::Spawn) {
             self.hit(self.offset(node.func.span()), lc_offset(&self.starts, node.func.span().end()),
-                     self.offset(node.paren_token.span.open()) + 1, &node.args, None);
+                     self.offset(node.paren_token.span.open()) + 1, &node.args, None, false);
         } else if self.thread_call(&node.func, ThreadName::Scope) {
             if let Some(Expr::Closure(c)) = node.args.first().map(plain_expr) {
                 if c.inputs.len() == 1 && matches!(c.inputs.first(), Some(Pat::Ident(_))) {
@@ -851,9 +908,14 @@ impl<'ast> Visit<'ast> for SpawnCollector {
         if node.method == "spawn" {
             if let Some(receiver) = self.scope_receiver(&node.receiver) {
                 self.hit(self.offset(node.receiver.span()), lc_offset(&self.starts, node.method.span().end()),
-                         self.offset(node.paren_token.span.open()) + 1, &node.args, Some(receiver));
+                         self.offset(node.paren_token.span.open()) + 1, &node.args, Some(receiver), false);
+            } else if self.builder_chain(&node.receiver) {
+                // `thread::Builder::new()[.name(..)][.stack_size(..)].spawn(..)`:
+                // replace the whole chain; the helper keeps `io::Result<JoinHandle>`.
+                self.hit(self.offset(node.receiver.span()), lc_offset(&self.starts, node.method.span().end()),
+                         self.offset(node.paren_token.span.open()) + 1, &node.args, None, true);
             } else {
-                self.limitations.push("spawn method receiver is not a recognized scope parameter (Builder is unsupported)".into());
+                self.limitations.push("spawn method receiver is not a recognized scope parameter or Builder".into());
             }
         }
         if node.method == "spawn_scoped" {

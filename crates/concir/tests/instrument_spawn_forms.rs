@@ -87,10 +87,32 @@ fn imported_scope() {
 }
 
 #[test]
-fn builder_and_custom_spawn_stay_unsupported() {
+fn builder_spawn_is_supported_custom_stays_unsupported() {
+    // R9d-P3: `thread::Builder::new()...spawn(..)` is rewritten; an unknown
+    // receiver method still stays a limitation.
     let w = wrap("fn main() { thread::Builder::new().spawn(|| {}); other.spawn(|| {}); }").unwrap();
-    assert!(spawns(&w).is_empty());
-    assert_eq!(w.annotated.matches(".spawn(").count(), 2);
+    assert_eq!(spawns(&w).len(), 1);
+    assert!(w.annotated.contains("cir_trace::builder_spawn("), "{}", w.annotated);
+    assert_eq!(w.annotated.matches(".spawn(").count(), 1);
+    assert!(w.limitations.iter().any(|l| l.contains("Builder")), "{:?}", w.limitations);
+    syn::parse_file(&w.annotated).unwrap();
+}
+
+#[test]
+fn builder_chain_name_and_import_forms() {
+    // `.name(..)`, `.stack_size(..)` chains and an imported bare `Builder`.
+    for src in [
+        "fn main() { std::thread::Builder::new().name(\"w\".into()).stack_size(1 << 20).spawn(|| worker()).unwrap(); }",
+        "use std::thread::Builder; fn main() { Builder::new().spawn(|| worker()).unwrap(); }",
+        "use std::thread::{self, Builder}; fn main() { Builder::new().name(\"w\".into()).spawn(|| worker()).unwrap(); }",
+    ] {
+        let w = wrap(src).unwrap();
+        assert_eq!(spawns(&w).len(), 1, "{}", w.annotated);
+        assert!(w.annotated.contains("cir_trace::builder_spawn("), "{}", w.annotated);
+        assert!(!w.annotated.contains(".spawn("), "{}", w.annotated);
+        assert!(!w.limitations.iter().any(|l| l.contains("spawn")), "{:?}", w.limitations);
+        syn::parse_file(&w.annotated).unwrap();
+    }
 }
 
 #[test]
