@@ -84,7 +84,8 @@ def test_skip_when_unverified(tmp_path):
                   workdir=tmp_path)
     assert result.extra["rust_skipped"] == "unverified"
     assert result.rust is None and result.oracle is None
-    assert len(provider.calls) == 4
+    # R9d-P1: the skeleton stage is capped at min(rounds, B-2)=3 in llm mode.
+    assert len(provider.calls) == 3
 
 
 def test_other_reply_keeps_previous_and_adds_format_note(tmp_path):
