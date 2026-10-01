@@ -207,7 +207,7 @@ def build_registry() -> list[ModelSpec]:
                   candidates=("qwen3.8-flash", "qwen3.8-max", "qwen3.7-flash"),
                   discovered="qwen3.8-flash" in DISCOVERED_MODELS["dashscope-direct"],
                   thinking=True, reasoning_effort=None, supports_seed=False,
-                  stream=False),
+                  stream=True),
         # Kimi runs on the owner's Moonshot key (China platform, Chat
         # Completions). Round 9c replaces ``kimi-k3`` with ``kimi-k2.7-code``
         # (cost and behaviour gap; see experiments/DEVIATIONS.md D-9c-2). The
@@ -218,7 +218,7 @@ def build_registry() -> list[ModelSpec]:
         ModelSpec("Kimi", "moonshot", "moonshot-direct", "kimi-k2.7-code",
                   role="compare",
                   thinking="always", reasoning_effort=None,
-                  supports_seed=False, stream=False),
+                  supports_seed=False, stream=True),
         ModelSpec("GPT 6 Luna", "openai", "opencode-go", "gpt-6-luna",
                   role="compare", surface="responses",
                   discovered="gpt-6-luna" in DISCOVERED_MODELS["opencode-go"],

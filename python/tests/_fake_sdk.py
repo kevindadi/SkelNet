@@ -33,6 +33,37 @@ def _attribute_model(response, requested):
     return response
 
 
+def _as_stream(response, kwargs):
+    """Adapt a non-streaming chat response to the streaming chunk protocol.
+
+    Qwen/Kimi use ``stream=True`` by default (round 9d). Tests that build these
+    real clients through ``channels.build_client`` return an ordinary
+    ``chat_response``; this wraps it so ``DirectChatClient._parse_stream`` sees
+    the expected chunk sequence without every test hand-building chunks.
+    """
+    choice = (getattr(response, "choices", None) or [None])[0]
+    message = getattr(choice, "message", None)
+    content = getattr(message, "content", None)
+    reasoning = getattr(message, "reasoning_content", None)
+    finish = getattr(choice, "finish_reason", None)
+    model = getattr(response, "model", None)
+    request_id = getattr(response, "id", None)
+    chunks = []
+    if content is not None or reasoning is not None:
+        delta = SimpleNamespace(content=content, reasoning_content=reasoning)
+        chunks.append(SimpleNamespace(
+            choices=[SimpleNamespace(delta=delta, finish_reason=None)],
+            model=model, id=request_id, usage=None))
+    empty = SimpleNamespace(content=None, reasoning_content=None)
+    chunks.append(SimpleNamespace(
+        choices=[SimpleNamespace(delta=empty, finish_reason=finish)],
+        model=model, id=request_id, usage=None))
+    if (kwargs.get("stream_options") or {}).get("include_usage"):
+        chunks.append(SimpleNamespace(choices=[], model=model, id=request_id,
+                                      usage=getattr(response, "usage", None)))
+    return chunks
+
+
 class _ChatCompletions:
     def __init__(self, handler):
         self.handler = handler
@@ -40,7 +71,10 @@ class _ChatCompletions:
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        return _attribute_model(self.handler(kwargs), kwargs.get("model"))
+        response = _attribute_model(self.handler(kwargs), kwargs.get("model"))
+        if kwargs.get("stream") and not hasattr(response, "__iter__"):
+            return _as_stream(response, kwargs)
+        return response
 
 
 class _Responses:

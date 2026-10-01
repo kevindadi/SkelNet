@@ -90,7 +90,10 @@ def _capture(model: str) -> dict:
     return call
 
 
-@pytest.mark.parametrize("model", ["DeepSeek Flash", "Qwen", "GPT 6 Luna"])
+# R9d-P4 makes Qwen stream by default, so only DeepSeek and GPT are still
+# byte-identical to the origin/main golden; Qwen/Kimi streaming is asserted in
+# test_round09d_streaming.py.
+@pytest.mark.parametrize("model", ["DeepSeek Flash", "GPT 6 Luna"])
 def test_unchanged_models_match_main_golden(model):
     assert _capture(model) == GOLDEN[model]
 

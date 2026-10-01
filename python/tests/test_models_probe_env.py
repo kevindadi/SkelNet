@@ -144,13 +144,15 @@ def test_requires_stream_rules(tmp_path):
             return _Client()
         return build
 
+    # R9d-P4: Qwen defaults to stream=True, so the probe's first call already
+    # uses the stream path; there is no non-stream->stream fallback anymore.
     doc = probe_run(tmp_path / "plain", models=[spec],
                     client_factory=stream_factory(nonstream_ok=True, stream_ok=True))
     assert doc["models"][0]["requires_stream"] is False
 
     doc = probe_run(tmp_path / "fallback", models=[spec],
                     client_factory=stream_factory(nonstream_ok=False, stream_ok=True))
-    assert doc["models"][0]["requires_stream"] is True
+    assert doc["models"][0]["requires_stream"] is False
 
     doc = probe_run(tmp_path / "both_fail", models=[spec],
                     client_factory=stream_factory(nonstream_ok=False, stream_ok=False))
