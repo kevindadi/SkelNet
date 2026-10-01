@@ -50,6 +50,18 @@ class CursorOutcome:
     temperature_sent: float | None = None
 
 
+_BRIDGE_CLIENT: Any | None = None
+
+
+def _bridge_client() -> Any:
+    """One lazily launched Cursor bridge client per process."""
+    global _BRIDGE_CLIENT
+    if _BRIDGE_CLIENT is None:
+        from cursor_sdk import Client
+        _BRIDGE_CLIENT = Client.launch_bridge()
+    return _BRIDGE_CLIENT
+
+
 def _usage_from_agent(usage: Any) -> dict[str, Any]:
     """Map a ``cursor_sdk`` ``TokenUsage`` (or dict) onto a normalized payload."""
     if usage is None:
@@ -76,14 +88,21 @@ def _usage_from_agent(usage: Any) -> dict[str, Any]:
 
 
 class CursorAgentClient:
+    # The Cursor agent SDK's own model id (its models.list discovery value).
+    # The experiment's registry id is ``cursor-agent``; the SDK still needs this
+    # concrete model selector.
+    SDK_MODEL = "composer-2.5"
+
     def __init__(self, *, api_key: str, base_url: str = "", model: str,
                  budget: Any, evidence_dir: Path | str, params: Any,
                  timeout: float = 900.0, sdk_client: Any | None = None,
                  mode: str = "plan", cwd: Path | str | None = None,
+                 sdk_model: str | None = None,
                  sleep: Callable[[float], None] = time.sleep) -> None:
         self.api_key = api_key
         self.base_url = base_url
         self.model = model
+        self.sdk_model = sdk_model or self.SDK_MODEL
         self.budget = budget
         self.params = params
         self.evidence_dir = Path(evidence_dir)
@@ -100,8 +119,7 @@ class CursorAgentClient:
         if sdk_client is not None:
             self._client = sdk_client
         else:
-            from cursor_sdk import Client
-            self._client = Client(api_key=api_key)
+            self._client = _bridge_client()
 
     # ── lifecycle ────────────────────────────────────────────────────
     def set_cell(self, task_id: str, replicate: int) -> None:
@@ -127,7 +145,7 @@ class CursorAgentClient:
             options: dict[str, Any] = {}
             if self.mode:
                 options["mode"] = self.mode
-            kwargs: dict[str, Any] = {"model": self.model, "api_key": self.api_key}
+            kwargs: dict[str, Any] = {"model": self.sdk_model, "api_key": self.api_key}
             if self.cwd is not None:
                 kwargs["local"] = {"cwd": str(self.cwd)}
             self._agent = self._client.create_agent(options, **kwargs)

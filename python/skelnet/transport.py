@@ -227,7 +227,10 @@ def build_registry() -> list[ModelSpec]:
                   discovered="gpt-6-luna" in DISCOVERED_MODELS["opencode-go"],
                   thinking=True, reasoning_effort="medium", supports_seed=False),
         # ── Reserved / comparison entries ───────────────────────────────
-        ModelSpec("Composer 2.5", "cursor", "cursor", "composer-2.5",
+        # Round 9e: the fourth experimental model. It must use the Cursor agent
+        # SDK, so the experiment calls it "Cursor Agent"; the SDK model selector
+        # is the internal ``CursorAgentClient.SDK_MODEL``.
+        ModelSpec("Cursor Agent", "cursor", "cursor", "cursor-agent",
                   role="compare",
                   thinking=False, reasoning_effort=None, supports_seed=False,
                   discovered="composer-2.5" in DISCOVERED_MODELS["cursor"]),
@@ -253,9 +256,9 @@ def build_registry() -> list[ModelSpec]:
     return specs
 
 
-# The four models this experiment round runs. Round 9e replaces Kimi with
-# Cursor Composer 2.5 (latency); see experiments/DEVIATIONS.md.
-EXPERIMENTAL_MODEL_IDS = ("gpt-6-luna", "composer-2.5", "deepseek-flash",
+# The four models this experiment round runs. Round 9e replaces Kimi with the
+# Cursor agent (registry id ``cursor-agent``); see experiments/DEVIATIONS.md.
+EXPERIMENTAL_MODEL_IDS = ("gpt-6-luna", "cursor-agent", "deepseek-flash",
                           "qwen3.8-flash")
 
 

@@ -1,4 +1,4 @@
-"""Round 9e: Kimi is replaced by Cursor Composer 2.5.
+"""Round 9e: Kimi is replaced by the Cursor Agent (Cursor agent SDK).
 
 Offline: the Cursor SDK is the only thing replaced (``sdk_client``); the real
 ``channels.build_client`` and ``CursorAgentClient`` still run.
@@ -87,12 +87,12 @@ def _usage(input_tokens=10, output_tokens=5, reasoning=3, cached=1):
 # ── registry ─────────────────────────────────────────────────────────
 def test_experimental_set_has_composer_not_kimi():
     ids = set(EXPERIMENTAL_MODEL_IDS)
-    assert "composer-2.5" in ids
+    assert "cursor-agent" in ids
     assert "kimi-k2.7-code" not in ids
     registry = build_registry()
-    composer = resolve_model(registry, "Composer 2.5")
+    composer = resolve_model(registry, "Cursor Agent")
     assert composer.status == "available"
-    assert composer.channel == "cursor" and composer.model_id == "composer-2.5"
+    assert composer.channel == "cursor" and composer.model_id == "cursor-agent"
     kimi = resolve_model(registry, "Kimi")
     assert kimi.status == "available" and kimi.channel == "moonshot-direct"
 
@@ -101,8 +101,8 @@ def test_experimental_set_has_composer_not_kimi():
 def test_cursor_client_maps_text_and_usage(tmp_path):
     fake = FakeCursor(_Result("```rust\nfn main() {}\n```", usage=_usage()))
     budget = _Budget()
-    spec = resolve_model(build_registry(), "Composer 2.5")
-    client = CursorAgentClient(api_key="k", model="composer-2.5", budget=budget,
+    spec = resolve_model(build_registry(), "Cursor Agent")
+    client = CursorAgentClient(api_key="k", model="cursor-agent", budget=budget,
                                evidence_dir=tmp_path, params=params_for_model(spec),
                                sdk_client=fake)
     client.set_cell("lock-order/abba_2lock", 0)
@@ -123,10 +123,10 @@ def test_cursor_client_maps_text_and_usage(tmp_path):
 
 def test_new_session_starts_a_fresh_agent(tmp_path):
     fake = FakeCursor(_Result("ok"))
-    client = CursorAgentClient(api_key="k", model="composer-2.5", budget=_Budget(),
+    client = CursorAgentClient(api_key="k", model="cursor-agent", budget=_Budget(),
                                evidence_dir=tmp_path,
                                params=params_for_model(resolve_model(
-                                   build_registry(), "Composer 2.5")),
+                                   build_registry(), "Cursor Agent")),
                                sdk_client=fake)
     client.set_cell("t", 0)
     client.complete("S", "U")
@@ -138,10 +138,10 @@ def test_new_session_starts_a_fresh_agent(tmp_path):
 
 def test_cursor_client_error_run_status(tmp_path):
     fake = FakeCursor(_Result("", status="error"))
-    client = CursorAgentClient(api_key="k", model="composer-2.5", budget=_Budget(),
+    client = CursorAgentClient(api_key="k", model="cursor-agent", budget=_Budget(),
                                evidence_dir=tmp_path,
                                params=params_for_model(resolve_model(
-                                   build_registry(), "Composer 2.5")),
+                                   build_registry(), "Cursor Agent")),
                                sdk_client=fake)
     try:
         client.complete("S", "U")
@@ -159,13 +159,13 @@ def test_composer_real_path_cmd_run(tmp_path, monkeypatch):
     monkeypatch.delenv("CURSOR_API_KEY", raising=False)
     env = write_env(tmp_path, CURSOR_API_KEY=SECRET)
     out = tmp_path / "run"
-    args = run_args("G0", out, model="Composer 2.5", reps=1,
+    args = run_args("G0", out, model="Cursor Agent", reps=1,
                     env_file=str(env), budget_file=str(tmp_path / "budget.json"))
     rc = cli.cmd_run(args, oracle_factory=lambda t, term: FakeOracle(True))
     assert rc == 0
     result = json.loads(out.joinpath(*CELL, "result.json").read_text())
-    assert result["model"] == "Composer 2.5"
-    assert result["model_id"] == "composer-2.5"
+    assert result["model"] == "Cursor Agent"
+    assert result["model_id"] == "cursor-agent"
     assert result["calls"][0]["stage"] == "generate"
     # The key value never reaches an artifact.
     for path in out.rglob("*"):

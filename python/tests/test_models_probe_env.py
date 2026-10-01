@@ -28,10 +28,10 @@ def test_dry_run_env_file_reports_key_presence(tmp_path, monkeypatch, capsys):
     document = json.loads(captured.out)
     by_id = {m["model_id"]: m for m in document["models"]}
     assert by_id["gpt-6-luna"]["api_key_present"] is True
-    # Round 9e: Composer 2.5 (Cursor) is the fourth experimental model; its key
+    # Round 9e: Cursor Agent is the fourth experimental model; its key
     # is CURSOR_API_KEY, absent here.
-    assert by_id["composer-2.5"]["channel"] == "cursor"
-    assert by_id["composer-2.5"]["api_key_present"] is False
+    assert by_id["cursor-agent"]["channel"] == "cursor"
+    assert by_id["cursor-agent"]["api_key_present"] is False
     assert by_id["deepseek-flash"]["api_key_present"] is False
 
     # Kimi is out of the experimental set but still probeable explicitly; it is
@@ -73,9 +73,9 @@ def test_probe_run_records_effort_and_no_key(tmp_path, monkeypatch):
     assert gpt["reasoning_tokens_low"] == 10
     assert gpt["reasoning_tokens_medium"] == 20
     assert gpt["thinking_accepted"] is True
-    # Composer 2.5 (cursor) has no reasoning_effort (round 9e): no effort
+    # Cursor Agent (cursor) has no reasoning_effort (round 9e): no effort
     # variants, but the default probe still observes reasoning.
-    composer = by_id["composer-2.5"]
+    composer = by_id["cursor-agent"]
     assert composer["reasoning_tokens_low"] is None
     assert composer["reasoning_tokens_high"] is None
     assert composer["reasoning_tokens_medium"] is None

@@ -2,17 +2,17 @@
 
 > This file is generated from `protocol.json` by `python -m skelnet protocol render`. Do not edit it by hand.
 
-- `protocol.json` sha256: `772bfe409a2e249e0e889f7273ecb76de73c24f97bcf64f470b6c5c6b6aba16f`
+- `protocol.json` sha256: `7a881ea57e19019b960c7df7c49bd43410a27174ce320e4a0b14212c1959ca60`
 - schema: `skelnet-protocol-v1`
-- frozen at commit: `3d12068`
-- frozen at: `2026-10-01T13:09:22Z`
+- frozen at commit: `7fda511`
+- frozen at: `2026-10-01T13:36:03Z`
 
 ## Models
 
 | display name | model id | channel | thinking | reasoning effort | stream | temperature |
 | --- | --- | --- | --- | --- | --- | --- |
 | GPT 6 Luna | `gpt-6-luna` | `opencode-go` | yes | medium | no | provider_default |
-| Composer 2.5 | `composer-2.5` | `cursor` | no | -- | no | provider_default |
+| Cursor Agent | `cursor-agent` | `cursor` | no | -- | no | provider_default |
 | DeepSeek Flash | `deepseek-flash` | `deepseek-direct` | yes | -- | no | provider_default |
 | Qwen | `qwen3.8-flash` | `dashscope-direct` | yes | -- | yes | provider_default |
 
@@ -115,7 +115,7 @@ Secondary groups: DYNAMIC_M.
 
 - tasks: lock-order/abba_2lock, condvar/lost_wakeup_notify_before_wait, atomic-data/atomic_lost_update, lock-order/partial_deadlock_bystander
 - groups: G0, SKEL, CIR, REFINE, STATIC, DYNAMIC
-- models: gpt-6-luna, composer-2.5, deepseek-flash, qwen3.8-flash
+- models: gpt-6-luna, cursor-agent, deepseek-flash, qwen3.8-flash
 - reps: 1
 - expected paired units: 16
 - ledger limits: {"max_requests": 800, "max_tokens": 15000000}
@@ -125,7 +125,7 @@ Secondary groups: DYNAMIC_M.
 
 - tasks: (experiment plan)
 - groups: G0, SKEL, CIR, REFINE, STATIC, DYNAMIC
-- models: gpt-6-luna, composer-2.5, deepseek-flash, qwen3.8-flash
+- models: gpt-6-luna, cursor-agent, deepseek-flash, qwen3.8-flash
 - reps: 3
 - expected paired units: 288
 - ledger limits: --
@@ -135,7 +135,7 @@ Secondary groups: DYNAMIC_M.
 
 - tasks: (experiment plan)
 - groups: G0, SKEL, CIR, REFINE, STATIC, DYNAMIC, DYNAMIC_M
-- models: gpt-6-luna, composer-2.5, deepseek-flash, qwen3.8-flash
+- models: gpt-6-luna, cursor-agent, deepseek-flash, qwen3.8-flash
 - reps: None
 - expected paired units: 528
 - ledger limits: --
@@ -145,7 +145,7 @@ Secondary groups: DYNAMIC_M.
 
 - tasks: (experiment plan)
 - groups: G0, SKEL, CIR, REFINE, STATIC, DYNAMIC, DYNAMIC_M
-- models: gpt-6-luna, composer-2.5, deepseek-flash, qwen3.8-flash
+- models: gpt-6-luna, cursor-agent, deepseek-flash, qwen3.8-flash
 - reps: None
 - expected paired units: 880
 - ledger limits: --

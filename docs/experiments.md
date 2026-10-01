@@ -48,16 +48,18 @@ concatenated `system_sha256`.
 ## Model parameters
 
 The four experimental models are GPT 6 Luna (`gpt-6-luna`, OpenCode Responses,
-`OPENCODE_API_KEY`, reasoning effort `medium`), Composer 2.5 (`composer-2.5`,
+`OPENCODE_API_KEY`, reasoning effort `medium`), the Cursor Agent (`cursor-agent`,
 Cursor agent SDK, `CURSOR_API_KEY`), DeepSeek Flash (`deepseek-flash`, direct)
 and Qwen (`qwen3.8-flash`, DashScope direct). Round 9e replaced Kimi
-(`kimi-k2.7-code`, Moonshot direct) with Composer 2.5 because Kimi was too slow;
-Kimi stays available but is no longer part of the frozen model set, so a run
-that names it can still be replayed (see `experiments/DEVIATIONS.md` D-9e-1).
-Composer 2.5 runs through the Cursor **agent** SDK, not a stateless chat
+(`kimi-k2.7-code`, Moonshot direct) with the Cursor Agent because Kimi was too
+slow; Kimi stays available but is no longer part of the frozen model set, so a
+run that names it can still be replayed (see `experiments/DEVIATIONS.md`
+D-9e-1). The Cursor Agent must use the Cursor **agent** SDK, not a stateless chat
 endpoint: its context is partly unobservable and its token usage/cost is
 server-reported per agent turn, so it is not directly comparable to the
-direct-API models. Every arm is still scored by the same oracle.
+direct-API models. The experiment therefore calls it "Cursor Agent" rather than
+reusing the SDK's internal model selector. Every arm is still scored by the same
+oracle.
 
 GPT, DeepSeek and Qwen run with thinking enabled and no temperature
 (`provider_default`); each cell is capped at 5 calls / 200k tokens; one output
@@ -77,8 +79,8 @@ is present (never the value); `--env-file` selects the dotenv file to load
 A real probe also sends one nontrivial concurrency question
 (`PROBE_NONTRIVIAL_USER`, correct answer `YES`) at the model's default effort,
 and, for models that take a reasoning effort (GPT 6 Luna), once more at
-`low`. Composer 2.5 has no `reasoning_effort`, so it runs the nontrivial prompt
-only once. The record stores `reasoning_tokens_nontrivial`,
+`low`. The Cursor Agent has no `reasoning_effort`, so it runs the nontrivial
+prompt only once. The record stores `reasoning_tokens_nontrivial`,
 `nontrivial_answer_ok`, `nontrivial_output_tokens`, and
 `reasoning_tokens_nontrivial_low` when the low call ran. GPT's Responses
 channel also stores `responses_reasoning_echo` (the `reasoning` object echoed
