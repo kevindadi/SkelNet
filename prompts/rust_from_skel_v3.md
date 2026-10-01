@@ -22,6 +22,7 @@ Write one std-only single-file Rust program that implements the skeleton.
 
 - Only the standard library and the already-linked `concir_sync` crate. No other
   crates, no `unsafe`, no `static mut`, no `#![feature]`, no `extern crate`.
+  No `async`, `select`, or `rwlock` (the skeleton DSL has no such constructs).
 - Do not use `sleep`, `yield_now`, `process::exit`, `process::abort`, timing, or
   environment-dependent behavior to dodge a concurrency problem. Coordination
   must come from synchronization primitives.

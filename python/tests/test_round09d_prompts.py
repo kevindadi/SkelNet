@@ -32,6 +32,8 @@ RULES = {
     "no_extern_crate": (r"extern crate", ("SKEL", "CIR")),
     "no_process_exit_abort": (r"process::exit", ("SKEL", "CIR")),
     "busy_wait": (r"busy[- ]wait", ("SKEL", "CIR")),
+    # F3: v2's "no async/select/rwlock" rule, restored in the SKEL prompt only.
+    "no_async_select_rwlock": (r"async.{0,40}select.{0,40}rwlock", ("SKEL",)),
 }
 
 RUNTIME_V1 = "rust_runtime_api_v1.md"
