@@ -1,0 +1,11 @@
+{
+  "defect_family": "pipeline",
+  "resources": [
+    "main::m",
+    "main::ch1",
+    "main::ch2"
+  ],
+  "statements": [],
+  "expected_outcome_fixed": "PASS",
+  "provenance": "new (SkelNet R7b)"
+}

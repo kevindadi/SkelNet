@@ -1,0 +1,25 @@
+skeleton dining_5_ordered;
+
+mutex f0;
+mutex f1;
+mutex f2;
+mutex f3;
+mutex f4;
+
+@R1 @R6 @R8 @R9
+fn main() { scope { spawn p1(); spawn p2(); spawn p3(); spawn p4(); spawn p5(); } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn p1() { lock f0 { lock f1 { } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn p2() { lock f1 { lock f2 { } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn p3() { lock f2 { lock f3 { } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn p4() { lock f3 { lock f4 { } } }
+
+@R2 @R3 @R4 @R5 @R7 @R8 @R9
+fn p5() { lock f0 { lock f4 { } } }

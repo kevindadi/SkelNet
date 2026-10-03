@@ -1,0 +1,13 @@
+{
+  "defect_family": "philosophers",
+  "resources": [
+    "main::f0",
+    "main::f1",
+    "main::f2",
+    "main::f3",
+    "main::f4"
+  ],
+  "statements": [],
+  "expected_outcome_fixed": "PASS",
+  "provenance": "new (SkelNet R7b)"
+}

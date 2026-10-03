@@ -1,0 +1,21 @@
+skeleton bounded_buffer_semaphores;
+
+mutex m;
+semaphore slots = 1;
+semaphore items = 0;
+shared count: Int[0..=1] = 0 guarded_by m;
+
+@R1 @R2 @R3 @R5 @R7 @R8 @R9
+fn main() { scope { spawn p1(); spawn p2(); spawn c1(); spawn c2(); } }
+
+@R2 @R3 @R5 @R7 @R8 @R9
+fn p1() { slots.take(); lock m { count = count + 1; } items.post(); }
+
+@R2 @R3 @R5 @R7 @R8 @R9
+fn p2() { slots.take(); lock m { count = count + 1; } items.post(); }
+
+@R2 @R4 @R6 @R7 @R8 @R9
+fn c1() { items.take(); lock m { count = count - 1; } slots.post(); }
+
+@R2 @R4 @R6 @R7 @R8 @R9
+fn c2() { items.take(); lock m { count = count - 1; } slots.post(); }

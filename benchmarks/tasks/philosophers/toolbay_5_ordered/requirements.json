@@ -1,0 +1,150 @@
+{
+  "task": "philosophers/toolbay_5_ordered",
+  "requirements": [
+    "A main task starts five robot roles that run at the same time.",
+    "The five robots share five tool bays, and no bay may be occupied by more than one robot at a time.",
+    "Each robot must occupy both of the bays it needs at the same time while it works.",
+    "A robot that finds a bay busy must wait for it to become free and then continue.",
+    "Every robot must claim its two bays in one global order that is the same for all five robots.",
+    "The main task starts all five robots and only finishes after all five have finished.",
+    "Every robot must release both bays before it finishes.",
+    "It must never be possible for the robots to leave each other waiting forever, each holding one bay and needing another.",
+    "Every possible schedule or interleaving of the five robots must terminate with all five finished.",
+    "The program must print exactly the line `DONE sum=15` and then exit. The value is the sum of the ids the five robots return, not a constant written into the print."
+  ],
+  "unverifiable": [
+    1,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R4",
+        "R5",
+        "R7",
+        "R8",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ],
+      [
+        "R1",
+        "R6",
+        "R9"
+      ]
+    ]
+  },
+  "terminal": "DONE sum=15",
+  "entities": {
+    "roles": [
+      "r1",
+      "r2",
+      "r3",
+      "r4",
+      "r5"
+    ],
+    "resources": [
+      {
+        "name": "bay0",
+        "kind": "lock"
+      },
+      {
+        "name": "bay1",
+        "kind": "lock"
+      },
+      {
+        "name": "bay2",
+        "kind": "lock"
+      },
+      {
+        "name": "bay3",
+        "kind": "lock"
+      },
+      {
+        "name": "bay4",
+        "kind": "lock"
+      }
+    ]
+  },
+  "contract": "philosophers/toolbay_5_ordered/contract.json",
+  "terminal_v2": "DONE sum=15",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "origin": "disguised",
+  "disguise_of": "philosophers/dining_5_ordered",
+  "protocol_params": {
+    "robots": 5
+  },
+  "tier": "L3",
+  "tier_source": "computed",
+  "tier_metrics": {
+    "threads": 5,
+    "thread_funcs": [
+      "main::r1",
+      "main::r2",
+      "main::r3",
+      "main::r4",
+      "main::r5"
+    ],
+    "sync_resources": 5,
+    "unused_resources": [],
+    "mechanisms": [
+      "Mutex"
+    ],
+    "mechanism_count": 1,
+    "parameterized": true,
+    "states": 13654,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L3",
+    "nearest_tier": "L3",
+    "violations": []
+  }
+}

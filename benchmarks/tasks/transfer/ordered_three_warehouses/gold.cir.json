@@ -1,0 +1,252 @@
+{
+  "program": "ordered_three_warehouses",
+  "version": "3.5.0",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "north",
+          "south",
+          "west",
+          "stock_north",
+          "stock_south",
+          "stock_west"
+        ],
+        "functions": [
+          "main",
+          "ship_ns",
+          "ship_sw",
+          "ship_wn"
+        ],
+        "types": []
+      },
+      "requires": {
+        "resources": [],
+        "functions": [],
+        "types": []
+      },
+      "resources": [
+        {
+          "name": "north",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "south",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "west",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "stock_north",
+          "kind": "var",
+          "type": "Var",
+          "base": {
+            "Int": [
+              0,
+              3
+            ]
+          },
+          "init": 1
+        },
+        {
+          "name": "stock_south",
+          "kind": "var",
+          "type": "Var",
+          "base": {
+            "Int": [
+              0,
+              3
+            ]
+          },
+          "init": 1
+        },
+        {
+          "name": "stock_west",
+          "kind": "var",
+          "type": "Var",
+          "base": {
+            "Int": [
+              0,
+              3
+            ]
+          },
+          "init": 1
+        }
+      ],
+      "protection": [
+        {
+          "var": "stock_north",
+          "lock": "north"
+        },
+        {
+          "var": "stock_south",
+          "lock": "south"
+        },
+        {
+          "var": "stock_west",
+          "lock": "west"
+        }
+      ],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "scope",
+              "funcs": [
+                "main::ship_ns",
+                "main::ship_sw",
+                "main::ship_wn"
+              ]
+            },
+            {
+              "sid": "s2",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "ship_ns",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "main::north"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "main::south"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "main::stock_north",
+              "expr": "stock_north - 1"
+            },
+            {
+              "sid": "s4",
+              "kind": "write_shared",
+              "resource": "main::stock_south",
+              "expr": "stock_south + 1"
+            },
+            {
+              "sid": "s5",
+              "kind": "mutex_unlock",
+              "resource": "main::south"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::north"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "ship_sw",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "main::south"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "main::west"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "main::stock_south",
+              "expr": "stock_south - 1"
+            },
+            {
+              "sid": "s4",
+              "kind": "write_shared",
+              "resource": "main::stock_west",
+              "expr": "stock_west + 1"
+            },
+            {
+              "sid": "s5",
+              "kind": "mutex_unlock",
+              "resource": "main::west"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::south"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "ship_wn",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "main::north"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "main::west"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "main::stock_west",
+              "expr": "stock_west - 1"
+            },
+            {
+              "sid": "s4",
+              "kind": "write_shared",
+              "resource": "main::stock_north",
+              "expr": "stock_north + 1"
+            },
+            {
+              "sid": "s5",
+              "kind": "mutex_unlock",
+              "resource": "main::west"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::north"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "entry": "main::main"
+}

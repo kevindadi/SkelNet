@@ -1,0 +1,126 @@
+{
+  "task": "transfer/ordered_three_warehouses",
+  "requirements": [
+    "A main task starts three shipping roles that run at the same time.",
+    "There are three warehouses, each with its own dock lock, and a warehouse's stock may not be read or changed except while its dock lock is held.",
+    "The first role ships one crate from the first warehouse to the second, the second role ships one crate from the second warehouse to the third, and the third role ships one crate from the third warehouse to the first.",
+    "A role must hold both the source warehouse's dock lock and the destination warehouse's dock lock at the same time while it ships its crate.",
+    "The total number of crates held across the three warehouses is always three.",
+    "In every state each warehouse holds at least zero crates and at most three crates.",
+    "The main task starts all three roles and only finishes after all three have finished.",
+    "Every role must finish eventually, whatever order the roles run in.",
+    "Every possible schedule or interleaving of the roles must terminate.",
+    "The program must print exactly the line `DONE crates=3` and then exit. The value is the sum of the three warehouse stock counts at the end, not a constant written into the print."
+  ],
+  "unverifiable": [
+    1,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R4",
+        "R8",
+        "R9"
+      ],
+      [
+        "R2",
+        "R5",
+        "R6"
+      ],
+      [
+        "R3",
+        "R7",
+        "R8"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R7",
+        "R8"
+      ],
+      [
+        "R1",
+        "R7",
+        "R8"
+      ],
+      [
+        "R1",
+        "R7",
+        "R8"
+      ],
+      [
+        "R2",
+        "R3",
+        "R4"
+      ],
+      [
+        "R2",
+        "R3",
+        "R4"
+      ],
+      [
+        "R2",
+        "R3",
+        "R4"
+      ]
+    ]
+  },
+  "terminal": "DONE crates=3",
+  "entities": {
+    "roles": [
+      "ship_ns",
+      "ship_sw",
+      "ship_wn"
+    ],
+    "resources": [
+      {
+        "name": "north",
+        "kind": "lock"
+      },
+      {
+        "name": "south",
+        "kind": "lock"
+      },
+      {
+        "name": "west",
+        "kind": "lock"
+      }
+    ]
+  },
+  "contract": "transfer/ordered_three_warehouses/contract.json",
+  "terminal_v2": "DONE crates=3",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "origin": "disguised",
+  "disguise_of": "transfer/ordered_three_accounts",
+  "protocol_params": {
+    "warehouses": 3
+  },
+  "tier": "L2",
+  "tier_source": "computed",
+  "tier_metrics": {
+    "threads": 3,
+    "thread_funcs": [
+      "main::ship_ns",
+      "main::ship_sw",
+      "main::ship_wn"
+    ],
+    "sync_resources": 3,
+    "unused_resources": [],
+    "mechanisms": [
+      "Mutex"
+    ],
+    "mechanism_count": 1,
+    "parameterized": true,
+    "states": 444,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L2",
+    "nearest_tier": "L2",
+    "violations": []
+  }
+}

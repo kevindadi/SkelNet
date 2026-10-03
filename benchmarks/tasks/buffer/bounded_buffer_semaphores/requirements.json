@@ -1,0 +1,107 @@
+{
+  "task": "buffer/bounded_buffer_semaphores",
+  "requirements": [
+    "A main task starts two producer roles and two consumer roles that run at the same time.",
+    "The producers and the consumers share one bounded buffer that can hold at most one item, and every access to the buffer is guarded by one mutex.",
+    "A producer must take a free-slot permit before it puts its item, and must put its item only when there is room.",
+    "A consumer must take an available-item permit before it takes an item, and must take an item only when one is present.",
+    "A producer must signal that an item is available after it has put an item, and must not hold the mutex while it signals.",
+    "A consumer must signal that a slot is free after it has taken an item, and must not hold the mutex while it signals.",
+    "Every item that is put must eventually be taken, and every schedule must terminate with all four roles finished.",
+    "In every state the buffer holds at most one item.",
+    "The two items are each taken exactly once.",
+    "The program must print exactly the line `DONE sum=11` and then exit. The value is the sum of the two item values that the consumers actually took, not a constant written into the print."
+  ],
+  "unverifiable": [
+    1,
+    10
+  ],
+  "clauses": {
+    "properties": [
+      [
+        "R1",
+        "R3",
+        "R4",
+        "R7",
+        "R9"
+      ],
+      [
+        "R2",
+        "R8"
+      ]
+    ],
+    "preserved": [
+      [
+        "R1",
+        "R7"
+      ],
+      [
+        "R1",
+        "R7"
+      ],
+      [
+        "R1",
+        "R9"
+      ],
+      [
+        "R1",
+        "R9"
+      ]
+    ]
+  },
+  "terminal": "DONE sum=11",
+  "entities": {
+    "roles": [
+      "p1",
+      "p2",
+      "c1",
+      "c2"
+    ],
+    "resources": [
+      {
+        "name": "m",
+        "kind": "lock"
+      },
+      {
+        "name": "slots",
+        "kind": "semaphore"
+      },
+      {
+        "name": "items",
+        "kind": "semaphore"
+      }
+    ]
+  },
+  "contract": "buffer/bounded_buffer_semaphores/contract.json",
+  "terminal_v2": "DONE sum=11",
+  "hint_variants": [
+    "h0",
+    "h1"
+  ],
+  "origin": "classic",
+  "tier": "L2",
+  "tier_source": "computed",
+  "tier_metrics": {
+    "threads": 4,
+    "thread_funcs": [
+      "main::c1",
+      "main::c2",
+      "main::p1",
+      "main::p2"
+    ],
+    "sync_resources": 3,
+    "unused_resources": [],
+    "mechanisms": [
+      "Mutex",
+      "Semaphore"
+    ],
+    "mechanism_count": 2,
+    "parameterized": false,
+    "states": 559,
+    "states_source": "explore",
+    "states_complete": true,
+    "computed_tier": "L2",
+    "nearest_tier": "L2",
+    "violations": []
+  }
+}

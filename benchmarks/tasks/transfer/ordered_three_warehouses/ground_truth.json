@@ -1,0 +1,11 @@
+{
+  "defect_family": "lock_order",
+  "resources": [
+    "main::north",
+    "main::south",
+    "main::west"
+  ],
+  "statements": [],
+  "expected_outcome_fixed": "PASS",
+  "provenance": "new (SkelNet R7b)"
+}

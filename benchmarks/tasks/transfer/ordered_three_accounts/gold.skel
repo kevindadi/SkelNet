@@ -1,0 +1,20 @@
+skeleton ordered_three_accounts;
+
+mutex a;
+mutex b;
+mutex c;
+shared bal_a: Int[0..=3] = 1 guarded_by a;
+shared bal_b: Int[0..=3] = 1 guarded_by b;
+shared bal_c: Int[0..=3] = 1 guarded_by c;
+
+@R1 @R2 @R3 @R5 @R7 @R8 @R9
+fn main() { scope { spawn ab(); spawn bc(); spawn ca(); } }
+
+@R2 @R3 @R4 @R5 @R6 @R7 @R8 @R9
+fn ab() { lock a { lock b { bal_a = bal_a - 1; bal_b = bal_b + 1; } } }
+
+@R2 @R3 @R4 @R5 @R6 @R7 @R8 @R9
+fn bc() { lock b { lock c { bal_b = bal_b - 1; bal_c = bal_c + 1; } } }
+
+@R2 @R3 @R4 @R5 @R6 @R7 @R8 @R9
+fn ca() { lock a { lock c { bal_c = bal_c - 1; bal_a = bal_a + 1; } } }

@@ -1,0 +1,18 @@
+skeleton graceful_workers;
+
+mutex m;
+channel jobs: Int cap 1;
+semaphore stop = 0;
+shared finished: Int = 0 guarded_by m;
+
+@R1 @R2 @R7
+fn main() { scope { spawn producer(); spawn w1(); spawn w2(); } }
+
+@R2 @R3 @R4 @R5 @R8
+fn producer() { jobs.send(1); jobs.send(2); jobs.send(3); jobs.send(4); stop.post(); stop.post(); lock m { finished = finished + 1; } }
+
+@R2 @R4 @R5 @R6 @R8
+fn w1() { jobs.recv(); jobs.recv(); stop.take(); lock m { finished = finished + 1; } }
+
+@R2 @R4 @R5 @R6 @R8
+fn w2() { jobs.recv(); jobs.recv(); stop.take(); lock m { finished = finished + 1; } }

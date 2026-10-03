@@ -1,0 +1,236 @@
+{
+  "program": "print_queue_two_printers",
+  "version": "3.5.0",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "ledger",
+          "queue",
+          "halt",
+          "printed"
+        ],
+        "functions": [
+          "main",
+          "spooler",
+          "printer1",
+          "printer2"
+        ],
+        "types": []
+      },
+      "requires": {
+        "resources": [],
+        "functions": [],
+        "types": []
+      },
+      "resources": [
+        {
+          "name": "ledger",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "queue",
+          "kind": "sync",
+          "type": "Channel",
+          "mode": "Sync",
+          "base": "Int",
+          "capacity": 1
+        },
+        {
+          "name": "halt",
+          "kind": "sync",
+          "type": "Semaphore",
+          "mode": "Sync",
+          "count": 0
+        },
+        {
+          "name": "printed",
+          "kind": "var",
+          "type": "Var",
+          "base": "Int",
+          "init": 0
+        }
+      ],
+      "protection": [
+        {
+          "var": "printed",
+          "lock": "ledger"
+        }
+      ],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "scope",
+              "funcs": [
+                "main::spooler",
+                "main::printer1",
+                "main::printer2"
+              ]
+            },
+            {
+              "sid": "s2",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "spooler",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "channel_send",
+              "channel": "main::queue",
+              "value": "1"
+            },
+            {
+              "sid": "s2",
+              "kind": "channel_send",
+              "channel": "main::queue",
+              "value": "2"
+            },
+            {
+              "sid": "s3",
+              "kind": "channel_send",
+              "channel": "main::queue",
+              "value": "3"
+            },
+            {
+              "sid": "s4",
+              "kind": "channel_send",
+              "channel": "main::queue",
+              "value": "4"
+            },
+            {
+              "sid": "s5",
+              "kind": "semaphore_release",
+              "resource": "main::halt"
+            },
+            {
+              "sid": "s6",
+              "kind": "semaphore_release",
+              "resource": "main::halt"
+            },
+            {
+              "sid": "s7",
+              "kind": "mutex_lock",
+              "resource": "main::ledger"
+            },
+            {
+              "sid": "s8",
+              "kind": "write_shared",
+              "resource": "main::printed",
+              "expr": "printed + 1"
+            },
+            {
+              "sid": "s9",
+              "kind": "mutex_unlock",
+              "resource": "main::ledger"
+            },
+            {
+              "sid": "s10",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "printer1",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "channel_recv",
+              "channel": "main::queue",
+              "dst": "_"
+            },
+            {
+              "sid": "s2",
+              "kind": "channel_recv",
+              "channel": "main::queue",
+              "dst": "_"
+            },
+            {
+              "sid": "s3",
+              "kind": "semaphore_acquire",
+              "resource": "main::halt"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_lock",
+              "resource": "main::ledger"
+            },
+            {
+              "sid": "s5",
+              "kind": "write_shared",
+              "resource": "main::printed",
+              "expr": "printed + 1"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::ledger"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "printer2",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "channel_recv",
+              "channel": "main::queue",
+              "dst": "_"
+            },
+            {
+              "sid": "s2",
+              "kind": "channel_recv",
+              "channel": "main::queue",
+              "dst": "_"
+            },
+            {
+              "sid": "s3",
+              "kind": "semaphore_acquire",
+              "resource": "main::halt"
+            },
+            {
+              "sid": "s4",
+              "kind": "mutex_lock",
+              "resource": "main::ledger"
+            },
+            {
+              "sid": "s5",
+              "kind": "write_shared",
+              "resource": "main::printed",
+              "expr": "printed + 1"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::ledger"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "entry": "main::main"
+}

@@ -1,0 +1,252 @@
+{
+  "program": "ordered_three_accounts",
+  "version": "3.5.0",
+  "modules": [
+    {
+      "name": "main",
+      "provides": {
+        "resources": [
+          "a",
+          "b",
+          "c",
+          "bal_a",
+          "bal_b",
+          "bal_c"
+        ],
+        "functions": [
+          "main",
+          "ab",
+          "bc",
+          "ca"
+        ],
+        "types": []
+      },
+      "requires": {
+        "resources": [],
+        "functions": [],
+        "types": []
+      },
+      "resources": [
+        {
+          "name": "a",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "b",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "c",
+          "kind": "sync",
+          "type": "Mutex",
+          "mode": "Sync"
+        },
+        {
+          "name": "bal_a",
+          "kind": "var",
+          "type": "Var",
+          "base": {
+            "Int": [
+              0,
+              3
+            ]
+          },
+          "init": 1
+        },
+        {
+          "name": "bal_b",
+          "kind": "var",
+          "type": "Var",
+          "base": {
+            "Int": [
+              0,
+              3
+            ]
+          },
+          "init": 1
+        },
+        {
+          "name": "bal_c",
+          "kind": "var",
+          "type": "Var",
+          "base": {
+            "Int": [
+              0,
+              3
+            ]
+          },
+          "init": 1
+        }
+      ],
+      "protection": [
+        {
+          "var": "bal_a",
+          "lock": "a"
+        },
+        {
+          "var": "bal_b",
+          "lock": "b"
+        },
+        {
+          "var": "bal_c",
+          "lock": "c"
+        }
+      ],
+      "functions": [
+        {
+          "name": "main",
+          "kind": "normal",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "scope",
+              "funcs": [
+                "main::ab",
+                "main::bc",
+                "main::ca"
+              ]
+            },
+            {
+              "sid": "s2",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "ab",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "main::a"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "main::b"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "main::bal_a",
+              "expr": "bal_a - 1"
+            },
+            {
+              "sid": "s4",
+              "kind": "write_shared",
+              "resource": "main::bal_b",
+              "expr": "bal_b + 1"
+            },
+            {
+              "sid": "s5",
+              "kind": "mutex_unlock",
+              "resource": "main::b"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::a"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "bc",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "main::b"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "main::c"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "main::bal_b",
+              "expr": "bal_b - 1"
+            },
+            {
+              "sid": "s4",
+              "kind": "write_shared",
+              "resource": "main::bal_c",
+              "expr": "bal_c + 1"
+            },
+            {
+              "sid": "s5",
+              "kind": "mutex_unlock",
+              "resource": "main::c"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::b"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        },
+        {
+          "name": "ca",
+          "kind": "normal",
+          "form": "closure",
+          "body": [
+            {
+              "sid": "s1",
+              "kind": "mutex_lock",
+              "resource": "main::a"
+            },
+            {
+              "sid": "s2",
+              "kind": "mutex_lock",
+              "resource": "main::c"
+            },
+            {
+              "sid": "s3",
+              "kind": "write_shared",
+              "resource": "main::bal_c",
+              "expr": "bal_c - 1"
+            },
+            {
+              "sid": "s4",
+              "kind": "write_shared",
+              "resource": "main::bal_a",
+              "expr": "bal_a + 1"
+            },
+            {
+              "sid": "s5",
+              "kind": "mutex_unlock",
+              "resource": "main::c"
+            },
+            {
+              "sid": "s6",
+              "kind": "mutex_unlock",
+              "resource": "main::a"
+            },
+            {
+              "sid": "s7",
+              "kind": "return"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "entry": "main::main"
+}
